@@ -12,5 +12,5 @@
     "@unwatched/engine": "workspace:*",
     "@unwatched/protocol": "workspace:*"
   },
-  "devDependencies": { "tsx": "^4.23.0", "typescript": "^5.8.0", "@types/node": "^22.15.0" }
+  "devDependencies": { "tsx": "^4.23.0", "typescript": "^7.0.2", "@types/node": "^26.5.0" }
 }

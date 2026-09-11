@@ -11,5 +11,5 @@
     "@unwatched/protocol": "workspace:*",
     "@supabase/supabase-js": "^2.60.0"
   },
-  "devDependencies": { "typescript": "^5.8.0", "@types/node": "^22.15.0" }
+  "devDependencies": { "typescript": "^7.0.2", "@types/node": "^26.5.0" }
 }

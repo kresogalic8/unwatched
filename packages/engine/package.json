@@ -10,5 +10,5 @@
     "test": "vitest run"
   },
   "dependencies": { "@unwatched/protocol": "workspace:*", "zod": "^4.0.0" },
-  "devDependencies": { "typescript": "^5.8.0", "@types/node": "^22.15.0", "vitest": "^5.0.0" }
+  "devDependencies": { "typescript": "^7.0.2", "@types/node": "^26.5.0", "vitest": "^5.0.0" }
 }
