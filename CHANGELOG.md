@@ -8,6 +8,10 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Changed
 
+- What the island keeps back from the morning boat is the shelf that food keeps to, so a surplus of bread or fish goes to the mainland for coins instead of going stale on the shelf overnight.
+- An owner with no plan gets the morning record as the town kept it, without a mind paid to write it up. The plan already said so.
+- The hill fields grow grain and no longer sell apples nobody ever grew or carted there. The orchard is the apple shelf.
+
 ### Fixed
 
 ## [0.2.1] - 2026-09-12

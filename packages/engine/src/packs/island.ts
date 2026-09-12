@@ -40,7 +40,7 @@ export const ISLAND: WorldPack = {
     // Hill
     P("hill", "the hill road", "public", "hill", "well", 2000, 1000, ["market", "chapel", "mill", "fields", "orchard", "pinewood"]),
     P("mill", "the mill", "workplace", "hill", "mill", 2180, 640, ["hill", "fields"], { stock: { flour: 30, grain: 12 } }),
-    P("fields", "the hill fields", "workplace", "hill", "field", 2380, 1000, ["hill", "mill", "orchard"], { sells: [{ item: "apples", base: 1 }] , stock: { grain: 90 } }),
+    P("fields", "the hill fields", "workplace", "hill", "field", 2380, 1000, ["hill", "mill", "orchard"], { stock: { grain: 90 } }),
     P("orchard", "the old orchard", "workplace", "hill", "orchard", 2360, 1320, ["fields", "hill", "shore"], { sells: [{ item: "apples", base: 1 }] , stock: { apples: 20 } }),
     // North shore
     P("coast", "the coast road", "public", "north shore", "searocks", 520, 620, ["harbor", "cove", "shore"]),
@@ -98,7 +98,7 @@ export const ISLAND: WorldPack = {
   ],
   // the morning boat takes the surplus to the mainland; this is where the island's coins come from
   exports: [
-    { item: "grain", price: 1, keep: 60 }, { item: "flour", price: 2, keep: 24 }, { item: "bread", price: 1, keep: 30 }, { item: "fish", price: 1, keep: 20 }, { item: "apples", price: 1, keep: 12 },
+    { item: "grain", price: 1, keep: 60 }, { item: "flour", price: 2, keep: 24 }, { item: "bread", price: 1, keep: 12 }, { item: "fish", price: 1, keep: 12 }, { item: "apples", price: 1, keep: 12 },
     { item: "lavender", price: 3, keep: 0 }, { item: "timber", price: 2, keep: 12 }, { item: "planks", price: 3, keep: 24 }, { item: "nails", price: 2, keep: 8 }, { item: "stone", price: 2, keep: 8 },
   ],
 };

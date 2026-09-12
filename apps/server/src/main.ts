@@ -298,6 +298,7 @@ app.get("/api/agents/:id", async (c) => {
 /** The written digest is one model call; it is remembered for the sim hour so a page refresh costs nothing. */
 const digestCache = new Map<string, { key: string; text: string; headline: string }>();
 async function writtenDigest(a: AgentState, since: number): Promise<{ text: string; headline: string } | null> {
+  if (a.owner && billing.wallet(a.owner).plan === "none") return null; // no plan, no mind: the owner still gets the record, written by nobody
   const key = `${town.day}:${town.hour}:${since}`;
   const hit = digestCache.get(a.id); if (hit && hit.key === key) return hit;
   const ctx = town.digestContext(a.id, since); if (!ctx) return null;
