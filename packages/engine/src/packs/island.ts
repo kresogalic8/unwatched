@@ -23,13 +23,13 @@ export const ISLAND: WorldPack = {
   places: [
     // Harbor
     P("harbor", "the harbor", "harbor", "harbor", "harbor-office", 560, 1180, ["inn", "market", "chandlery", "boatshed", "fishhouse", "coast"]),
-    P("inn", "the harbor inn", "inn", "harbor", "inn", 820, 1020, ["harbor", "market"], { sells: [{ item: "soup", base: 2 }, { item: "bread", base: 1 }], beds: { price: 4, capacity: 6 } , stock: { bread: 6 } }),
+    P("inn", "the harbor inn", "inn", "harbor", "inn", 820, 1020, ["harbor", "market"], { sells: [{ item: "soup", base: 2 }, { item: "bread", base: 1 }], beds: { price: 4, capacity: 6 } , stock: { bread: 6, soup: 8, fish: 4 } }),
     P("chandlery", "the chandlery", "shop", "harbor", "chandlery", 880, 1280, ["harbor", "market"], { sells: [{ item: "rope", base: 3 }, { item: "lamp oil", base: 2 }], beds: { price: 3, capacity: 1 } }),
     P("boatshed", "the boat shed", "home", "harbor", "boatshed", 420, 1400, ["harbor"], { beds: { price: 0, capacity: 8 } }),
-    P("fishhouse", "the fish house", "workplace", "harbor", "fishhouse", 300, 1000, ["harbor"], { sells: [{ item: "fish", base: 1 }] , stock: { fish: 10 } }),
+    P("fishhouse", "the fish house", "workplace", "harbor", "fishhouse", 300, 1000, ["harbor"], { sells: [{ item: "fish", base: 1 }] , stock: { fish: 12 } }),
     // Old town
-    P("market", "the market square", "market", "old town", "stall", 1180, 1100, ["harbor", "inn", "bakery", "chandlery", "tavern", "council", "hill", "chapel", "smithy", "lane"], { sells: [{ item: "bread", base: 1 }, { item: "apples", base: 1 }, { item: "fish", base: 1 }] , stock: { bread: 8, apples: 6, fish: 6 } }),
-    P("bakery", "Ilić's bakery", "workplace", "old town", "bakery", 1160, 840, ["market"], { sells: [{ item: "bread", base: 1 }] , stock: { bread: 16, flour: 24 } }),
+    P("market", "the market square", "market", "old town", "stall", 1180, 1100, ["harbor", "inn", "bakery", "chandlery", "tavern", "council", "hill", "chapel", "smithy", "lane"], { sells: [{ item: "bread", base: 1 }, { item: "apples", base: 1 }, { item: "fish", base: 1 }] , stock: { bread: 10, apples: 8, fish: 8 } }),
+    P("bakery", "Ilić's bakery", "workplace", "old town", "bakery", 1160, 840, ["market"], { sells: [{ item: "bread", base: 1 }] , stock: { bread: 20, flour: 24 } }),
     P("tavern", "the tavern", "public", "old town", "tavern", 1500, 1200, ["market", "lane"], { sells: [{ item: "drink", base: 1 }] }),
     P("council", "the council hall", "civic", "old town", "council", 1520, 880, ["market", "chapel"]),
     P("chapel", "the chapel", "public", "old town", "chapel", 1820, 760, ["council", "market", "hill"]),
@@ -79,10 +79,13 @@ export const ISLAND: WorldPack = {
     // the cash crop: lavender, six weeks of the year, all of it for the boat
     { place: "fields", makes: "lavender", qty: 4, months: [6, 7] }, { place: "orchard", makes: "lavender", qty: 2, months: [6, 7] },
     { place: "mill", makes: "flour", qty: 6, needs: { item: "grain", qty: 6 } },
-    { place: "bakery", makes: "bread", qty: 10, needs: { item: "flour", qty: 2 } },
-    { place: "fishhouse", makes: "fish", qty: 5 }, { place: "orchard", makes: "apples", qty: 5, seasons: ["summer", "autumn"] }, { place: "orchard", makes: "apples", qty: 1, seasons: ["spring"] },
+    { place: "bakery", makes: "bread", qty: 24, needs: { item: "flour", qty: 2 } },
+    { place: "fishhouse", makes: "fish", qty: 12 }, { place: "orchard", makes: "apples", qty: 5, seasons: ["summer", "autumn"] }, { place: "orchard", makes: "apples", qty: 1, seasons: ["spring"] },
     { place: "pinewood", makes: "timber", qty: 3 }, { place: "sawpit", makes: "planks", qty: 4, needs: { item: "timber", qty: 4 } },
     { place: "smithy", makes: "nails", qty: 2 }, { place: "quarry", makes: "stone", qty: 2 },
+    // the counters: the inn's pot needs fish, the tavern draws what it sells, the chandlery splices and decants
+    { place: "inn", makes: "soup", qty: 8, needs: { item: "fish", qty: 2 } }, { place: "tavern", makes: "drink", qty: 4 },
+    { place: "chandlery", makes: "rope", qty: 1 }, { place: "chandlery", makes: "lamp oil", qty: 1 },
   ],
   // the days the island keeps: its own, not anyone else's
   feasts: [{ name: "the island's day", month: 7, day: 24, place: "market" }, { name: "the harvest supper", month: 10, day: 5, place: "market" }, { name: "the midwinter fire", month: 12, day: 21, place: "harbor" }],
@@ -91,11 +94,11 @@ export const ISLAND: WorldPack = {
     { from: "fields", to: "mill", item: "grain", qty: 6, price: 1, upTo: 12 }, { from: "mill", to: "bakery", item: "flour", qty: 6, price: 2, upTo: 8 },
     { from: "bakery", to: "market", item: "bread", qty: 8, price: 1, upTo: 10 }, { from: "bakery", to: "inn", item: "bread", qty: 4, price: 1, upTo: 6 },
     { from: "orchard", to: "market", item: "apples", qty: 5, price: 1, upTo: 8 }, { from: "fishhouse", to: "market", item: "fish", qty: 5, price: 1, upTo: 8 },
-    { from: "pinewood", to: "sawpit", item: "timber", qty: 4, price: 2, upTo: 8 },
+    { from: "pinewood", to: "sawpit", item: "timber", qty: 4, price: 2, upTo: 8 }, { from: "fishhouse", to: "inn", item: "fish", qty: 4, price: 1, upTo: 8 },
   ],
   // the morning boat takes the surplus to the mainland; this is where the island's coins come from
   exports: [
-    { item: "grain", price: 1, keep: 60 }, { item: "flour", price: 2, keep: 24 }, { item: "bread", price: 1, keep: 16 }, { item: "fish", price: 1, keep: 12 }, { item: "apples", price: 1, keep: 12 },
+    { item: "grain", price: 1, keep: 60 }, { item: "flour", price: 2, keep: 24 }, { item: "bread", price: 1, keep: 30 }, { item: "fish", price: 1, keep: 20 }, { item: "apples", price: 1, keep: 12 },
     { item: "lavender", price: 3, keep: 0 }, { item: "timber", price: 2, keep: 12 }, { item: "planks", price: 3, keep: 24 }, { item: "nails", price: 2, keep: 8 }, { item: "stone", price: 2, keep: 8 },
   ],
 };

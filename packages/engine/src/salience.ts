@@ -1,9 +1,15 @@
 import type { AgentState, Tier } from "./types.ts";
 
-export interface SalienceView { hour: number; t: number; nearby: AgentState[]; jobsOpenHere: number; plotHere?: boolean; watched?: string | null }
+export interface SalienceView {
+  hour: number; t: number; day: number; nearby: AgentState[]; jobsOpenHere: number; plotHere?: boolean; watched?: string | null;
+  /** coins owed by them or to them fall due today */
+  debtDue?: boolean;
+  /** a gathering within the hour at the place they are walking to */
+  gathering?: { id: number; what: string } | null;
+}
 
-/** A plan step whose hour has come, not yet acted on. Habit walks them there; this is the thought on arrival. */
-function dueStep(a: AgentState, hour: number, day: number) { return a.plan?.day === day ? a.plan.steps.find((s) => !s.done && s.hour <= hour) ?? null : null; }
+/** A plan step whose hour has come, not yet done and not yet missed. Habit walks them there; this is the thought on arrival. */
+function dueStep(a: AgentState, hour: number, day: number) { return a.plan?.day === day ? a.plan.steps.find((s) => !s.done && !s.missed && s.hour <= hour) ?? null : null; }
 
 /**
  * Decides whether this minute deserves a thought, and how expensive a one.
@@ -15,8 +21,13 @@ export function salience(a: AgentState, v: SalienceView): { tier: Tier; why: str
   if (a.brainKind === "own_brain" && v.t - a.lastThought >= 1) return { tier: 1, why: "own brain, every minute" };
   if (a.hint && v.t - a.lastThought >= 1) return { tier: 2, why: "something at stake with someone here" };
   if (a.crossroads && v.t - a.lastThought >= 1) return { tier: 2, why: "a crossroads" };
+  // the body and the calendar interrupt: the first day of starving, a debt falling due, a gathering they are walking to, hunger with coins in the pocket
+  if (a.starving === 1 && a.starvingThoughtDay !== v.day && v.hour >= 6) return { tier: 2, why: "starving" };
+  if (v.debtDue && a.debtThoughtDay !== v.day && v.hour >= 7 && v.hour < 22) return { tier: 2, why: "debt due" };
+  if (v.gathering && a.gatheringThoughtId !== v.gathering.id) return { tier: 1, why: `gathering: ${v.gathering.what}` };
+  if (a.needs.hunger > 0.8 && a.coins > 0 && v.t - a.lastHungerThought >= 120) return { tier: 1, why: "hungry" };
   if (a.letters.some((l) => !l.read) && v.hour >= 6 && v.hour < 9) return { tier: 1, why: "letter" };
-  const step = a.plan ? dueStep(a, v.hour, a.plan.day) : null;
+  const step = dueStep(a, v.hour, v.day);
   if (step && (step.place === null || step.place === a.location) && v.t - a.lastThought >= 3) return { tier: 1, why: `plan: ${step.do}` };
   if (v.plotHere && a.coins >= 15 && v.t - a.lastThought > 60 && v.hour >= 7 && v.hour < 19) return { tier: 2, why: "standing on land for sale" };
   if (a.coins <= 3 && a.job === null && v.hour >= 8 && v.hour < 18 && v.t - a.lastThought > 90) return { tier: 2, why: "broke" };

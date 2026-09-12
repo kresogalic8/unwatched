@@ -25,7 +25,11 @@ describe("the town on habit alone", () => {
     const town = new Town({ seed: 1, brain: none });
     const rng = new Rng(1);
     for (let i = 0; i < 12; i++) town.addAgent({ persona: persona(`P${i}`, rng) });
-    const start = [...town.agents.values()].reduce((s, a) => s + a.coins, 0);
+    // shelves are finite now: an island where nobody works eats itself bare in three days, so the food posts are staffed the way the brain would staff them on the first morning
+    const people = [...town.agents.values()]; let k = 0;
+    for (const id of ["bakery.cook", "bakery.cook", "fishhouse.gutter", "fishhouse.gutter", "mill.hand", "fields.hand", "inn.help"]) { const a = people[k++]!; a.job = id; town.jobs.get(id)!.holders.push(a.id); }
+    const coinsOnIsland = () => [...town.agents.values()].reduce((s, a) => s + a.coins, 0) + [...town.places.values()].reduce((s, p) => s + p.treasury, 0);
+    const start = coinsOnIsland() - town.minted;
     await town.run(4);
     for (const a of town.agents.values()) {
       expect(a.needs.hunger).toBeLessThan(1);
@@ -33,9 +37,8 @@ describe("the town on habit alone", () => {
     }
     const slept = town.events.filter((e) => e.kind === "agent.sleep").length;
     expect(slept).toBeGreaterThanOrEqual(12 * 3);
-    const end = [...town.agents.values()].reduce((s, a) => s + a.coins, 0);
-    // Without wages, coins only leave (beds, food). Nothing is created.
-    expect(end).toBeLessThanOrEqual(start);
+    // Nothing is created: what is on the island is what arrived plus what the mainland paid, less what left.
+    expect(coinsOnIsland()).toBe(start + town.minted - town.burned);
   });
 
   it("is deterministic for a seed", async () => {
