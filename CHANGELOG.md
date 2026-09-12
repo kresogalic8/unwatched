@@ -8,6 +8,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Changed
 
+### Fixed
+
+## [0.8.0] - 2026-09-12
+### Added
+
+### Changed
+
 - Street lighting separates the lantern glow from an elliptical pool on the ground. Broader, quieter bloom and reduced window flicker preserve the Harbor material colors after dark.
 
 - Orchards now show pruned trees instead of grain rows. Harbor piers gain plank wear, fasteners and mooring wraps; rowboats gain hull seams and coiled rope. Coastal rocks gain waterlines and quarry terraces gain stone joints.
@@ -16,7 +23,6 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 - Harbor buildings gain recessed window frames, shutter hardware, corner masonry, deeper eaves, drainpipes and individually highlighted roof tiles. Street furniture gains wood grain and fasteners; barrels, lamps, wells, laundry and towers gain material details. Rebuilt shared day/night artwork keeps the town and study consistent.
 
-### Fixed
 
 ## [0.7.0] - 2026-09-12
 ### Added
@@ -239,7 +245,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/kresogalic8/unwatched/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/kresogalic8/unwatched/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kresogalic8/unwatched/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kresogalic8/unwatched/compare/v0.4.0...v0.5.0
