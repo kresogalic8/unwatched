@@ -6,12 +6,17 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.9.0] - 2026-09-12
+### Added
+
 - Stable tag releases automatically deploy both DigitalOcean services after release checks. Images are tagged with release and commit, live settings are preserved, and public version endpoints verify the rollout. The production workflow can be rerun for the latest published release without creating another release.
 
 - Outcome-backed food-purchase learning: bounded, persistent evidence from validated purchases and unavailable stock, with recency-weighted confidence and repeated-failure deduplication. Learned preferences break ties between equally near affordable food shops and are available to the agent's perception.
 - Agent profiles show public purchase receipts separately from owner-only lessons and executed routine changes. Private rejected attempts and counterfactual choices remain owner-only. `Town({ learning: false })` supports controlled comparisons; learning tests verify behavior changes, reversal, restart continuity and public-view privacy.
-
-### Changed
 
 ### Fixed
 
@@ -250,7 +255,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/kresogalic8/unwatched/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/kresogalic8/unwatched/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/kresogalic8/unwatched/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kresogalic8/unwatched/compare/v0.5.0...v0.6.0
