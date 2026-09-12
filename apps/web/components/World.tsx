@@ -340,7 +340,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           const sp = spot(a.location, seat);
           f = { id: a.id, g, rig, x: sp.x, y: sp.y, tx: sp.x, ty: sp.y, place: a.location, asleep: a.asleep, home: a.home ?? null, mine: a.id === mineId, name: a.name, pose: a.pose ?? (a.asleep ? "sleep" : "idle"), facing: 1, weak: !!a.weak, bench: false };
           figs.current.set(a.id, f);
-        } else { f.asleep = a.asleep; f.home = a.home ?? null; f.weak = !!a.weak; f.rig.wear({ broke: !!a.broke, roof: !!a.roof }); f.pose = a.pose ?? (a.asleep ? "sleep" : "idle"); f.rig.trade(a.job); f.rig.hold(a.carrying ?? null); f.rig.age(a.age); if (a.location !== f.place) moveTo(a.id, a.location); }
+        } else { f.asleep = a.asleep; f.home = a.home ?? null; f.weak = !!a.weak; f.rig.wear({ broke: !!a.broke, roof: !!a.roof, roofless: !!a.roofless }); f.pose = a.pose ?? (a.asleep ? "sleep" : "idle"); f.rig.trade(a.job); f.rig.hold(a.carrying ?? null); f.rig.age(a.age); if (a.location !== f.place) moveTo(a.id, a.location); }
         // someone idle where there is a bench takes it
         if (!f.asleep && f.pose === "idle" && !f.bench) { const b = benchAt(f.place); if (b && !takenBenches.has(b.key)) { takenBenches.add(b.key); f.bench = true; f.tx = b.x; f.ty = b.y; } }
         return f;

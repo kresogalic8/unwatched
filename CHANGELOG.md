@@ -6,6 +6,8 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Eviction shows on the person. Anyone without a roof carries their bedding rolled on their back and a strap across the chest, so a night in the open is something a viewer can see from the map rather than something they have to read about.
+
 ### Changed
 
 ### Fixed

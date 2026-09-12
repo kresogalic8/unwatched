@@ -78,7 +78,7 @@ export class Citizen extends Container {
   private held = new Graphics(); private heldItem: string | null = null; private tradeName: string | null = null; private workStyle: "swing" | "push" | "haul" | "sweep" | "knead" = "swing"; private years = 30;
   private carry = new Graphics(); private tool = new Graphics();
   private hood = new Graphics(); private umbrella = new Graphics(); private breath = new Graphics(); private coat = new Graphics(); private scarf = new Graphics(); private gear = { rain: false, cold: false };
-  private patches = new Graphics(); private vest = new Graphics(); private apron = new Graphics(); private beard = new Graphics(); private glasses = new Graphics(); private letter = new Graphics(); private cup = new Graphics(); private bowl = new Graphics(); private state = { broke: false, roof: false };
+  private patches = new Graphics(); private vest = new Graphics(); private bundle = new Graphics(); private strap = new Graphics(); private apron = new Graphics(); private beard = new Graphics(); private glasses = new Graphics(); private letter = new Graphics(); private cup = new Graphics(); private bowl = new Graphics(); private state = { broke: false, roof: false, roofless: false };
   private facing = 1;
   private pose: Pose = "idle";
   private phase = Math.random() * 10;
@@ -112,6 +112,13 @@ export class Citizen extends Container {
     // what they have come to: patches when the coins are gone, a waistcoat once they own a roof, an apron for a trade with one
     this.patches.roundRect(-3, this.thighH - 6, 6, 5, 1).fill({ color: 0xffffff, alpha: 0.35 }).stroke({ width: 0.8, color: KELP, alpha: 0.6 }); this.patches.visible = false; this.legL.addChild(this.patches);
     this.vest.roundRect(-this.torsoW / 2 + 2, -this.legH - this.torsoH + 3, this.torsoW - 4, this.torsoH - 2, 5).fill(look.top === "Kelp" ? 0x8e6a4b : KELP).stroke(STROKE); this.vest.moveTo(0, -this.legH - this.torsoH + 6).lineTo(0, -this.legH).stroke({ width: 1, color: CREAM, alpha: 0.5 }); for (let i = 0; i < 3; i++) this.vest.circle(0, -this.legH - this.torsoH + 9 + i * 6, 1.3).fill(CREAM); this.vest.visible = false;
+    // everything they have, rolled and slung: what a person carries when there is no room to leave it in
+    const rollW = this.torsoW / 2 + 8, rollY = -this.legH - this.torsoH + 2;
+    this.bundle.roundRect(-rollW, rollY - 5, rollW * 2, 11, 5).fill(0xcfc4a8).stroke(STROKE);
+    this.bundle.moveTo(-rollW + 5, rollY - 4).lineTo(-rollW + 5, rollY + 5).moveTo(rollW - 5, rollY - 4).lineTo(rollW - 5, rollY + 5).stroke({ width: 1.1, color: WOOD_H });
+    this.bundle.visible = false; this.body.addChild(this.bundle);
+    this.strap.moveTo(-this.torsoW / 2 + 3, -this.legH - this.torsoH + 4).lineTo(this.torsoW / 2 - 3, -this.legH - this.torsoH + 15).stroke({ width: 2, color: WOOD_H });
+    this.strap.visible = false;
     this.apron.moveTo(-this.torsoW / 2 + 3, -this.legH - this.torsoH + 10).lineTo(this.torsoW / 2 - 3, -this.legH - this.torsoH + 10).lineTo(this.torsoW / 2 - 1, -this.legH + 10).lineTo(-this.torsoW / 2 + 1, -this.legH + 10).closePath().fill(0xf7f5ee).stroke(STROKE); this.apron.moveTo(-3, -this.legH - this.torsoH + 10).lineTo(-4, -this.legH - this.torsoH + 2).moveTo(3, -this.legH - this.torsoH + 10).lineTo(4, -this.legH - this.torsoH + 2).stroke({ width: 1.2, color: KELP }); this.apron.visible = false;
     if (look.coral === "Buttons") for (let i = 0; i < 3; i++) this.torso.circle(0, -this.legH - this.torsoH + 7 + i * 7, 1.8).fill(CORAL);
     if (look.coral === "Scarf") this.torso.roundRect(-this.torsoW / 2 - 1, -this.legH - this.torsoH - 3, this.torsoW + 2, 7, 3).fill(CORAL).stroke(STROKE);
@@ -124,7 +131,7 @@ export class Citizen extends Container {
     this.scarf.roundRect(-this.torsoW / 2 - 1, -this.legH - this.torsoH - 4, this.torsoW + 2, 8, 4).fill(wool).stroke(STROKE);
     this.scarf.roundRect(this.torsoW / 2 - 8, -this.legH - this.torsoH - 2, 6, 14, 3).fill(wool).stroke(STROKE);
     this.scarf.visible = false; this.body.addChild(this.scarf);
-    this.body.addChild(this.torso); this.body.setChildIndex(this.torso, this.body.getChildIndex(this.coat)); this.body.addChild(this.vest); this.body.addChild(this.apron);
+    this.body.addChild(this.torso); this.body.setChildIndex(this.torso, this.body.getChildIndex(this.coat)); this.body.addChild(this.vest); this.body.addChild(this.apron); this.body.addChild(this.strap);
     // arms: an upper arm at the shoulder, a forearm at the elbow, a hand at the end
     this.upperH = this.torsoH * 0.44; this.foreH = this.torsoH * 0.4;
     for (const [g, fore, side] of [[this.armL, this.foreL, -1], [this.armR, this.foreR, 1]] as const) {
@@ -258,7 +265,7 @@ export class Citizen extends Container {
   /** What the day is doing to their face. */
   mood(m: { hunger?: number; joy?: number; grief?: number; anger?: number; surprise?: number; tired?: number }): void { const next = { hunger: m.hunger ?? 0, joy: m.joy ?? 0, grief: m.grief ?? 0, anger: m.anger ?? 0, surprise: m.surprise ?? 0, tired: m.tired ?? 0 }; const keys = Object.keys(next) as (keyof typeof next)[]; if (keys.every((k) => Math.abs(next[k] - this.moodState[k]) < 0.05)) return; this.moodState = next; this.drawFace(); }
   /** What has come of them, on the body: patches when broke, a waistcoat once they hold a roof of their own. */
-  wear(s: { broke?: boolean; roof?: boolean }): void { const next = { broke: !!s.broke, roof: !!s.roof }; if (next.broke === this.state.broke && next.roof === this.state.roof) return; this.state = next; this.patches.visible = next.broke; this.vest.visible = next.roof && !next.broke; }
+  wear(s: { broke?: boolean; roof?: boolean; roofless?: boolean }): void { const next = { broke: !!s.broke, roof: !!s.roof, roofless: !!s.roofless }; if (next.broke === this.state.broke && next.roof === this.state.roof && next.roofless === this.state.roofless) return; this.state = next; this.patches.visible = next.broke; this.vest.visible = next.roof && !next.broke; this.bundle.visible = next.roofless; this.strap.visible = next.roofless; }
   /** Where they are looking, in local pixels to the side; the eyes follow a little. */
   lookAt(dx: number): void { this.gaze = Math.max(-2.5, Math.min(2.5, dx / 40)); }
   private glanceTilt = 0; private glanceGaze = 0;

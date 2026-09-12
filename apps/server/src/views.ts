@@ -14,7 +14,7 @@ export function publicAgent(town: Town, a: AgentState) {
     ownerId: a.owner, appearance: a.appearance ?? null, carrying: a.inventory.length ? a.inventory[a.inventory.length - 1]! : null,
     pose: poseOf(town, a), weak: a.starving >= 2, daysHungry: a.starving, perks: perksOf(a),
     // what shows on a person in the street: the patches of the broke, the waistcoat of someone with a roof of their own
-    broke: a.coins <= 2, roof: !!a.home && town.places.get(a.home.place)?.owner === a.id,
+    broke: a.coins <= 2, roof: !!a.home && town.places.get(a.home.place)?.owner === a.id, roofless: !a.home,
   };
 }
 
