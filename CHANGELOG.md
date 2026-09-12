@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.2.1] - 2026-09-12
+### Added
+
 - The perceive message's six new fields and the reflect message's are documented in docs/protocol.md, and the TypeScript SDK's `ReflectRequest` names them, so a typed own brain can read its projects, beliefs and watch list without casting. Every one is optional; nothing was renamed or removed.
 
 ### Changed
@@ -133,6 +140,7 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/kresogalic8/unwatched/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kresogalic8/unwatched/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kresogalic8/unwatched/releases/tag/v0.1.0
