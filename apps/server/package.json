@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@unwatched/cognition": "workspace:*",
@@ -24,6 +25,7 @@
     "@types/node": "^22.15.0",
     "@types/ws": "^8.18.0",
     "tsx": "^4.23.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^5.0.0"
   }
 }

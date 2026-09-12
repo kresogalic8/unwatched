@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Wordmark, Button, Label, Chip, LinkButton } from "@/components/ui";
 import { api } from "@/lib/api";
-import { rememberAgent } from "@/lib/auth";
+import { rememberAgent, currentOwner } from "@/lib/auth";
 import { LookPreview } from "@/components/LookPreview";
 import { Portrait } from "@/components/Portrait";
 import { lookFor, type Look } from "@/components/world/citizen";
@@ -16,11 +16,6 @@ const F = (l: string, v: string, set: (s: string) => void, ph = "", multi = fals
 
 type Draft = { p?: { name: string; age: string; origin: string; summary: string; want: string; fear: string; secret: string; strangers: string; advice: string }; look?: Partial<Look>; instructions?: string; step?: number };
 const MODELS = ["anthropic/claude-haiku-4.5", "anthropic/claude-sonnet-5", "anthropic/claude-opus-5", "anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.8"];
-const FALLBACK_PLANS = {
-  visitor: { name: "Visitor", price: 3, tier1: 10, tier2: 0, reflect: false, blurb: "Ten thoughts a day. Enough to answer a letter and keep a job.", gets: ["10 thoughts a day, on Haiku 4.5", "No careful decisions: at a crossroads they go with habit", "No nightly reflection, unless credits pay for one", "The digest and the paper", "No portrait, and letters are not read aloud"] },
-  resident: { name: "Resident", price: 12, tier1: 50, tier2: 6, reflect: true, blurb: "Thinks all day, reflects every night, writes to you at crossroads.", gets: ["50 thoughts a day, on Haiku 4.5", "6 careful decisions a day, on Sonnet 5", "A nightly reflection on Opus 5, and a morning plan", "Writes to you when something is at stake", "Their portrait, and letters read aloud in their voice", "The digest and the paper"] },
-  patron: { name: "Patron", price: 29, tier1: 120, tier2: 15, reflect: true, blurb: "Our most capable mind for every careful thought.", gets: ["120 thoughts a day, on Haiku 4.5", "15 careful decisions a day, on Opus 5", "A nightly reflection on Opus 5, and a morning plan", "Writes to you when something is at stake", "Their portrait, and letters read aloud in their voice", "Their book and paintings", "The digest and the paper"] },
-};
 const SKINS = ["#f1d6c0", "#e7c3a5", "#d2a682", "#b98460", "#8f5f42", "#6b4630"];
 const LOOKS = [["build", ["Slight", "Average", "Sturdy", "Tall"]], ["hair", ["Short dark", "Bob", "Curls", "Bun", "Grey", "Under a hat"]], ["hat", ["None", "Knit cap", "Wide brim", "Baker's cap", "Headscarf"]], ["carrying", ["Nothing", "Suitcase", "Satchel", "Basket", "Tool bag"]], ["top", ["Teal", "Sage", "Cream", "Sand", "Kelp"]], ["bottom", ["Teal", "Sage", "Cream", "Sand", "Kelp"]], ["coral", ["None", "Suitcase", "Scarf", "Buttons", "Hat band"]]] as const;
 function readDraft(): Draft { try { return JSON.parse(localStorage.getItem("ft.draft") ?? "{}") as Draft; } catch { return {}; } }
@@ -56,8 +51,11 @@ export default function Board() {
   const [brain, setBrain] = useState<"hosted" | "own_key" | "own_brain">("hosted");
   const [plan, setPlan] = useState<"visitor" | "resident" | "patron">("resident");
   type PlanRow = { name: string; price: number; tier1: number; tier2: number; reflect: boolean; blurb: string; gets: string[] };
-  const [plans, setPlans] = useState<Record<string, PlanRow>>(FALLBACK_PLANS);
+  // the plans come from the server, the one place they are written; until they arrive the list says so
+  const [plans, setPlans] = useState<Record<string, PlanRow> | null>(null);
   useEffect(() => { void api<{ plans: Record<string, PlanRow> }>("/api/plans").then((r) => setPlans(r.plans)).catch(() => {}); }, []);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => { void currentOwner().then((o) => setSignedIn(!!o)).catch(() => setSignedIn(false)); }, []);
   const [ownKey, setOwnKey] = useState(""); const [models, setModels] = useState({ routine: MODELS[0]!, stakes: MODELS[1]!, reflect: MODELS[2]! }); const [cap, setCap] = useState(2);
   const [instructions, setInstructions] = useState("");
   useEffect(() => { const d = readDraft(); if (d.p) setP((x) => ({ ...x, ...d.p })); if (d.look) setLook(d.look); if (d.instructions) setInstructions(d.instructions); if (d.step) setStep(Math.min(4, d.step)); setHydrated(true); }, []);
@@ -82,7 +80,8 @@ export default function Board() {
       }
       if (brain === "own_brain") { r.push("/account/brain"); return; } // the socket and its token are on the next page
       // the plan chosen here is bought now, on Stripe's page; in test mode it simply applies. Without it the citizen lives on habit.
-      try { const pr = await api<{ url?: string; ok?: boolean }>("/api/me/plan", { method: "POST", body: JSON.stringify({ plan }) }); if (pr.url) { location.href = pr.url; return; } } catch { /* the digest still opens; the plan can be bought on the credits page */ }
+      try { const pr = await api<{ url?: string; ok?: boolean }>("/api/me/plan", { method: "POST", body: JSON.stringify({ plan }) }); if (pr.url) { location.href = pr.url; return; } }
+      catch { r.push("/digest?plan=unbought"); return; } // boarded, but not on the plan they chose: the digest says so, and the credits page is a step away
       r.push("/digest");
     } catch (e) { setErr((e as Error).message); setBusy(false); }
   }
@@ -126,6 +125,7 @@ export default function Board() {
               <div className="flex flex-col gap-1.5">{children.grown.map((c) => <button key={c.id} type="button" onClick={() => setAdopting({ id: c.id, name: c.name, note: `grown, at ${c.place}`, grown: true })} className={`text-left rounded-xl px-3 py-2 text-sm ${adopting?.id === c.id ? "bg-teal text-sand" : "bg-shell"}`}><b>{c.name}</b> · grown · {c.summary}</button>)}{children.growing.map((c) => <button key={c.id} type="button" onClick={() => setAdopting({ id: c.id, name: c.name, note: `comes of age in ${c.ofAgeIn} days`, grown: false })} className={`text-left rounded-xl px-3 py-2 text-sm ${adopting?.id === c.id ? "bg-teal text-sand" : "bg-shell"}`}><b>{c.name}</b> · {c.days} days old, child of {c.parents.join(" and ")}{c.orphan ? ", orphaned" : ""} · comes of age in {c.ofAgeIn} days</button>)}</div>
               {adopting && <div className="flex items-center justify-between gap-3"><span className="text-sm">Adopt <b>{adopting.name}</b>, {adopting.note}.</span><div className="flex gap-2"><Button kind="tertiary" size={36} onClick={() => setAdopting(null)}>Never mind</Button><Button size={36} disabled={busy} onClick={adopt}>{busy ? "Writing…" : "Adopt"}</Button></div></div>}
             </div>}
+            {signedIn === false && <p className="text-[13px] text-drift">You are not signed in yet. You will sign in at the harbor office before boarding; the ticket is saved as you write, so nothing here is lost.</p>}
             <div className="mt-auto flex justify-between items-center gap-3"><Button kind="tertiary" onClick={() => setStep(0)}>Back</Button><div className="flex items-center gap-4"><span className="text-sm text-drift hidden sm:inline">{ready ? "Step 2 of 5" : "A name, a sentence, a want, a fear and a secret"}</span><Button disabled={!ready} onClick={() => setStep(2)}>Next, how they look</Button></div></div>
           </div>
         </div>
@@ -177,7 +177,8 @@ export default function Board() {
           <div className={`bg-shell rounded-[28px] p-6 sm:p-9 flex flex-col gap-3.5 transition-opacity ${brain === "hosted" ? "" : "opacity-40 pointer-events-none"}`} aria-disabled={brain !== "hosted"}>
             <Label>Hosted plans</Label>
             <p className="text-[13px] text-ink2">Nobody thinks for free on the island. Each plan is a daily allowance of thinking; credits top it up.</p>
-            {(["visitor", "resident", "patron"] as const).map((k) => { const pl = plans[k] ?? FALLBACK_PLANS[k]; const on = plan === k; return <button key={k} type="button" aria-pressed={on} onClick={() => setPlan(k)} className={`text-left rounded-[20px] p-5 flex flex-col gap-2 transition-colors ${on ? "bg-teal text-sand" : "bg-sand hover:bg-sand-2"}`}><div className="flex justify-between items-baseline"><span className="font-bold text-[17px]">{pl.name}</span><span className="display font-bold text-xl">${pl.price}<span className="text-[13px] font-semibold opacity-70"> / mo</span></span></div><span className={`text-[13px] ${on ? "opacity-80" : "text-ink2"}`}>{pl.blurb}</span><ul className={`text-[13px] flex flex-col gap-0.5 pl-4 m-0 list-disc ${on ? "opacity-90" : "text-ink2"}`}>{pl.gets.map((g) => <li key={g}>{g}</li>)}</ul></button>; })}
+            {!plans && <div className="flex flex-col gap-3" aria-live="polite">{[0, 1, 2].map((k) => <div key={k} className="rounded-[20px] bg-sand p-5 flex flex-col gap-2"><div className="h-4 w-1/3 rounded-full bg-line" /><div className="h-3 w-3/4 rounded-full bg-line" /></div>)}<p className="text-[13px] text-drift">Fetching the plans from the harbor office.</p></div>}
+            {plans && (["visitor", "resident", "patron"] as const).map((k) => { const pl = plans[k]; if (!pl) return null; const on = plan === k; return <button key={k} type="button" aria-pressed={on} onClick={() => setPlan(k)} className={`text-left rounded-[20px] p-5 flex flex-col gap-2 transition-colors ${on ? "bg-teal text-sand" : "bg-sand hover:bg-sand-2"}`}><div className="flex justify-between items-baseline"><span className="font-bold text-[17px]">{pl.name}</span><span className="display font-bold text-xl">${pl.price}<span className="text-[13px] font-semibold opacity-70"> / mo</span></span></div><span className={`text-[13px] ${on ? "opacity-80" : "text-ink2"}`}>{pl.blurb}</span><ul className={`text-[13px] flex flex-col gap-0.5 pl-4 m-0 list-disc ${on ? "opacity-90" : "text-ink2"}`}>{pl.gets.map((g) => <li key={g}>{g}</li>)}</ul></button>; })}
             <p className="text-[13px] text-drift">Per citizen, per month, before tax. The plan is bought right after boarding, on Stripe's page. Credits never buy coins. Coins are earned on the island only.</p>
           </div>
         </div>
@@ -195,7 +196,7 @@ export default function Board() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Passenger</div><div className="display text-xl font-semibold">{p.name}, {age}</div></div>
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Arrives</div><div className="display text-xl font-semibold">Next boat</div></div>
-                <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Mind</div><div>{brain === "hosted" ? `Hosted · ${(plans[plan] ?? FALLBACK_PLANS[plan]).name}, $${(plans[plan] ?? FALLBACK_PLANS[plan]).price} a month` : brain === "own_key" ? "Your own key" : "Your own brain"}</div></div>
+                <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Mind</div><div>{brain === "hosted" ? (plans?.[plan] ? `Hosted · ${plans[plan]!.name}, $${plans[plan]!.price} a month` : "Hosted") : brain === "own_key" ? "Your own key" : "Your own brain"}</div></div>
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Carrying</div><div>{look.carrying}, 40 coins</div></div>
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Lodging</div><div>Harbor inn, 3 nights</div></div>
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Return</div><div>When they decide</div></div>

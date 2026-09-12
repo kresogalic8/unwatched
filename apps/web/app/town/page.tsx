@@ -1,14 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { Page, Card, Label, Chip, Button, Bubble, Tide, LinkButton } from "@/components/ui";
 import { api, type PublicAgent, type OwnerAgent } from "@/lib/api";
 import { useMyAgent } from "@/lib/useAgent";
 const World = dynamic(() => import("@/components/World").then((m) => m.World), { ssr: false, loading: () => <div className="w-full h-full rounded-[28px] bg-glass flex items-center justify-center text-teal font-bold">Crossing to the island…</div> });
 
 export default function Town() {
-  const { agent } = useMyAgent();
+  const { agent, reason } = useMyAgent();
   const [sel, setSel] = useState<PublicAgent | null>(null);
+  // ?clean=1 is film mode: the island with nothing over it, so nothing below is drawn either
+  const [clean, setClean] = useState(false);
+  useEffect(() => { try { setClean(new URLSearchParams(window.location.search).get("clean") === "1"); } catch {} }, []);
+  // a viewer with nobody here is asked once a session, quietly, from a corner
+  const visitor = reason === "signed-out" || reason === "none";
+  const [nudge, setNudge] = useState(false);
+  useEffect(() => { try { setNudge(sessionStorage.getItem("ft.nudge") !== "1"); } catch { setNudge(true); } }, []);
+  const dismiss = () => { setNudge(false); try { sessionStorage.setItem("ft.nudge", "1"); } catch {} };
   // ?view=map or ?view=cinema opens the town in that view, for sharing a link and for looking at the island from afar
   const [view, setView] = useState<"street" | "map" | "cinema">("street");
   useEffect(() => { try { const v = new URLSearchParams(window.location.search).get("view"); if (v === "map" || v === "cinema") setView(v); } catch {} }, []);
@@ -37,15 +46,24 @@ export default function Town() {
           {agent && <div className="flex gap-1 bg-shell rounded-full p-1"><Chip active={follow} onClick={() => setFollow(true)}>Follow {agent.name.split(" ")[0]}</Chip><Chip active={!follow} onClick={() => setFollow(false)}>Free camera</Chip></div>}
           {possessed && agent && <div className="flex items-center gap-2 bg-shell rounded-full px-4"><span className="w-2.5 h-2.5 rounded-full bg-coral" /><span className="font-bold text-sm">You are {agent.name.split(" ")[0]}</span></div>}
         </div>
+        {visitor && nudge && !clean && (
+          <div className="absolute left-3 top-16 sm:left-6 sm:top-20 w-[calc(100%-24px)] sm:w-[280px] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
+            <Label>Everyone here belongs to someone</Label>
+            <p className="text-sm text-ink2">Forty coins, a suitcase, three nights at the inn.</p>
+            <div className="flex items-center justify-between gap-2"><LinkButton href="/board" size={36}>Send someone over</LinkButton><button onClick={dismiss} className="text-[13px] text-drift">Not now</button></div>
+          </div>
+        )}
         {sel && (
           <div className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:right-6 sm:top-6 sm:bottom-6 sm:w-[360px] max-h-[70%] sm:max-h-none overflow-auto bg-shell rounded-[28px] p-5 sm:p-7 flex flex-col gap-4 pointer-events-auto">
             <div><Label>{sel.asleep ? "Asleep" : `At ${sel.place}`}</Label><div className="display text-[30px] font-bold">{sel.name}</div><div className="text-sm text-drift">{sel.job ?? "no work"} · arrived day {sel.arrivedDay}{sel.ownerId ? "" : " · house-funded"}</div></div>
             {agent && sel.id !== agent.id && <div className="flex flex-col gap-2"><Label>What {agent.name.split(" ")[0]} knows</Label>{rel ? <><Tide name="Trust" trust={rel.trust} word={rel.tide} width={60} />{rel.opinion && <Bubble max={300}>“{rel.opinion}”</Bubble>}</> : <p className="text-sm text-drift">They have not met. {agent.name.split(" ")[0]} would have to be introduced, or introduce themselves.</p>}</div>}
+            {visitor && <div className="flex flex-col gap-2"><Label>What your person would know</Label><div className="opacity-40 pointer-events-none" aria-hidden><Tide name="Trust" trust={0.45} word="steady" width={60} /></div><p className="text-[13px] text-drift">What your person would know about them: trust, and what they think. Owners see it here.</p></div>}
             {selFull && "persona" in selFull && <div className="flex flex-col gap-1"><Label>Only you can see this</Label><p className="text-sm text-ink2">{String(selFull.persona.summary)}</p></div>}
             {!("persona" in (selFull ?? {})) && <div className="flex flex-col gap-1"><Label>Unknown</Label><p className="text-sm text-drift">Their money, their family, where they were last night. Someone would have to ask.</p></div>}
             <div className="mt-auto flex flex-col gap-2">
               {agent && sel.id === agent.id && !possessed && <Button onClick={() => setPossessed(true)} disabled={sel.asleep}>{sel.asleep ? `${sel.name.split(" ")[0]} is asleep` : `Possess ${sel.name.split(" ")[0]}`}</Button>}
               {agent && sel.id !== agent.id && !possessed && <Button onClick={() => { setPossessed(true); setFollow(true); }} disabled={agent.asleep}>Possess {agent.name.split(" ")[0]} and go talk</Button>}
+              {visitor && <div className="flex flex-col gap-1"><Button disabled>Possess and go talk</Button><p className="text-[12px] text-drift text-center">Owners can walk their citizen through the street. <Link href="/board" className="font-bold text-teal">Send someone over</Link></p></div>}
               <LinkButton href={`/agent/${sel.id}`} kind="secondary">Their page</LinkButton>
               <button onClick={() => setSel(null)} className="text-sm text-drift">Close</button>
             </div>

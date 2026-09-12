@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Page, Card, Label, Strip, Bubble, Tide, LinkButton } from "@/components/ui";
 import { api, hhmm, dayOf, type OwnerAgent, type PublicAgent, type TownEvent } from "@/lib/api";
+import { Portrait } from "@/components/Portrait";
 
 export default function Profile() {
   const { id } = useParams<{ id: string }>();
@@ -14,11 +15,11 @@ export default function Profile() {
     <Page>
       <div className="grid gap-5 grow grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_360px]">
         <Card className="p-7 items-start">
-          <div className="w-40 h-56 rounded-card bg-glass" />
+          <Portrait name={a.name} appearance={a.appearance} age={a.age} size={160} locked={a.perks === false} />
           <div className="display text-[28px] font-bold">{a.name}</div>
           <div className="text-sm text-ink2">{a.age} · arrived day {a.arrivedDay} · from {a.origin}</div>
           <div className="text-sm text-ink2">{a.asleep ? "Asleep" : `At ${a.place}`}.</div>
-          <div className="flex gap-2 flex-wrap">{own ? <LinkButton href="/letters" kind="secondary" size={36}>Write to {first}</LinkButton> : null}<LinkButton href="/town" kind="tertiary" size={36}>Watch</LinkButton></div>
+          <div className="flex gap-2 flex-wrap">{own ? <LinkButton href="/letters" kind="secondary" size={36}>Write to {first}</LinkButton> : null}{own ? <LinkButton href={`/agent/${a.id}/book`} kind="tertiary" size={36}>The book</LinkButton> : null}<LinkButton href="/town" kind="tertiary" size={36}>Watch</LinkButton></div>
           {own && <div className="mt-auto bg-sand rounded-[18px] p-4 flex flex-col gap-1"><Label>Only you can see this</Label><div className="text-sm"><b>The secret</b> · {String((a as OwnerAgent).persona.secret)}</div><div className="text-[13px] text-drift">Still a secret, as far as the record shows.</div></div>}
           {!own && <div className="mt-auto text-[13px] text-drift">You are seeing what the town knows. The owner sees the rest.</div>}
         </Card>

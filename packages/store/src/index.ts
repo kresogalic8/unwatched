@@ -4,6 +4,10 @@ import type { Town, AgentState, TownSnapshot, AgentSnapshot } from "@unwatched/e
 
 export type Plan = "none" | "visitor" | "resident" | "patron";
 export interface Wallet { ownerId: string; plan: Plan; credits: number; stripeCustomer: string | null }
+/** What an owner asked to be told by mail, and the last island day the morning digest went out. Both notices are on until turned off. */
+export interface OwnerPrefs { ownerId: string; notifyDigest: boolean; notifyLetters: boolean; lastMailedDay: number | null }
+/** Where one owner's reading of one citizen stands: the digest watermark, and the last island day a letter notice was mailed. */
+export interface OwnerRead { ownerId: string; agentId: string; lastDigestT: number | null; lastLetterMailDay: number | null }
 export interface BrainRow { agent_id: string; kind: "hosted" | "own_key" | "own_brain"; provider: string | null; api_key: string | null; models: { routine: string; stakes: string; reflect: string } | null; think_every: number | null; daily_cap_usd: number | null; token: string | null; memory: "lease" | "own" }
 import { compress } from "@unwatched/engine";
 
@@ -160,6 +164,8 @@ export class TownStore {
   }
   async deleteOwner(ownerId: string): Promise<void> {
     await this.sb.from("letters").delete().eq("owner_id", ownerId);
+    await this.sb.from("owner_prefs").delete().eq("owner_id", ownerId);
+    await this.sb.from("owner_reads").delete().eq("owner_id", ownerId);
     await this.sb.from("agents").update({ owner_id: null }).eq("owner_id", ownerId);
     await this.sb.auth.admin.deleteUser(ownerId);
   }
@@ -225,12 +231,13 @@ export class TownStore {
     if (error) console.error("paper upsert failed:", error.message);
   }
 
-  async saveLetter(agentId: string, ownerId: string | null, direction: "to_agent" | "to_owner", text: string, t: number): Promise<void> {
-    const { error } = await this.sb.from("letters").insert({ agent_id: agentId, town_id: this.townId, owner_id: ownerId && /^[0-9a-f-]{36}$/.test(ownerId) ? ownerId : null, direction, text, t }); // dev owners are names, not ids
+  /** A letter on the record. `readAt` is set when the engine already delivered it, so the hourly replay does not deliver it again. */
+  async saveLetter(agentId: string, ownerId: string | null, direction: "to_agent" | "to_owner", text: string, t: number, readAt: number | null = null): Promise<void> {
+    const { error } = await this.sb.from("letters").insert({ agent_id: agentId, town_id: this.townId, owner_id: ownerId && /^[0-9a-f-]{36}$/.test(ownerId) ? ownerId : null, direction, text, t, read_at: readAt }); // dev owners are names, not ids
     if (error) console.error("letter insert failed:", error.message);
   }
 
-  /** Letters owners wrote through the web app that the engine has not delivered yet. */
+  /** Letters written straight into the record (another process, the web app's own insert) that the engine has not delivered yet. */
   async undeliveredLetters(): Promise<{ id: number; agent_id: string; text: string }[]> {
     const { data, error } = await this.sb.from("letters").select("id, agent_id, text").eq("direction", "to_agent").is("read_at", null);
     if (error) { console.error("letters read failed:", error.message); return []; }
@@ -239,6 +246,33 @@ export class TownStore {
   async markDelivered(ids: number[], t: number): Promise<void> {
     if (!ids.length) return;
     await this.sb.from("letters").update({ read_at: t }).in("id", ids);
+  }
+
+  /** What an owner asked to be told by mail. Defaults are on: a morning digest and a note when their citizen writes. */
+  async ownerPrefs(ownerId: string): Promise<OwnerPrefs> {
+    const { data } = await this.sb.from("owner_prefs").select("owner_id, notify_digest, notify_letters, last_mailed_day").eq("owner_id", ownerId).maybeSingle();
+    return data ? { ownerId: data.owner_id, notifyDigest: data.notify_digest, notifyLetters: data.notify_letters, lastMailedDay: data.last_mailed_day } : { ownerId, notifyDigest: true, notifyLetters: true, lastMailedDay: null };
+  }
+  async saveOwnerPrefs(p: OwnerPrefs): Promise<void> {
+    const { error } = await this.sb.from("owner_prefs").upsert({ owner_id: p.ownerId, notify_digest: p.notifyDigest, notify_letters: p.notifyLetters, last_mailed_day: p.lastMailedDay, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
+    if (error) console.error("prefs save failed:", error.message);
+  }
+  /** Where the owner's email lives: the owners row the sign-in trigger fills, or the auth record behind it. Dev names have none. */
+  async ownerEmail(ownerId: string): Promise<string | null> {
+    if (!/^[0-9a-f-]{36}$/.test(ownerId)) return null;
+    const { data } = await this.sb.from("owners").select("email").eq("id", ownerId).maybeSingle();
+    if (data?.email) return data.email as string;
+    const { data: u } = await this.sb.auth.admin.getUserById(ownerId).catch(() => ({ data: { user: null } }));
+    return u?.user?.email ?? null;
+  }
+  /** The owner's reading of one citizen: the digest watermark and the last day a letter notice went out. */
+  async ownerRead(ownerId: string, agentId: string): Promise<OwnerRead> {
+    const { data } = await this.sb.from("owner_reads").select("last_digest_t, last_letter_mail_day").eq("owner_id", ownerId).eq("agent_id", agentId).maybeSingle();
+    return { ownerId, agentId, lastDigestT: data?.last_digest_t == null ? null : Number(data.last_digest_t), lastLetterMailDay: data?.last_letter_mail_day ?? null };
+  }
+  async saveOwnerRead(r: OwnerRead): Promise<void> {
+    const { error } = await this.sb.from("owner_reads").upsert({ owner_id: r.ownerId, agent_id: r.agentId, last_digest_t: r.lastDigestT, last_letter_mail_day: r.lastLetterMailDay, updated_at: new Date().toISOString() }, { onConflict: "owner_id,agent_id" });
+    if (error) console.error("read save failed:", error.message);
   }
 
   /** Agents boarded through the web app that the engine has not admitted yet: state is null until the boat docks. */

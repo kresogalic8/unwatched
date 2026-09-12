@@ -2,8 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./icons";
-const TABS: [string, string, IconName][] = [["Digest", "/digest", "digest"], ["Letters", "/letters", "letter"], ["Town", "/town", "town"], ["Gazette", "/gazette", "gazette"], ["You", "/account", "you"]];
-/** Five tabs on phones, hidden on desktop where the top bar carries navigation. */
+const TABS: [string, string, IconName][] = [["Digest", "/digest", "digest"], ["Letters", "/letters", "letter"], ["People", "/people", "people"], ["Town", "/town", "town"], ["Gazette", "/gazette", "gazette"], ["You", "/account", "you"]];
+/** Six tabs on phones, hidden on desktop where the top bar carries navigation. */
 export function MobileTabs() {
   const path = usePathname();
   return (

@@ -13,12 +13,13 @@ import { Looks, looksEnabled } from "./looks.ts";
 import { createClient } from "@supabase/supabase-js";
 import { Town, Rng, MINUTES_PER_DAY, sha256, canonicalEvent } from "@unwatched/engine";
 import type { Brain } from "@unwatched/engine";
-import { Action, Persona, type TownEvent, Passenger } from "@unwatched/protocol";
+import { Action, Persona, type TownEvent, type PersonaDepth, Passenger } from "@unwatched/protocol";
 import { MockBrain, AnthropicBrain, OpenRouterBrain, seedPersonas } from "@unwatched/cognition";
 import { TownStore, FileStore } from "@unwatched/store";
 import { publicAgent, ownerAgent, clockOf, realClock, setPerks } from "./views.ts";
 import { BrainRouter, newToken, OwnBrain, OwnKeyBrain } from "./brains.ts";
-import type { BrainRow, Plan, Store } from "@unwatched/store";
+import type { BrainRow, Plan, Store, OwnerPrefs, OwnerRead } from "@unwatched/store";
+import { digestMail, letterMail, sendMail, mailEnabled } from "./mail.ts";
 import { Billing, PLANS, PACKS, COST } from "./billing.ts";
 import { Metrics } from "./ops.ts";
 import { RealWorld, parsePlace, resolveZone } from "./realworld.ts";
@@ -48,6 +49,8 @@ router.onBad = (text) => metrics.hold("watch", text, "own brains");
 if (townBrain instanceof OpenRouterBrain) townBrain.onFallback = (f) => metrics.fallback(f);
 const TOWN_ID = process.env.UW_TOWN_ID ?? "island";
 const TOWN_NAME = process.env.UW_TOWN_NAME ?? "The island";
+/** Where the pages live, for the buttons in the mail: the island's address without the engine's own path. */
+const SITE_URL = (process.env.UW_PUBLIC_URL ?? "https://unwatched.world").replace(/\/engine\/?$/, "").replace(/\/$/, "");
 /** Other islands a boat runs to: UW_HARBORS="north=https://north.example/engine,west=http://localhost:4011". Names are fetched from them. */
 const HARBORS: { id: string; url: string; name: string }[] = (process.env.UW_HARBORS ?? "").split(",").map((x) => x.trim()).filter(Boolean).map((x) => { const [id, url] = x.split("="); return { id: id!.trim(), url: (url ?? "").trim().replace(/\/$/, ""), name: id!.trim() }; }).filter((h) => h.url);
 const BOAT_SECRET = process.env.UW_BOAT_SECRET ?? "";
@@ -78,7 +81,7 @@ modelsFor = (a) => {
   return a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
 };
 const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.wallet(a.owner).plan === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
-const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } } });
+const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
 if (townBrain instanceof OpenRouterBrain) townBrain.primer = primerOf(town);
 let saved: Awaited<ReturnType<NonNullable<typeof store>["loadSnapshot"]>> = null;
@@ -110,6 +113,38 @@ for (const h of HARBORS) void harborTown(h).then((d) => { const n = (d as { name
 if (HARBORS.length) log(`boats run to ${HARBORS.map((h) => h.id).join(", ")}${BOAT_SECRET ? "" : " (no UW_BOAT_SECRET: arrivals from other islands are refused)"}`);
 log(`${town.agents.size} citizens · brain ${brain.name} · ${MS_PER_SIM_MINUTE} ms per sim minute · store ${store ? (store instanceof FileStore ? "file" : "supabase") : "memory only"} · sign-in ${process.env.SUPABASE_URL ? "supabase" : "dev names"}`);
 
+// ---- what the owner asked to be told, and where their reading stands ----
+const prefsCache = new Map<string, OwnerPrefs>(); const readCache = new Map<string, OwnerRead>();
+async function prefsOf(owner: string): Promise<OwnerPrefs> { let p = prefsCache.get(owner); if (!p) { p = store ? await store.ownerPrefs(owner) : { ownerId: owner, notifyDigest: true, notifyLetters: true, lastMailedDay: null }; prefsCache.set(owner, p); } return p; }
+async function savePrefs(p: OwnerPrefs): Promise<void> { prefsCache.set(p.ownerId, p); if (store) await store.saveOwnerPrefs(p); }
+async function readOf(owner: string, agentId: string): Promise<OwnerRead> { const k = `${owner}:${agentId}`; let r = readCache.get(k); if (!r) { r = store ? await store.ownerRead(owner, agentId) : { ownerId: owner, agentId, lastDigestT: null, lastLetterMailDay: null }; readCache.set(k, r); } return r; }
+async function saveRead(r: OwnerRead): Promise<void> { readCache.set(`${r.ownerId}:${r.agentId}`, r); if (store) await store.saveOwnerRead(r); }
+/** Where a digest starts: what the owner asked for, else where they last read, else three days back. Never before the boat, never more than fourteen days. */
+function sinceFor(a: AgentState, asked: number | null): number { return Math.max(asked ?? town.t - 3 * MINUTES_PER_DAY, town.t - 14 * MINUTES_PER_DAY, a.arrivedAt); }
+/** Seven each morning: every owner with an inbox who has not said no gets their citizen's written digest, once per island day. */
+async function morningMail(): Promise<void> {
+  const byOwner = new Map<string, AgentState[]>(); for (const a of town.agents.values()) if (a.owner) (byOwner.get(a.owner) ?? byOwner.set(a.owner, []).get(a.owner)!).push(a);
+  for (const [owner, agents] of byOwner) {
+    try {
+      const p = await prefsOf(owner); if (!p.notifyDigest || p.lastMailedDay === town.day) continue;
+      const email = store ? await store.ownerEmail(owner) : null; if (!email) { log(`no email on file for ${owner}; no morning mail`); continue; }
+      const a = agents[0]!; const first = a.persona.name.split(" ")[0]!;
+      const since = sinceFor(a, (await readOf(owner, a.id)).lastDigestT); const d = town.digest(a.id, since); const w = await writtenDigest(a, since);
+      const lines = [...d.items].sort((x, y) => y.importance - x.importance).slice(0, 3).sort((x, y) => x.t - y.t).map((e) => `${town.clockAt(e.t)}: ${e.text}`);
+      const m = digestMail({ to: email, name: a.persona.name, day: town.day, headline: w?.headline ?? (d.items.length ? d.headline : `Nothing changed for ${first}.`), text: w?.text ?? (d.items.length ? `What the record shows for ${first} since you last read.` : `${first} worked, ate at the inn, and slept. No coral today, and that is allowed.`), lines, url: `${SITE_URL}/digest` });
+      if (await sendMail(m, log)) { await savePrefs({ ...p, lastMailedDay: town.day }); log(`morning mail to ${owner} about ${a.persona.name}`); }
+    } catch (err) { log(`morning mail for ${owner}: ${(err as Error).message}`); }
+  }
+}
+/** A citizen wrote home: their owner hears of it by mail, at most once per citizen per island day. */
+async function noticeLetter(e: TownEvent): Promise<void> {
+  const a = town.agents.get(e.actors[0]!); if (!a?.owner) return;
+  const p = await prefsOf(a.owner); if (!p.notifyLetters) return;
+  const read = await readOf(a.owner, a.id); if (read.lastLetterMailDay === e.day) return;
+  const email = store ? await store.ownerEmail(a.owner) : null; if (!email) { log(`no email on file for ${a.owner}; ${a.persona.name}'s letter waits on the page`); return; }
+  const m = letterMail({ to: email, name: a.persona.name, day: e.day, text: String(e.payload?.text ?? e.text), url: `${SITE_URL}/letters` });
+  if (await sendMail(m, log)) await saveRead({ ...read, lastLetterMailDay: e.day });
+}
 // ---- the clock ----
 let running = true; let ticking = false; let lastHour = town.hour; let memoryMark = town.t + 1;
 async function loop() {
@@ -125,7 +160,7 @@ async function loop() {
         const plannedAfter = [...town.agents.values()].filter((a) => a.plan?.day === town.day).length;
         if (store && plannedAfter > plannedBefore) void store.snapshot(town).catch((e: Error) => log(`plan snapshot failed: ${e.message}`));
         if (real) { const lag = real.lag(); if (lag > 3) { town.skip(lag); log(`caught up ${lag} minutes with ${real.place.name}`); } realClock.temperatureC = real.state.temperatureC; realClock.sunrise = real.state.sunrise; realClock.sunset = real.state.sunset; }
-        if (town.hour !== lastHour) { lastHour = town.hour; broadcast({ type: "clock", clock: clockOf(town) }); if (town.hour === 7) await sailCargo(); await hourly(); }
+        if (town.hour !== lastHour) { lastHour = town.hour; broadcast({ type: "clock", clock: clockOf(town) }); if (town.hour === 7) { await sailCargo(); void morningMail(); } await hourly(); }
       } catch (err) { log(`tick failed: ${(err as Error).message}`); }
       ticking = false;
     }
@@ -139,8 +174,10 @@ async function hourly() {
   for (const a of town.agents.values()) await store.appendMemories(a, memoryMark);
   memoryMark = town.t;
   const paper = town.papers[town.papers.length - 1]; if (paper) await store.savePaper(paper);
-  for (const l of await store.undeliveredLetters()) { town.sendLetter(l.agent_id, l.text); }
-  await store.markDelivered((await store.undeliveredLetters()).map((l) => l.id), town.t);
+  // letters posted through the API were delivered on the spot; this replays only the ones written straight into the record
+  const undelivered = await store.undeliveredLetters();
+  for (const l of undelivered) town.sendLetter(l.agent_id, l.text);
+  await store.markDelivered(undelivered.map((l) => l.id), town.t);
   for (const p of await store.pendingArrivals()) {
     const persona = Persona.safeParse(p.persona); if (!persona.success) continue;
     const a = town.addAgent({ persona: persona.data, owner: p.owner_id, funded: true }, p.id);
@@ -169,9 +206,12 @@ function primerOf(t: Town): string {
   return `The island of ${t.name}:\nPlaces: ${places.join("; ")}.\nWork: ${jobs.join("; ")}.\nThe boat comes each morning; the six o'clock cart moves grain to the mill, flour to the bakery, bread and fish and apples to the market. Sundays have no shifts, Saturday is market day, the first of the month is council day.\nFeasts: ${feasts.join("; ")}.\nPlots for sale are listed in the morning plan; the council sells them.`;
 }
 /** A person's depth, written once: how they talk, a habit, a skill, a flaw, why they came. The mock mind gives none, and that is fine. */
+type Enricher = { enrich(p: Persona, island: string): Promise<Partial<PersonaDepth> | null | undefined> };
+/** Whichever mind can write depth: the OpenRouter brain does, the Anthropic one may, the mock one never. Duck-typed, so either serves. */
+function enricherOf(b: Brain): Enricher | null { return "enrich" in b && typeof (b as { enrich?: unknown }).enrich === "function" ? (b as unknown as Enricher) : null; }
 async function deepen(a: AgentState): Promise<void> {
-  if (!(townBrain instanceof OpenRouterBrain) || a.persona.habit) return;
-  try { const d = await townBrain.enrich(a.persona, TOWN_NAME); if (d) { const own = a.persona.voice ?? []; a.persona = { ...a.persona, habit: d.habit, skill: d.skill, flaw: d.flaw, cameBecause: a.persona.cameBecause || d.cameBecause, voice: [...own, ...d.voice].slice(0, 3) }; log(`depth for ${a.persona.name}: ${d.habit}`); } }
+  const mind = enricherOf(townBrain); if (!mind || a.persona.habit) return;
+  try { const d = await mind.enrich(a.persona, TOWN_NAME); if (d) { const own = a.persona.voice ?? []; const voice = [...own, ...(d.voice ?? [])].slice(0, 3); a.persona = { ...a.persona, ...(d.habit ? { habit: d.habit } : {}), ...(d.skill ? { skill: d.skill } : {}), ...(d.flaw ? { flaw: d.flaw } : {}), ...(a.persona.cameBecause || d.cameBecause ? { cameBecause: a.persona.cameBecause || d.cameBecause! } : {}), ...(voice.length ? { voice } : {}) }; log(`depth for ${a.persona.name}: ${d.habit ?? "written"}`); } }
   catch (err) { log(`depth failed for ${a.persona.name}: ${(err as Error).message}`); }
 }
 async function deepenAll(): Promise<void> {
@@ -258,16 +298,20 @@ async function writtenDigest(a: AgentState, since: number): Promise<{ text: stri
   catch (err) { log(`digest failed for ${a.persona.name}: ${(err as Error).message}`); return null; }
 }
 /** An intent is the owner's to read, not the town's. Public streams carry the deed, never the why. */
-function publicEvent(e: TownEvent): TownEvent { if (!e.payload || !("because" in e.payload)) return e; const { because: _b, ...rest } = e.payload; return { ...e, ...(Object.keys(rest).length ? { payload: rest } : {}) } as TownEvent; }
+function publicEvent(e: TownEvent): TownEvent { if (!e.payload || !("because" in e.payload)) return e; const { because: _b, ...rest } = e.payload; const { payload: _p, ...base } = e; return { ...base, ...(Object.keys(rest).length ? { payload: rest } : {}) } as TownEvent; }
 app.get("/api/agents/:id/digest", async (c) => {
   const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
-  const since = Math.max(Number(c.req.query("since") ?? town.t - 3 * MINUTES_PER_DAY), a.arrivedAt); // nothing before the boat counts as "away"
-  const d = town.digest(a.id, since);
   const owner = await ownerOf(c.req.raw);
   const mine = owns(a, owner);
+  // the window: what the page asked for, else where this owner last read, else three days; the true start goes back so the kicker counts right
+  const asked = c.req.query("since"); const askedT = asked !== undefined && asked !== "" && Number.isFinite(Number(asked)) ? Number(asked) : null;
+  const read = mine ? await readOf(owner!, a.id) : null;
+  const since = sinceFor(a, askedT ?? read?.lastDigestT ?? null);
+  const d = town.digest(a.id, since);
   const written = mine ? await writtenDigest(a, since) : null;
   if (!mine) d.items = d.items.map(publicEvent);
-  return c.json({ ...d, written, since, now: town.t, agent: owns(a, owner) ? ownerAgent(town, a) : publicAgent(town, a), letters: owns(a, owner) ? town.events.filter((e) => e.kind === "agent.letter" && e.actors[0] === a.id && e.t >= since).map((e) => ({ t: e.t, text: String(e.payload?.text ?? e.text) })) : [] });
+  if (read && (read.lastDigestT ?? -1) < town.t) void saveRead({ ...read, lastDigestT: town.t }).catch((err: Error) => log(`read mark failed: ${err.message}`)); // opening the digest is reading it
+  return c.json({ ...d, written, since, now: town.t, readAt: read?.lastDigestT ?? null, agent: mine ? ownerAgent(town, a) : publicAgent(town, a), letters: mine ? town.events.filter((e) => e.kind === "agent.letter" && e.actors[0] === a.id && e.t >= since).map((e) => ({ t: e.t, text: String(e.payload?.text ?? e.text) })) : [] });
 });
 app.get("/api/agents/:id/events", (c) => {
   const id = c.req.param("id"); const since = Number(c.req.query("since") ?? 0);
@@ -279,7 +323,7 @@ app.post("/api/agents/:id/letters", async (c) => {
   const body = z.object({ text: z.string().min(1).max(1200) }).safeParse(await c.req.json()); if (!body.success) return c.json({ error: "a letter needs words" }, 400);
   if (/https?:\/\/|www\.|@[a-z0-9.-]+\.[a-z]{2,}/i.test(body.data.text)) metrics.hold("watch", `A letter to ${a.persona.name} carries a link or an address. Delivered; worth a look.`, "letters");
   town.sendLetter(a.id, body.data.text);
-  if (store) await store.saveLetter(a.id, owner, "to_agent", body.data.text, town.t);
+  if (store) await store.saveLetter(a.id, owner, "to_agent", body.data.text, town.t, town.t); // delivered now, so the hourly replay leaves it be
   return c.json({ ok: true, readsAt: "tomorrow morning" });
 });
 app.post("/api/agents/:id/possess", async (c) => {
@@ -342,11 +386,13 @@ app.get("/api/events/:id/voice", async (c) => {
   try { const buf = await voices.read(`${TOWN_ID}-${id}`, a.persona, text); return new Response(new Uint8Array(buf), { headers: { "Content-Type": "audio/wav", "Cache-Control": "private, max-age=86400", "X-Voice": voiceOf(a.persona.name) } }); }
   catch (err) { log(`voice for letter ${id}: ${(err as Error).message}`); return c.json({ error: (err as Error).message }, 502); }
 });
+/** What never leaves a person's head, so it is never a moment to share: the same set the paper keeps out. */
+const PRIVATE_KINDS = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self"]);
 app.get("/api/moments/:id", (c) => {
   const id = Number(c.req.param("id")); const e = town.events.find((x) => x.id === id);
-  if (!e) return c.json({ error: "that moment is not in the street's memory anymore" }, 404);
-  const around = town.events.filter((x) => x.place === e.place && Math.abs(x.t - e.t) <= 15 && x.kind !== "agent.move").slice(0, 20);
-  return c.json({ moment: e, around, place: town.places.get(e.place ?? "")?.name ?? null, people: e.actors.map((id2) => ({ id: id2, name: town.agents.get(id2)?.persona.name ?? id2 })) });
+  if (!e || PRIVATE_KINDS.has(e.kind)) return c.json({ error: "that moment is not in the street's memory anymore" }, 404);
+  const around = town.events.filter((x) => x.place === e.place && Math.abs(x.t - e.t) <= 15 && x.kind !== "agent.move" && !PRIVATE_KINDS.has(x.kind)).slice(0, 20).map(publicEvent);
+  return c.json({ moment: publicEvent(e), around, place: town.places.get(e.place ?? "")?.name ?? null, people: e.actors.map((id2) => ({ id: id2, name: town.agents.get(id2)?.persona.name ?? id2 })) });
 });
 app.get("/api/hall", (c) => {
   const mayor = town.mayor ? town.agents.get(town.mayor) : null;
@@ -359,7 +405,21 @@ app.post("/api/me/delete", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
   for (const a of [...town.agents.values()]) if (a.owner === owner) { town.removeAgent(a.id, "left", "Their owner closed the account."); if (store) await store.markLeft(a.id, town.t); }
   if (store) { await store.snapshot(town); await store.deleteOwner(owner); }
+  prefsCache.delete(owner); for (const k of [...readCache.keys()]) if (k.startsWith(`${owner}:`)) readCache.delete(k);
   return c.json({ ok: true });
+});
+// ---- what the owner is told by mail ----
+app.get("/api/me/notifications", async (c) => {
+  const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
+  const p = await prefsOf(owner);
+  return c.json({ notifyDigest: p.notifyDigest, notifyLetters: p.notifyLetters, email: store ? await store.ownerEmail(owner) : null, mail: mailEnabled(), lastMailedDay: p.lastMailedDay });
+});
+app.put("/api/me/notifications", async (c) => {
+  const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
+  const body = z.object({ notifyDigest: z.boolean().optional(), notifyLetters: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null)); if (!body.success) return c.json({ error: "that is not a notice the island sends" }, 400);
+  const p = await prefsOf(owner); const next = { ...p, notifyDigest: body.data.notifyDigest ?? p.notifyDigest, notifyLetters: body.data.notifyLetters ?? p.notifyLetters };
+  await savePrefs(next);
+  return c.json({ notifyDigest: next.notifyDigest, notifyLetters: next.notifyLetters, email: store ? await store.ownerEmail(owner) : null, mail: mailEnabled(), lastMailedDay: next.lastMailedDay });
 });
 // ---- who thinks: own key, own brain ----
 const brainView = (a: { id: string; brainKind: string }, row: BrainRow | undefined) => {
