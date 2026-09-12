@@ -32,7 +32,7 @@ export const PROSE_CAPS: Partial<Record<CallKind, Record<string, number>>> = {
   life: { text: 4400 },
   reflection: { summary: 1500 },
   digest: { text: 1400 },
-  persona_depth: { habit: 160, skill: 120, flaw: 160, cameBecause: 200, "voice[]": 160 },
+  persona_depth: { habit: 240, skill: 120, flaw: 240, cameBecause: 200, "voice[]": 240 }, // the protocol's caps for PersonaDepth
 };
 /** Cuts a paragraph at the last sentence end that fits the cap; failing that at a word; failing that at the cap itself. */
 export function trimProse(s: string, cap: number): string {

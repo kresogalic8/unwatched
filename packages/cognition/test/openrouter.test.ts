@@ -38,7 +38,7 @@ describe("the chooser", () => {
     const life = await b.life({ name: "Ada", persona: persona("Ada"), how: "left", note: "", arrivedDay: 1, day: 9, coins: 0, job: null, home: null, events: [], memories: [], people: [], letters: 0, children: [], lettersHome: [], lastThought: null, owned: [], convictions: 0 } as unknown as LifeContext);
     expect(life.title).toBe("A life"); expect(bodies[0]!.model).toBe("sonnet"); expect(seen[0]).toBe("town");
     const a = citizen("ada");
-    await b.digest({ agent: a, name: "Ada", day: 3, daysAway: 1, events: [], plan: null, letter: null, people: [], coins: 0, job: null, home: null, reflection: null, intentions: [] } as DigestContext);
+    await b.digest({ agent: a, name: "Ada", day: 3, daysAway: 1, events: [], plan: null, letter: null, people: [], coins: 0, job: null, home: null, reflection: null, intentions: [], projects: [], trust: [] } as DigestContext);
     expect(bodies[1]!.model).toBe("haiku"); expect(seen[1]).toBe("ada");
   });
   it("a hook that throws is a hook that said nothing", async () => {
@@ -50,7 +50,7 @@ describe("the chooser", () => {
 });
 
 describe("a quiet night", () => {
-  const ctx = (agent: AgentState, quiet: boolean) => ({ agent, day: 2, dayMemories: [], keyMemories: [], relationships: [], unreadLetters: [], quiet } as unknown as ReflectContext);
+  const ctx = (agent: AgentState, quiet: boolean) => ({ agent, day: 2, dayMemories: [], keyMemories: [], relationships: [], unreadLetters: [], plan: null, projects: [], beliefs: [], watch: [], quiet } as unknown as ReflectContext);
   const answer = { summary: "Nothing much.", insights: [], opinions: [], intentions: [], letter_to_owner: null };
   it("is thought through on the stakes model with fewer tokens, the same prompt otherwise", async () => {
     const { bodies } = fakeFetch([answer, answer]);
@@ -75,7 +75,7 @@ describe("the cache markers", () => {
     const answer = { summary: "Fine.", insights: [], opinions: [], intentions: [], letter_to_owner: null };
     const { bodies } = fakeFetch([answer, answer]);
     const b = new OpenRouterBrain({ apiKey: "k", ...models });
-    const ctx = (a: AgentState) => ({ agent: a, day: 2, dayMemories: [], keyMemories: [], relationships: [], unreadLetters: [] } as unknown as ReflectContext);
+    const ctx = (a: AgentState) => ({ agent: a, day: 2, dayMemories: [], keyMemories: [], relationships: [], unreadLetters: [], plan: null, projects: [], beliefs: [], watch: [], quiet: false } as unknown as ReflectContext);
     await b.reflect(ctx(citizen("ada"))); await b.reflect(ctx(citizen("bo", 5)));
     expect((bodies[0]!.messages[0]!.content as { cache_control?: unknown }[])[1]!.cache_control).toBeUndefined();
     expect((bodies[1]!.messages[0]!.content as { cache_control?: unknown }[])[1]!.cache_control).toEqual({ type: "ephemeral" });
@@ -95,7 +95,7 @@ describe("repairing an answer", () => {
     const paper = truncateProse("paper", { lead: { body: "A story. " + "z".repeat(3000) } }) as { lead: { body: string } };
     expect(paper.lead.body.length).toBeLessThanOrEqual(2600);
     const depth = truncateProse("persona_depth", { voice: ["short", "w ".repeat(200)], habit: "h ".repeat(200) }) as { voice: string[]; habit: string };
-    expect(depth.voice[0]).toBe("short"); expect(depth.voice[1]!.length).toBeLessThanOrEqual(160); expect(depth.habit.length).toBeLessThanOrEqual(160);
+    expect(depth.voice[0]).toBe("short"); expect(depth.voice[1]!.length).toBeLessThanOrEqual(240); expect(depth.habit.length).toBeLessThanOrEqual(240); // the protocol's caps
     expect(truncateProse("judgement", { happened: "x".repeat(500) })).toEqual({ happened: "x".repeat(500) }); // no table, no trim
   });
   it("names the path and the cap", () => {
@@ -106,7 +106,7 @@ describe("repairing an answer", () => {
     const long = "A day of rain. ".repeat(110); // 1650 characters, trimmed to a sentence under 1400 before zod sees it
     const { bodies } = fakeFetch([{ text: long, headline: "h".repeat(100) }, { text: "Rain.", headline: "Rain all day" }]);
     const b = new OpenRouterBrain({ apiKey: "k", ...models });
-    const out = await b.digest({ agent: citizen("ada"), name: "Ada", day: 3, daysAway: 1, events: [], plan: null, letter: null, people: [], coins: 0, job: null, home: null, reflection: null, intentions: [] } as DigestContext);
+    const out = await b.digest({ agent: citizen("ada"), name: "Ada", day: 3, daysAway: 1, events: [], plan: null, letter: null, people: [], coins: 0, job: null, home: null, reflection: null, intentions: [], projects: [], trust: [] } as DigestContext);
     expect(out).toEqual({ text: "Rain.", headline: "Rain all day" });
     expect(bodies).toHaveLength(2);
     const m = bodies[1]!.messages; expect(m).toHaveLength(4); expect(m[2]!.role).toBe("assistant");
@@ -116,7 +116,7 @@ describe("repairing an answer", () => {
     const long = "A day of rain. ".repeat(110);
     const { bodies } = fakeFetch([{ text: long, headline: "Rain" }]);
     const b = new OpenRouterBrain({ apiKey: "k", ...models });
-    const out = await b.digest({ agent: citizen("ada"), name: "Ada", day: 3, daysAway: 1, events: [], plan: null, letter: null, people: [], coins: 0, job: null, home: null, reflection: null, intentions: [] } as DigestContext);
+    const out = await b.digest({ agent: citizen("ada"), name: "Ada", day: 3, daysAway: 1, events: [], plan: null, letter: null, people: [], coins: 0, job: null, home: null, reflection: null, intentions: [], projects: [], trust: [] } as DigestContext);
     expect(bodies).toHaveLength(1); expect(out.text.length).toBeLessThanOrEqual(1400); expect(out.text.endsWith("rain.")).toBe(true);
   });
   it("when the fallback still stands in, the answer is marked without changing shape and ops hear of it", async () => {

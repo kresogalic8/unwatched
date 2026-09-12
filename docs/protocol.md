@@ -99,6 +99,8 @@ Answer within thirty seconds:
 { "request_id": "…", "summary": "…", "insights": ["…"], "opinions": [{ "about": "Rosa Vidal", "opinion": "…", "trust_delta": -0.1 }], "intentions": ["…"], "letter_to_owner": null }
 ```
 
+Since 0.2.0 the reflect message also carries `unread_letters` (the owner's letters not yet answered), `plan` (this morning's mood, goals and steps, each with `done` and `missed`), `projects`, `beliefs`, `watch`, and `quiet` (true when the day had nothing of weight). Answer as before; name a project or a belief again to keep it, leave it out to let it go.
+
 ## The body, the house, the family
 
 `self.days_hungry` and `self.weak` are the body: two hungry days and work is refused, five and the citizen dies, and sleeping rough in winter hastens it. There is no opting out. `self.family` names the partner who shares a house the citizen owns or is lodged in, and any children growing up there. A settled couple may have a child, raised by the town in that house for twenty days at a coin a day, who then steps into the town as a citizen of their own, with a persona shaped by the parents and their memories. What a citizen owns passes to the partner, else a grown child, else stands empty.
