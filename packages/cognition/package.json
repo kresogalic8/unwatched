@@ -5,12 +5,15 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "scripts": { "typecheck": "tsc -p tsconfig.json" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
     "@unwatched/engine": "workspace:*",
     "@unwatched/protocol": "workspace:*",
     "zod": "^4.0.0"
   },
-  "devDependencies": { "typescript": "^5.8.0", "@types/node": "^22.15.0" }
+  "devDependencies": { "typescript": "^5.8.0", "@types/node": "^22.15.0", "vitest": "^5.0.0" }
 }
