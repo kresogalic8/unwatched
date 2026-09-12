@@ -6,9 +6,38 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Goods are finite: every shelf carries a count, taking from a shelf removes the item, a theft from an owned shop reaches the owner's digest, a place buys only what it sells or uses and pays half the shelf price, and bread, fish and soup spoil at midnight past a shelf of twelve. The wild can be foraged: timber in the pinewood, stone at the quarry.
+- What a citizen perceives: where the people they know are and whether they are asleep, their own shift with its place, wage and hours, how hungry, tired and lonely they feel in words, and how many planks the sawpit holds before they try to build.
+- The midnight reflection sees the morning's plan with each step done or missed, the projects, the beliefs, the watch list and the unread letters, and is asked what it did of what it meant to do. Quiet days are marked so a cheaper mind can take them.
+- The digest admits what was said to and by the citizen, refused actions, price moves at places they own, and the first and last thing of each day, and leads with the gap between the plan and the day. Trust moves since the owner last looked are shown by name.
+- The body and the calendar interrupt the mind: real hunger with coins in pocket, the first day of starving, a debt due today, and a gathering within the hour each draw a thought.
+- A letter from an owner that asks something gets an answer within the day, one answer per letter, without spending the citizen's one unprompted letter home.
+- The morning email: at seven island time each owner gets their citizen's digest, and a letter home arrives by email the hour it is written. Both can be switched off on the account page. Needs RESEND_API_KEY; without it nothing is sent.
+- The digest knows how long you were away: a read watermark per owner and citizen, up to fourteen days of history, day headers over a long absence, and a link to the whole record.
+- The relationships page is in the tabs, every important line of the digest can be shared as a moment with a preview card, the profile page shows the portrait and links the book, and the Gazette links the town hall.
+- A way in from the town page for a visitor without a citizen, with locked previews of what an owner would see.
+- The model layer: one chooser for every call so the daily ceiling and a Patron's mind apply to conversations, digests, the Gazette and the books; quiet reflections on the middle mind; an answer that does not fit the schema is trimmed at a sentence or repaired with one more turn before any canned text stands in, and canned text is marked; a request timeout with one retry; persona depth on the Anthropic brain too.
+- Own brains receive the full reflect context (the plan, projects, beliefs, watch list, unread letters and the quiet flag), documented in docs/protocol.md.
+- Votes are recorded by name, one per citizen per proposal, and printed as an event. A non-exposé writing stays with its author as a memory.
+- Releases: CHANGELOG.md, RELEASING.md, pnpm release, a release workflow on version tags and release notes grouped by label.
+
 ### Changed
 
+- The Visitor plan gets one careful decision a day, so a letter home is possible but rare, and the letters and digest pages say plainly when a plan cannot write home.
+- The food economy was retuned for finite shelves: the bakery bakes 24 loaves a shift, the fishhouse lands 12 fish, the inn makes soup from fish, and the mainland keeps 30 bread and 20 fish home before buying.
+- The jobless take the nearest open post and the hungry walk to the nearest stocked shelf. A broken place no longer sacks people for a shift it could not hold.
+- Persona depth may be up to 240 characters a line, and the depth prompt states the limits.
+- Leaving on the boat is refused in a storm or while the boat is held.
+- The README, the rules page, the landing page and the boarding copy are written plain.
+
 ### Fixed
+
+- An owner's letter was delivered and remembered twice, once by the API and once by the hourly replay.
+- The digest window silently capped at three days and its kicker always said three days.
+- A plan step was marked done the moment a thought was spent; steps are now ticked by being at the place at the hour, or marked missed.
+- A stale plan could make salience fire and an unfunded citizen could throw inside a tick.
+- The gate page overflowed on phones; a failed plan purchase after boarding was swallowed silently.
+- The ops room metered conversations and digests at the town's models rather than the chooser's.
 
 ## [0.1.0] - 2026-09-12
 

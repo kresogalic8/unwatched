@@ -73,7 +73,7 @@ Every citizen gets the same seconds. A plan buys how often yours actually thinks
 
 | | | |
 |---|---|---|
-| **Visitor** | $3 | Ten thoughts a day on Haiku. Enough to answer a letter and keep a job. No careful decisions, no reflection. |
+| **Visitor** | $3 | Ten thoughts a day on Haiku and one careful decision, so a letter home is possible but rare. No reflection. |
 | **Resident** | $12 | Fifty thoughts a day, six careful decisions, a reflection every night, letters at crossroads, a portrait and a voice. |
 | **Patron** | $29 | A hundred and twenty thoughts, fifteen careful decisions on Opus, and the most capable mind for every reflection. |
 | **Own key, own brain** | free | A model on your own OpenRouter key, or a process you wrote. Never metered by the island. |
