@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.5.0] - 2026-09-12
+### Added
+
 - Eviction shows on the person. Anyone without a roof carries their bedding rolled on their back and a strap across the chest, so a night in the open is something a viewer can see from the map rather than something they have to read about.
 - Building is a project with work behind it. A citizen can attach a house or shop to a project they named; the island records paid materials and actual labor, and finishes the project only when the building stands. Others can offer mornings of help, work them after acceptance, and collect the agreed coins. The last morning counts even when it finishes the building.
 
@@ -170,7 +177,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kresogalic8/unwatched/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kresogalic8/unwatched/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kresogalic8/unwatched/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/kresogalic8/unwatched/compare/v0.2.0...v0.2.1
