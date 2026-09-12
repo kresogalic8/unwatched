@@ -1,26 +1,21 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { constructionStage, type BuildingReplay } from "@unwatched/protocol";
 import { API } from "@/lib/api";
 import { Wordmark } from "./ui";
+import { House as HarborHouse, P } from "./world/harbor-art";
 
 /** Architectural reconstruction from measured labor; no invented citizen movements or dialogue. */
 function House({ labor, needed, shop = false }: { labor: number; needed: number; shop?: boolean }) {
-  const ratio = labor / Math.max(1, needed); const finished = ratio >= 1;
-  return <g stroke="#274c48" strokeWidth="2.5" strokeLinejoin="round">
-    <ellipse cx="0" cy="30" rx="150" ry="23" fill="#264d4820" stroke="none" />
-    <path d="M-112 6 L-76 -12 H104 L126 6 L92 23 H-88Z" fill="#d3c6a9" />
-    {ratio < .3 && <g strokeDasharray="5 5"><path d="M-92 4V-39H94V4Z" fill="#eee5d0" /><path d="M-92 -39L-63 -60H121L94 -39" fill="none" /></g>}
-    {ratio >= .3 && <g><path d={`M-92 4V${-32-Math.min(ratio,.8)*115}H94V4Z`} fill="#f7f3e9" /><path d={`M94 4L122 -17V${-53-Math.min(ratio,.8)*115}L94 ${-32-Math.min(ratio,.8)*115}Z`} fill="#cccfba" />
-      {Array.from({length: Math.floor(Math.min(ratio,.8)*10)},(_,i)=><path key={i} d={`M-91 ${-12-i*14}H93`} stroke="#c9c4b0" strokeWidth="1" />)}
-      <path d="M-14 4V-54Q4 -73 22 -54V4" fill="#305954" />
-      {ratio >= .6 && <g fill="#aec8bf"><path d="M-70 -70H-38V-33H-70Z" /><path d="M47 -70H77V-33H47Z" /><path d="M-54 -70V-33M62 -70V-33" /></g>}
-    </g>}
-    {ratio >= .8 && <g><path d="M-112 -127L0 -199L112 -127Z" fill="#557b70" /><path d="M0 -199L28 -215L137 -145L112 -127Z" fill="#355e55" /><path d="M-118 -124H116" strokeWidth="6" /></g>}
-    {!finished && <g stroke="#9e8962" fill="none"><path d="M-114 8V-156M-81 8V-139M113 8V-152M-120 -95H121M-120 -144H121M-114 -95L-81 -140M-81 -95L-114 -40" strokeWidth="4" /><path d="M132 9L157 -110M143 9L168 -110" />{Array.from({length:7},(_,i)=><path key={i} d={`M${134+i*3.5} ${-i*16}h12`} />)}</g>}
-    {finished && <g><path d="M-93 4H94" strokeWidth="6" />{shop ? <g><path d="M-85 -79H85L95 -58H-95Z" fill="#bd694b" /><path d="M-48 -108H48V-89H-48Z" fill="#e5cf9e" /></g> : <g fill="#6c8662"><ellipse cx="-107" cy="-7" rx="18" ry="25" /><ellipse cx="119" cy="-6" rx="15" ry="21" /></g>}</g>}
-    {!finished && <g fill="#c5ab79">{[0,1,2].map(i=><path key={i} d={`M-167 ${8-i*7}h40v5h-40Z`} />)}</g>}
+  const id=useId(),ratio=Math.max(0,Math.min(1,labor/Math.max(1,needed))),finished=ratio>=1;
+  const [x,y]=P(130,95),height=ratio<.3?8:ratio<.8?28+(ratio-.3)*270:170+(ratio-.8)*450;
+  return <g>
+    <path d="M-128 -4L-40 -46L108 2L18 45Z" fill="#ddd7bd" stroke="#b5b69d" strokeWidth="1"/>
+    <defs><clipPath id={id}><rect x="-200" y={-height} width="400" height={height+5}/></clipPath></defs>
+    <g clipPath={finished?undefined:`url(#${id})`}><g transform={`translate(${-x*.9} ${-y*.9}) scale(.9)`}><HarborHouse u={0} v={0} w={130} d={95} h={142} name="" cafe={shop}/></g></g>
+    {!finished&&<g stroke="#a28d69" strokeWidth="2" fill="none"><path d="M-110 4V-181M105 4V-181M-110 -65H105M-110 -148H105M-110 -65L-62 -148M105 -65L61 -148"/>
+    <path d="M119 8L147 -138M132 8L160 -138"/>{Array.from({length:10},(_,i)=><path key={i} d={`M${120+i*2.8} ${3-i*14}h13`} />)}</g>}
   </g>;
 }
 

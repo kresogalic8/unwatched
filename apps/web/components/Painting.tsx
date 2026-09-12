@@ -3,7 +3,7 @@ import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef } from "react";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { Citizen, lookFor } from "@/components/world/citizen";
-import { drawThing } from "@/components/world/buildings";
+import { loadWorldArt, drawThing } from "@/components/world/buildings";
 import type { PaperScene } from "@/lib/api";
 import { KELP, SAND, GROUND, LIGHT, SKY } from "@/components/world/palette";
 
@@ -20,7 +20,8 @@ export function Painting({ scene, edition }: { scene: PaperScene; edition: numbe
     (async () => {
       const el = host.current!; const W = 720, H = 400;
       app = new Application();
-      await app.init({ width: W, height: H, background: SAND, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
+      await loadWorldArt();
+      await app.init({bezierSmoothness:.97, width: W, height: H, background: SAND, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
       if (!alive) { app.destroy(true); return; }
       el.replaceChildren(app.canvas); app.canvas.style.width = "100%"; app.canvas.style.height = "auto";
       const stage = new Container(); app.stage.addChild(stage);

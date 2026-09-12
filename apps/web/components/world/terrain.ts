@@ -48,103 +48,70 @@ function ribbon(g: Graphics, a: Pt, b: Pt, width: number, color: number, alpha =
 }
 
 export function drawGround(o: TerrainOptions, season: string): Graphics {
-  const { W, H, cy, inside, outline, places, oldTown } = o; const g = new Graphics();
-  const poly = (pts: [number, number][]) => { g.moveTo(pts[0]![0], pts[0]![1]); for (const [x, y] of pts.slice(1)) g.lineTo(x, y); g.closePath(); return g; };
-  // the sea's edge: the island's shadow on the water, a see-through shallows ring over the sea's own light, then wet sand and sand
-  const shadowRing = outline(1.0).map(([x, y]) => [x + 8, y + 24] as [number, number]); poly(shadowRing).fill({ color: KELP, alpha: 0.16 });
-  poly(outline(1.09)).fill({ color: GROUND.shallow, alpha: 0.42 });
-  poly(outline(1.0)).fill(GROUND.wetSand);
-  poly(outline(0.975)).fill(GROUND.sand);
-  // how much of each ground is at a point: smooth, so kinds fade into each other over sixty pixels
-  const at = (ids: string[]) => ids.map((id) => places.get(id)).filter((p): p is TerrainPlace => !!p);
-  const zones: { ids: TerrainPlace[]; r: number; color: number; kind: string }[] = [
-    { ids: at(["harbor", "cove", "coast", "boatshed"]), r: 200, color: GROUND.sand, kind: "sand" },
-    { ids: at(["pinewood", "sawpit", "wood-1"]), r: 300, color: GROUND.forest, kind: "forest" },
-    { ids: at(["quarry", "lighthouse"]), r: 230, color: GROUND.rock, kind: "rock" },
-    { ids: at(["fields", "orchard"]), r: 240, color: GROUND.field, kind: "field" },
-    { ids: at(oldTown), r: 260, color: GROUND.cobble, kind: "cobble" },
-  ];
-  const weightsAt = (x0: number, y0: number) => {
-    // the edges wander: every point is looked up a little off from where it is, by a slow noise, so no border follows the tiles
-    const x = x0 + (noise(x0 / 150 + 7, y0 / 90) - 0.5) * 140, y = y0 + (noise(x0 / 120, y0 / 75 + 3) - 0.5) * 70;
-    const d = inside(x, y); const out: { kind: string; color: number; w: number }[] = [];
-    out.push({ kind: "sand", color: GROUND.sand, w: smooth((d - 0.85) / 0.07) });
-    for (const z of zones) { let w = 0; for (const p of z.ids) { const dist = Math.hypot(p.x - x, (p.y - 30 - y) * 1.6); w = Math.max(w, smooth((z.r - dist) / 110)); } if (w > 0) out.push({ kind: z.kind, color: z.color, w }); }
-    return out;
-  };
-  const TW = 64, TH = 32; const hill = places.get("hill") ?? places.get("mill");
-  const contour = (x: number, y: number) => hill ? Math.max(0, 1 - Math.hypot(x - hill.x, (y - hill.y) * 1.7) / 420) : 0;
-  for (let j = -12; j < (H / TH) * 2 + 12; j++) for (let i = -6; i < W / TW + 6; i++) {
-    const x = i * TW + (j % 2 ? TW / 2 : 0), y = j * (TH / 2);
-    const d = inside(x, y); if (d > 0.965) continue;
-    // blend the grounds by weight, grass underneath
-    let color = GROUND.grass; let dominant = "grass"; let best = 0;
-    for (const z of weightsAt(x, y)) { color = mix(color, z.color, z.w); if (z.w > best) { best = z.w; dominant = z.w > 0.5 ? z.kind : dominant; } }
-    // tone: a slow swell across the ground and a grain per tile, so nothing reads as a grid; the hill is a shade lighter as it rises
-    const tone = (noise(x / 260, y / 160) - 0.5) * 0.06 + (hash2(i, j) - 0.5) * 0.012 + Math.floor(contour(x, y) * 3) * 0.012;
-    g.moveTo(x, y - TH / 2).lineTo(x + TW / 2, y).lineTo(x, y + TH / 2).lineTo(x - TW / 2, y).closePath().fill(shade(color, tone));
-    const h = hash2(i * 7, j * 3);
-    if (dominant === "field" && (i + j) % 2 === 0) g.moveTo(x - 22, y - 2).lineTo(x + 22, y - 2).stroke({ width: 1.5, color: 0xb2c6a3, alpha: 0.9 });
-    if (dominant === "forest" && h < 0.2) g.circle(x + (h * 50) % 11 - 5, y + (h * 70) % 7 - 3, 4).fill({ color: 0x9fbfa8, alpha: 0.8 });
-    if (dominant === "cobble") for (let k = 0; k < 3; k++) { const hh = hash2(i + k * 17, j + k * 31); g.ellipse(x - 18 + hh * 36, y - 8 + ((hh * 97) % 1) * 16, 3.2, 2).fill({ color: KELP, alpha: 0.045 }); }
-    if (dominant === "grass") {
-      if (h < 0.11) { const gx = x - 10 + h * 180, gy = y - 4 + ((h * 53) % 1) * 8; g.moveTo(gx, gy).lineTo(gx + 2, gy - 6).moveTo(gx + 4, gy).lineTo(gx + 5, gy - 5).stroke({ width: 1.2, color: 0xa9c4a4, alpha: 0.9 }); }
-      else if ((season === "spring" || season === "summer") && h > 0.93) { const fx = x - 12 + h * 24, fy = y - 3 + ((h * 31) % 1) * 6; g.circle(fx, fy, 1.6).fill({ color: h > 0.97 ? CORAL : CREAM, alpha: 0.85 }); }
-      else if (h > 0.905 && h <= 0.93) g.ellipse(x - 8 + h * 16, y + 2, 3, 1.6).fill({ color: GROUND.rock, alpha: 0.5 });
-    }
-    if (dominant === "rock" && h < 0.16) g.ellipse(x - 8 + h * 100, y, 6, 3).fill({ color: 0x8e9aa8, alpha: 0.2 });
-    if (dominant === "sand" && h < 0.08) g.moveTo(x - 9, y + 3).quadraticCurveTo(x, y + 1, x + 9, y + 3).stroke({ width: 1, color: GROUND.wetSand, alpha: 0.9 });
+  const {W,H,cy,inside,outline,places,oldTown}=o; const g=new Graphics();
+  const poly=(pts:[number,number][])=>{g.moveTo(...pts[0]!);for(const p of pts.slice(1))g.lineTo(...p);return g.closePath();};
+  // A continuous landscape replaces the old diamond terrain grid.
+  poly(outline(1.055)).fill({color:0xc5d8c9,alpha:.65});
+  poly(outline(1).map(([x,y])=>[x+9,y+22] as [number,number])).fill({color:0x527d70,alpha:.15});
+  poly(outline(1)).fill(0xc3c6a8);poly(outline(.98)).fill(0xded7bb);
+  poly(outline(.92)).fill(season==="winter"?0xc8cbbd:season==="autumn"?0xcac6a4:0xc4c9a6);
+  // Broad overlapping color washes have soft, irregular boundaries, never hard tiles.
+  for(let n=0;n<380;n++) {
+    const x=hash2(n,31)*W,y=hash2(n,67)*H,rx=25+hash2(n,19)*50,ry=rx*.42;
+    if(inside(x-rx,y)>.90||inside(x+rx,y)>.90||inside(x,y+ry)>.90||inside(x,y-ry)>.90)continue;
+    g.ellipse(x,y,rx,ry).fill({color:n%3?0xe1d9b8:0x97aa88,alpha:.075});
   }
-  // the hill's contours: a thin dark edge on the downhill side of each step, inside the island only
-  if (hill) for (const r of [140, 260, 380]) { const pts: [number, number][] = []; for (let k = 0; k <= 60; k++) { const a = (k / 60) * Math.PI; const x = hill.x + Math.cos(a) * r * (1 + (noise(k / 9, r / 100) - 0.5) * 0.18), y = hill.y + 20 + Math.sin(a) * r * 0.58; if (inside(x, y) < 0.95) pts.push([x, y]); else if (pts.length) { break; } } for (let k = 1; k < pts.length; k++) g.moveTo(pts[k - 1]![0], pts[k - 1]![1]).lineTo(pts[k]![0], pts[k]![1]).stroke({ width: 1.5, color: KELP, alpha: 0.07 }); }
-  // the shore: a wrack line the tide left, and rocks where the noise put them
-  const wrack = outline(0.985);
-  for (let k = 0; k < wrack.length; k += 2) { const n = noise(k / 7, 3.3); if (n < 0.45) continue; const a = wrack[k]!, b = wrack[(k + 2) % wrack.length]!; g.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2, color: 0x9a9c7a, alpha: 0.35 + (n - 0.45) * 0.6, cap: "round" }); }
-  const rocksAt = outline(0.993);
-  for (let k = 0; k < rocksAt.length; k += 5) { const n = noise(k / 4 + 11, 7.1); if (n < 0.72) continue; const [x, y] = rocksAt[k]!; const s = 4 + n * 6; g.ellipse(x, y, s, s * 0.55).fill(GROUND.rock).stroke({ width: 1, color: KELP, alpha: 0.5 }); g.ellipse(x - s * 0.3, y - s * 0.2, s * 0.5, s * 0.25).fill({ color: 0xffffff, alpha: 0.25 }); }
-  // the shore has height: where it is not a beach, rock drops from the land's edge to the water on the side that faces us.
-  // The lip wanders, the face is broken into stones of uneven width and tone with a few strata and cracks, and the odd block has fallen to the foot.
-  const beachy = (x: number, y: number) => zones[0]!.ids.some((p) => Math.hypot(p.x - x, (p.y - 30 - y) * 1.6) < 300);
-  const rim = outline(0.985);
-  const lipAt = (k: number) => { const pt = rim[((k % rim.length) + rim.length) % rim.length]!; return [pt[0], pt[1] - 2 + (noise(k / 2.2, 4.4) - 0.5) * 8] as [number, number]; };
-  const hAt = (k: number) => 12 + noise(k / 6, 2.2) * 18 + (noise(k / 1.9, 8.8) - 0.5) * 5;
-  let seed = 0;
-  for (let k = 0; k < rim.length; k++) {
-    const a = lipAt(k), b = lipAt(k + 1); const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-    const facing = my > cy + 40; if (!facing || beachy(mx, my)) continue;
-    const hA = hAt(k), hB = hAt(k + 1);
-    // stones of uneven width across the stretch; tone from the noise, so neighbours differ but nothing repeats
-    let t0 = 0; while (t0 < 1) {
-      seed++; const wdt = 0.18 + hash2(seed, 3) * 0.5; const t1 = Math.min(1, t0 + wdt);
-      const x0 = a[0] + (b[0] - a[0]) * t0, y0 = a[1] + (b[1] - a[1]) * t0, x1 = a[0] + (b[0] - a[0]) * t1, y1 = a[1] + (b[1] - a[1]) * t1;
-      const h0 = hA + (hB - hA) * t0, h1 = hA + (hB - hA) * t1; const tone = -0.36 + noise(seed / 1.3, 6.1) * 0.26;
-      g.moveTo(x0, y0).lineTo(x1, y1).lineTo(x1, y1 + h1).lineTo(x0, y0 + h0).closePath().fill(shade(GROUND.rock, tone));
-      if (hash2(seed, 9) > 0.62) g.moveTo(x0, y0 + 1).lineTo(x0 + (hash2(seed, 5) - 0.5) * 4, y0 + h0 - 1).stroke({ width: 1, color: KELP, alpha: 0.22 }); // a crack between stones
-      if (hash2(seed, 13) > 0.5) { const sy = 0.3 + hash2(seed, 17) * 0.5; g.moveTo(x0 + 1, y0 + h0 * sy).lineTo(x1 - 1, y1 + h1 * sy).stroke({ width: 1, color: KELP, alpha: 0.14 }); } // a stratum
-      t0 = t1;
-    }
-    g.moveTo(a[0], a[1] + hA).lineTo(b[0], b[1] + hB).stroke({ width: 1.6, color: KELP, alpha: 0.5 }); // the foot, dark against the water
-    g.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 1.6, color: shade(GROUND.rock, 0.14), alpha: 0.95 }); // the lip catches the light
-    if (noise(k / 1.7, 11.3) > 0.8) { const r = 3 + noise(k, 1.1) * 3; g.ellipse(mx + 4, my + Math.max(hA, hB) + 2, r, r * 0.55).fill(GROUND.rock).stroke({ width: 1, color: KELP, alpha: 0.5 }); }
+  const urban=[...places.values()].filter(p=>oldTown.includes(p.id)||["harbor","boatshed","chandlery","fishhouse","inn"].includes(p.id));
+  const urbanity=(x:number,y:number)=>urban.reduce((best,p)=>Math.min(best,Math.hypot((x-p.x)/230,(y-p.y+20)/145)),Infinity);
+  // Worn limestone beds fade into the soil; only fragments retain a visible joint.
+  for (const p of urban) for (let layer=0;layer<4;layer++) {
+    const rx=185-layer*23, ry=105-layer*13;
+    if(inside(p.x-rx,p.y)<.97 && inside(p.x+rx,p.y)<.97 && inside(p.x,p.y+ry)<.97)
+      g.ellipse(p.x,p.y-15,rx,ry).fill({color:0xdbd5bd,alpha:.16});
   }
-  // where people stand: bare earth at every door and at the junctions
-  for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild") continue; const dr = doorOf(p); g.ellipse(dr.x, dr.y, 62, 24).fill({ color: GROUND.earth, alpha: 0.35 }); g.ellipse(dr.x, dr.y, 40, 15).fill({ color: GROUND.earth, alpha: 0.35 }); }
+  // Sparse, chipped stones interrupt the paving instead of covering town in a checkerboard.
+  for(let row=-8;row<H/10+8;row++)for(let col=-4;col<W/38+4;col++) {
+    const x=col*38+(row%2)*19,y=row*10;
+    if(hash2(col+311,row+91)<.58)continue;
+    if(urbanity(x,y)>1+noise(x/110,y/80)*.18)continue;
+    const pts:[number,number][]=[[x-2,y-8],[x+15,y-1],[x+16,y+1],[x+1,y+8],[x-15,y+1],[x-16,y-1]];
+    if(pts.some(([xx,yy])=>inside(xx,yy)>.973))continue;
+    poly(pts).fill({color:[0xd8d2bc,0xdcd6c0,0xd4cfb8,0xdfd8c1,0xd7d3bc][Math.floor(hash2(col,row)*5)]!,alpha:.25+hash2(col+81,row)*.22});
+    g.moveTo(x-17,y).lineTo(x,y-9).lineTo(x+17,y).stroke({width:.45,color:0xeee3c9,alpha:.25});
+  }
+  // Tiny grass, shells and limestone chips share the ground instead of sitting on tile symbols.
+  for(let n=0;n<2400;n++) {
+    const x=hash2(n,7)*W,y=hash2(n,13)*H,d=inside(x,y); if(d>.96)continue;
+    const paved=urbanity(x,y)<1.15;
+    if(paved) { if(n%4===0)g.ellipse(x,y,.7,.4).fill({color:0x8d9277,alpha:.3});continue; }
+    if(n%7===0)g.ellipse(x,y,2.2,1).fill({color:0xeee4c9,alpha:.7});
+    else if(d<.86){g.moveTo(x,y).quadraticCurveTo(x-2,y-3,x-1,y-5).moveTo(x+2,y).lineTo(x+4,y-4).stroke({width:.8,color:0x889b75,alpha:.5});if(season==="spring"&&n%13===0)g.circle(x,y-5,1.6).fill(0xd4a087);}
+  }
+  // The front shore is a physical cut of limestone, with cap stones and mortar joints.
+  const rim=outline(.99);
+  for(let k=0;k<rim.length;k++) {
+    const a=rim[k]!,b=rim[(k+1)%rim.length]!;if((a[1]+b[1])/2<cy)continue;
+    const h=17+noise(k/8,2)*13;
+    poly([a,b,[b[0],b[1]+h],[a[0],a[1]+h]]).fill(k%3?0xb1b49b:0xa6ad95);
+    g.moveTo(a[0],a[1]+2).lineTo(a[0],a[1]+h).stroke({width:.7,color:0x87977f,alpha:.65});
+    g.moveTo(...a).lineTo(...b).stroke({width:4,color:k%2?0xe5dec5:0xd9d5bc});
+    g.moveTo(a[0],a[1]+h).lineTo(b[0],b[1]+h).stroke({width:1,color:0x789381,alpha:.55});
+  }
   return g;
 }
 
 /** Roads with an edge, a centre worn pale, and cobbles in the old town. Drawn once; the wear layer above them changes. */
 export function drawRoads(segs: Seg[]): Graphics {
-  const g = new Graphics();
-  segs.forEach((s, i) => ribbon(g, s.a, s.b, 34, s.cobbled ? 0xd3cbb8 : GROUND.earthEdge, 1, 3, i * 1.7));
-  segs.forEach((s, i) => ribbon(g, s.a, s.b, 26, s.cobbled ? GROUND.cobble : GROUND.earth, 1, 3, i * 1.7));
-  for (const s of segs) {
-    if (s.cobbled) { // stones in courses along the street
-      const L = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y); const ux = (s.b.x - s.a.x) / L, uy = (s.b.y - s.a.y) / L, nx = -uy, ny = ux;
-      for (let t = 6; t < L - 6; t += 11) for (let k = -1; k <= 1; k++) { const h = hash2(Math.round(t), k + 5); if (h < 0.35) continue; const off = k * 7.5 + (h - 0.5) * 5; const x = s.a.x + ux * t + nx * off + (h * 7 % 1 - 0.5) * 4, y = s.a.y + uy * t + ny * off; g.ellipse(x, y, 3.6, 2).fill({ color: KELP, alpha: 0.045 }); }
+  const g=new Graphics();
+  segs.forEach((s,i)=>{
+    const L=Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y);if(L<1)return;
+    if(!s.cobbled) {ribbon(g,s.a,s.b,22,0xcfc5a8,.34,4,i);ribbon(g,s.a,s.b,15,0xe2d7b9,.65,3,i);}
+    const ux=(s.b.x-s.a.x)/L,uy=(s.b.y-s.a.y)/L;
+    for(let t=7;t<L;t+=14){const h=hash2(Math.round(t),i),x=s.a.x+ux*t,y=s.a.y+uy*t;
+      if(s.cobbled)g.moveTo(x-8,y).lineTo(x,y-4).lineTo(x+8,y).lineTo(x,y+4).closePath().fill({color:h>.5?0xe3ddc5:0xd4ceb5,alpha:.55});
+      else if(h>.65)g.ellipse(x+7,y+3,1.8,.8).fill({color:0xb0b394,alpha:.45});
     }
-  }
-  for (const s of segs) if (!s.cobbled) { const dx = s.b.x - s.a.x, dy = s.b.y - s.a.y, L = Math.hypot(dx, dy) || 1; const nx = -dy / L * 6, ny = dx / L * 6; for (const sgn of [-1, 1]) g.moveTo(s.a.x + nx * sgn, s.a.y + ny * sgn).lineTo(s.b.x + nx * sgn, s.b.y + ny * sgn).stroke({ width: 1.2, color: GROUND.earthEdge, alpha: 0.45 }); }
-  return g;
+  });return g;
 }
 
 /** The wear on the roads: the centre goes pale where feet go. Counts steps between places and redraws now and then. */
@@ -154,7 +121,7 @@ export class Wear extends Container {
   step(from: string, to: string): void { const key = [from, to].sort().join("|"); if (!this.count.has(key)) return; this.count.set(key, (this.count.get(key) ?? 0) + 1); this.dirty = true; }
   redraw(): void {
     if (!this.dirty) return; this.dirty = false; const g = this.g; g.clear();
-    for (const s of this.segs) { const n = this.count.get(s.key) ?? 0; if (n <= 0) continue; const k = Math.min(1, Math.log2(1 + n) / 7); ribbon(g, s.a, s.b, 4 + 9 * k, s.cobbled ? 0xe2dbca : 0xe6dcc4, 0.16 + 0.3 * k, 2, 3); }
+    for (const s of this.segs) { const n = this.count.get(s.key) ?? 0; if (n <= 0) continue; const k = Math.min(1, Math.log2(1 + n) / 7); ribbon(g, s.a, s.b, 4 + 9 * k, s.cobbled ? 0xe2dbca : 0xe6dcc4, 0.06 + 0.08 * k, 2, 3); }
   }
 }
 

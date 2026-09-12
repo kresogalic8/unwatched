@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { join } from "node:path";
 
 /** The island's palette, the same hexes the code-drawn buildings use. */
-export const PALETTE = ["#F7F5EE", "#E9E5D8", "#1F5F5B", "#174A47", "#E8735A", "#B9D9C6", "#9FC2AD", "#1E2A2B", "#C9B58F", "#8A6A45"];
+export const PALETTE = ["#F7F5EE", "#E9E5D8", "#1F5F5B", "#174A47", "#E8735A", "#B9D9C6", "#9FC2AD", "#1E2A2B", "#C9B58F", "#8A6A45", "#B97754", "#92553E", "#76846A", "#D1C6AD"];
 const BACKGROUND = "#EFEDE4";
 const MODEL = process.env.UW_LOOK_MODEL ?? "recraftv4_1_vector";
 
@@ -39,7 +39,7 @@ export function patternFor(look: string, kind: "house" | "shop"): string { const
 
 /** The prompt that keeps every generated building in the island's hand. */
 export function lookPrompt(look: string, kind: "house" | "shop"): string {
-  return `Flat vector illustration of ${look}, a small ${kind === "shop" ? "shop or workshop" : "house"} on a Mediterranean island, drawn in dimetric projection (2:1 isometric, seen from the front-right corner at a 30 degree angle), for a hand-drawn game map. Style: clean flat fills with a single thin dark outline of even weight, no gradients, no textures, no shading except a slightly darker right-facing wall; cream walls, dark teal roof, coral red for a door or a shutter, muted sage accents, wood in warm tan. Centered, the whole building visible, nothing else in the frame: no ground, no shadow, no people, no text, no background.`;
+  return `Flat vector illustration of ${look}, a small ${kind === "shop" ? "shop or workshop" : "house"} on a Mediterranean island, drawn in dimetric projection (2:1 isometric, seen from the front-right corner at a 30 degree angle), for a hand-drawn game map. Style: a handcrafted Mediterranean diorama, clean vector shapes with fine muted olive outlines, warm limestone blocks and plaster, individually drawn terracotta roof tiles, recessed windows with olive wooden shutters, pale stone sills, warm tan wood, subtle material facets and a darker right-facing wall; no gradients or raster textures. Preserve the citizen's explicitly described architectural features and colors; use these materials as defaults where unspecified. Centered, the whole building visible, nothing else in the frame: no ground, no shadow, no people, no text, no background.`;
 }
 
 const hexOf = (m: RegExpMatchArray) => "#" + [m[1], m[2], m[3]].map((v) => Number(v).toString(16).padStart(2, "0")).join("").toUpperCase();

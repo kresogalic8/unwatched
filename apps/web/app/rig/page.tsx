@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { Page, Label } from "@/components/ui";
 import { Citizen, lookFor, aged, type Look, type Pose } from "@/components/world/citizen";
-import { drawThing, drawStock, DRAWN } from "@/components/world/buildings";
+import { loadWorldArt, drawThing, drawStock, DRAWN } from "@/components/world/buildings";
 import { Portrait } from "@/components/Portrait";
 
 /** The citizen rig, laid out like a model sheet: every part, every pose, and one person walking the length of the harbor. */
@@ -15,7 +15,8 @@ export default function Rig() {
     (async () => {
       const el = host.current!;
       app = new Application();
-      await app.init({ background: 0xefede4, resizeTo: el, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
+      await loadWorldArt();
+      await app.init({bezierSmoothness:.97, background: 0xefede4, resizeTo: el, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
       if (!alive) { app.destroy(true); return; }
       el.appendChild(app.canvas);
       const stage = new Container(); app.stage.addChild(stage);
@@ -61,19 +62,15 @@ export default function Rig() {
       newPoses.forEach(([name, pose], i) => { const c = new Citizen({ ...base, hair: "Bob", carrying: "Basket", top: "Teal", bottom: "Sand", beard: "None", glasses: false, hairColor: "Dark", pattern: "Plain", shape: "Straight" }); c.scale.set(S); c.position.set(70 + i * 110, 1420); c.setPose(pose); if (pose === "argue") c.mood({ anger: 0.8 }); if (pose === "greet") c.mood({ joy: 0.7 }); stage.addChild(c); rigs.push({ c }); label(name, 70 + i * 110, 1428); });
       // every building and prop, at the world's scale
       const names = [...DRAWN]; let bx = 90, by = 1600, rowH = 0;
-      for (const n of names) { const d = drawThing(n); if (!d) continue; const wpx = d.w * 1.1 + 30; if (bx + wpx > 1180) { bx = 90; by += rowH + 40; rowH = 0; } d.c.scale.set(1.1); d.c.position.set(bx + d.w * 0.55, by); stage.addChild(d.c); const t = new Text({ text: n, style: { fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x6f7a78 } }); t.anchor.set(0.5, 0); t.position.set(bx + d.w * 0.55, by + 6); stage.addChild(t); bx += wpx; rowH = Math.max(rowH, 150); }
+      for (const n of names) { const d = drawThing(n); if (!d) continue; const wpx = d.w * 1.1 + 30; if (bx + wpx > 1180) { bx = 90; by += rowH + 40; rowH = 0; } d.c.scale.set(1.1); d.c.position.set(bx + d.w * 0.55, by); stage.addChild(d.c); const t = new Text({ text: n, style: { fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x6f7a78 } }); t.anchor.set(0.5, 0); t.position.set(bx + d.w * 0.55, by + 6); stage.addChild(t); bx += wpx; rowH = Math.max(rowH, 300); }
       // the shelves as the street shows them: full, and half empty
       const SHELVES: [string, Record<string, number>][] = [["stall", { bread: 12, fish: 9, apples: 6 }], ["stall", { bread: 3, fish: 0, apples: 0 }], ["sawpit", { planks: 24, timber: 8 }], ["sawpit", { planks: 4 }], ["mill", { flour: 30, grain: 12 }], ["fishhouse", { fish: 14 }], ["tree-large", { timber: 14 }]];
       bx = 90; by += rowH + 60; rowH = 0;
-      for (const [sprite, stock] of SHELVES) { const d = drawThing(sprite); if (!d) continue; const wpx = d.w * 1.1 + 30; if (bx + wpx > 1180) { bx = 90; by += rowH + 40; rowH = 0; } d.c.scale.set(1.1); d.c.position.set(bx + d.w * 0.55, by); stage.addChild(d.c); const st = drawStock(sprite, stock); if (st) { st.scale.set(1.1); st.position.set(bx + d.w * 0.55, by); stage.addChild(st); } const t = new Text({ text: Object.entries(stock).map(([k, v]) => `${v} ${k}`).join(" · "), style: { fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x6f7a78 } }); t.anchor.set(0.5, 0); t.position.set(bx + d.w * 0.55, by + 6); stage.addChild(t); bx += wpx; rowH = Math.max(rowH, 150); }
+      for (const [sprite, stock] of SHELVES) { const d = drawThing(sprite); if (!d) continue; const wpx = d.w * 1.1 + 30; if (bx + wpx > 1180) { bx = 90; by += rowH + 40; rowH = 0; } d.c.scale.set(1.1); d.c.position.set(bx + d.w * 0.55, by); stage.addChild(d.c); const st = drawStock(sprite, stock); if (st) { st.scale.set(1.1); st.position.set(bx + d.w * 0.55, by); stage.addChild(st); } const t = new Text({ text: Object.entries(stock).map(([k, v]) => `${v} ${k}`).join(" · "), style: { fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x6f7a78 } }); t.anchor.set(0.5, 0); t.position.set(bx + d.w * 0.55, by + 6); stage.addChild(t); bx += wpx; rowH = Math.max(rowH, 300); }
       // a building the island invented: Recraft's SVG, parsed straight into a Graphics context, footed and scaled like the drawn ones
-      try {
-        const svg = await (await fetch("/generated/boathouse.svg")).text();
-        const g = new Graphics(); g.svg(svg); const b = g.getLocalBounds(); const target = 120; const sc = target / b.width;
-        const gx = 1080, gy = 300;
-        g.scale.set(sc); g.position.set(gx - (b.x + b.width / 2) * sc, gy - (b.y + b.height) * sc); stage.addChild(g);
-        const t = new Text({ text: "boathouse · generated by Recraft, parsed as SVG", style: { fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x6f7a78 } }); t.anchor.set(0.5, 0); t.position.set(gx, gy + 6); stage.addChild(t);
-      } catch (e) { console.warn("generated building did not load", e); }
+      const specimen=drawThing("house");if(specimen){specimen.c.scale.set(.65);specimen.c.position.set(1080,300);stage.addChild(specimen.c);}
+      el.style.height = `${by + 90}px`;
+      app.renderer.resize(el.clientWidth, by + 90);
       let dir = 1;
       app.ticker.add(() => {
         const t = performance.now() / 1000;
@@ -84,9 +81,9 @@ export default function Rig() {
   }, []);
   return (
     <Page>
-      <div className="flex flex-col gap-2 pt-4"><Label>The citizen rig · model sheet</Label><h1 className="display text-[32px] sm:text-[40px] font-bold">One body, drawn from parts.</h1><p className="text-[17px] text-ink2 max-w-[70ch]">Hair and hats, builds and what they carry, the seven poses and the faces, one person walking the pier, twelve house citizens whose looks come from their names alone, and every building and prop on the island in the same hand, with the shelves full and half empty.</p></div>
+      <div className="flex flex-col gap-2 pt-4"><Label>The citizen rig · model sheet</Label><h1 className="display text-[32px] sm:text-[40px] font-bold">One body, drawn from parts.</h1><p className="text-[17px] text-ink2 max-w-[70ch]">Hair and hats, builds and what they carry, the poses and the faces, one person walking the pier, twelve house citizens whose looks come from their names alone, and every building and prop on the island in the same hand, with the shelves full and half empty.</p></div>
       <div className="flex flex-wrap gap-3 items-center"><Label>Portraits · the same rig, head and shoulders</Label>{["Tomo Radić", "Rosa Vidal", "Petar Ilić", "Ivana Horvat", "Luka Babić", "Ana Perić", "Vesna Marić", "Teodor Ilić"].map((n, i) => <Portrait key={n} name={n} age={i === 2 ? 68 : i === 5 ? 12 : 34} size={56} />)}</div>
-      <div ref={host} className="relative w-full h-[2400px] rounded-[28px] overflow-hidden bg-sand" />
+      <div className="w-full overflow-auto rounded-[28px]"><div ref={host} className="relative min-w-[1520px] h-[2400px] bg-sand" /></div>
     </Page>
   );
 }

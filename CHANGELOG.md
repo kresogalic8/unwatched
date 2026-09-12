@@ -6,9 +6,44 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Street camera zoom and recenter buttons, usable by touch and keyboard. Character preview can pause and honors reduced-motion preferences.
+- Harbor Street visual study with afternoon, blue-hour and coastal-rain views at `/harbor-study`. Its architectural drawings are the canonical source for the live world and building replay.
+- Interactive character standard at `/harbor-characters`: appearance components, fourteen animations, directions, age and weather, with a matching portrait. The approved live rig also supplies the Harbor study’s people.
+- Reproducible Harbor Street atlas generation: 55 drawings and lighting variants rendered at 3× resolution, including buildings, vegetation, boats, street furniture and working places.
+
 ### Changed
 
+- Conversation gestures respond to existing fatigue, hunger, joy and grief, with age-sensitive timing. Tired citizens fidget less; eye movements ease toward their subject, and passing glances decay consistently across refresh rates.
+
+- Eating separates the supported bowl and animated spoon. Reading uses both hands; writing adds a pen moving over the supported page. Kneading and hauling align both wrists to the working object, and unrelated held items hide during meals and reading.
+
+- Live citizens turn over a short staged pivot, passing through a front view when reversing direction, with a subtle shoulder and head movement. Repeated direction updates do not restart the turn; static previews retain immediate facing controls.
+
+- World walking accelerates and brakes before arrival. Step cycles follow actual distance and body size, with a slower everyday pace and faster fire evacuation. A facing dead band prevents flickering between front and profile on diagonal routes.
+
+- Production citizens use more natural illustrated proportions: longer legs and torso, a smaller head, narrower coat hem and a quieter stride. Portrait framing and interior scale follow the new anatomy.
+- More natural citizen anatomy: shaped jaw, ear, nose, lips and thumb silhouettes; tonal hair strands, garment seams, collars, pockets, trouser folds and shaped leather shoes. Shared by world, interiors and portraits.
+- Articulated ankles keep walking soles level and grounded across body sizes and ages. Smoother sleeves, calmer arm swing and subtler coat folds bring the moving silhouette closer to the Harbor reference.
+- Worn paving uses sparse, low-contrast stone fragments over limestone beds instead of a continuous diamond grid. Faces gain cheek light and clearer eyes; beards fit the compact head and necks use the citizen’s skin tone.
+- Conversation participants face and look toward their recorded partners while nearby; walking speed is consistent across refresh rates.
+- Citizens blend between actions over a short transition instead of snapping between poses. Winter coats, scarves and buttons fit the Harbor proportions; character preview includes expressions.
+- Replace the former building and prop drawings throughout the live world with limestone and plaster architecture, clay roofs, wooden shutters, planted balconies and olive trees. Occupied windows light up at night; mill sails, chapel bells and laundry remain animated.
+- Rebuild the ground as a continuous landscape with jointed stone streets and a raised limestone coastline. Fine paths replace the former broad road strips.
+- Redraw citizen proportions, faces, clothing and articulated limbs across the town, portraits and interiors, retaining personal appearances, poses, carried objects and simulation actions.
+- Building replays and live construction use the same Harbor Street house drawings as completed buildings. Future generated illustrations follow this material palette while respecting explicitly described citizen choices; stored illustrations retain their original artwork.
+
 ### Fixed
+
+- Seat assignment and release blend smoothly even when the citizen keeps the same action. Mirrored walking preserves ground contact and level shoes for older citizens; cups stay upright when facing left.
+
+- Citizens reserve actual bench and terrace seats, align hips to the seat surface and release seats on departure. Seated conversations stay seated; unsupported eating/drinking stays standing. Bench height fits the new anatomy; interiors draw supporting chairs. Cups remain upright and reach the mouth.
+- Bob hair and low cap bands no longer cover the eyes. Glasses and beards follow profile/front views, and aprons end at the coat hem. Shared Harbor curves use explicit smoothing.
+- Headscarves leave the face visible instead of covering the entire head.
+- Petting faces the animal immediately. Expired speech bubbles stop driving talking poses, and queued dialogue is cancelled when the world unmounts.
+- Blinking preserves tired and surprised eyes; tall citizens retain their proportions while sleeping. Paused character previews can inspect a different pose immediately.
+- Missing or invalid preview zoom parameters no longer target zero. Street camera coasting is frame-rate independent, does not fight active dragging, and dragging suppresses accidental character or building selection.
+- Interior citizens apply age and trade styling consistently with the town; portraits frame children and tall citizens correctly and cache each exact age.
+- Building selection uses the new drawings' bounds; failed world artwork loading offers a retry.
 
 ## [0.6.0] - 2026-09-12
 ### Added
