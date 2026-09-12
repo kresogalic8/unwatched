@@ -1,5 +1,5 @@
 import type { Action } from "@unwatched/protocol";
-import { BUILDS, WORKS, buildKind } from "./world.ts";
+import { BUILDS, WORKS, buildKind, FOOD_ITEMS } from "./world.ts";
 import type { AgentState, Place, Job } from "./types.ts";
 
 export type Verdict = { ok: true } | { ok: false; reason: string };
@@ -9,6 +9,9 @@ export interface ValidatorView {
   jobs: Map<string, Job>;
   agents: Map<string, AgentState>;
   hour: number; weekday?: number; day?: number; mayor?: string | null; works?: string[]; feast?: boolean; residentsOf?: (p: Place) => AgentState[]; bedPrice?: (p: Place) => number; knownItem?: (item: string) => boolean; curfew?: number | null;
+  /** what a place pays for a thing brought to its counter, or null when it has no use for it; whether a thing can be eaten; the sky and the boat; the proposals open at the council */
+  buyPrice?: (place: Place, item: string) => number | null; food?: (item: string) => boolean; weather?: string; boatHeld?: boolean;
+  laws?: { text: string; by: string; open: boolean; voters?: string[] }[];
   price(place: Place, item: string): number | null;
   path(from: string, to: string): string | null;
 }
@@ -53,10 +56,15 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
         if (!other.inventory.includes(action.item)) return { ok: false, reason: "they do not have it" };
         return { ok: true };
       }
-      if (!here.sells.some((s) => s.item === action.item)) return { ok: false, reason: "nothing like that here" };
+      // a shelf or a store room, or the wild: only what is actually there can be taken
+      if ((here.stock[action.item] ?? 0) <= 0) return { ok: false, reason: here.sells.some((s) => s.item === action.item) || here.stock[action.item] !== undefined ? `there is no ${action.item} left at ${here.name}` : "nothing like that here" };
       return { ok: true };
     }
-    case "use": return a.inventory.includes(action.item) ? { ok: true } : { ok: false, reason: "does not have it" };
+    case "use": {
+      if (!a.inventory.includes(action.item)) return { ok: false, reason: "does not have it" };
+      if (!(v.food ? v.food(action.item) : FOOD_ITEMS.has(action.item))) return { ok: false, reason: `${action.item} is not something to eat; carry it, give it, or sell it` };
+      return { ok: true };
+    }
     case "work": {
       if (a.starving >= 2) return { ok: false, reason: "too weak with hunger to work" };
       if (v.weekday === 0 && !here.site) return { ok: false, reason: "it is Sunday; no shifts today" };
@@ -97,11 +105,24 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
         if (p === null) return { ok: false, reason: "not for sale here" };
         if (a.coins < p) return { ok: false, reason: "not enough coins" };
       }
-      if (action.sell && !a.inventory.includes(action.sell)) return { ok: false, reason: "does not have it" };
+      if (action.sell) {
+        if (!a.inventory.includes(action.sell)) return { ok: false, reason: "does not have it" };
+        // a counter buys what it sells and what its shifts need, out of its own till
+        const bp = v.buyPrice ? v.buyPrice(here, action.sell) : 1; if (bp === null) return { ok: false, reason: `${here.name} has no use for ${action.sell}` };
+        const purse = here.owner === a.id ? Infinity : here.owner ? (v.agents.get(here.owner)?.coins ?? 0) : here.treasury;
+        if (purse < bp) return { ok: false, reason: `${here.name} cannot pay for ${action.sell} today; the till is empty` };
+      }
       return { ok: true };
     }
     case "propose": return here.kind === "civic" ? { ok: true } : { ok: false, reason: "proposals are made at the council hall" };
-    case "vote": return here.kind === "civic" ? { ok: true } : { ok: false, reason: "votes are cast at the council hall" };
+    case "vote": {
+      if (here.kind !== "civic") return { ok: false, reason: "votes are cast at the council hall" };
+      if (!v.laws) return { ok: true };
+      const law = v.laws.find((l) => l.open && l.text.toLowerCase().includes(action.proposal.toLowerCase().slice(0, 20)));
+      if (!law) return { ok: false, reason: "no such proposal is open" };
+      if (law.by === a.id || law.voters?.includes(a.id)) return { ok: false, reason: "already voted on that" };
+      return { ok: true };
+    }
     case "write": return { ok: true };
     case "stock": { if (here.owner !== a.id) return { ok: false, reason: "not your place to stock" }; const item = action.item.toLowerCase().trim(); if (!item) return { ok: false, reason: "name the thing" }; if (action.price > 0 && !(v.knownItem?.(item) ?? true) && !a.inventory.includes(item) && !(here.stock[item] !== undefined)) return { ok: false, reason: `the island has no ${item} to sell` }; return { ok: true }; }
     case "make": {
@@ -167,7 +188,13 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if (b.id === a.id) return { ok: false, reason: "cannot accuse oneself" };
       return { ok: true };
     }
-    case "leave": return here.kind === "harbor" ? (v.hour >= 6 && v.hour <= 20 ? { ok: true } : { ok: false, reason: "no boat at this hour" }) : { ok: false, reason: "the boat leaves from the harbor" };
+    case "leave": {
+      if (here.kind !== "harbor") return { ok: false, reason: "the boat leaves from the harbor" };
+      if (v.hour < 6 || v.hour > 20) return { ok: false, reason: "no boat at this hour" };
+      if (v.weather === "storm") return { ok: false, reason: "no boat crosses in a storm" };
+      if (v.boatHeld) return { ok: false, reason: "the boat is not running today" };
+      return { ok: true };
+    }
     case "sleep": {
       const beds = here.beds;
       if (!beds) return { ok: false, reason: "no bed here" };

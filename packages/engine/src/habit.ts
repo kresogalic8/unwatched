@@ -10,6 +10,8 @@ export interface HabitView {
   crowd(placeId: string): number;
   price(place: Place, item: string): number | null;
   path(from: string, to: string): string | null;
+  /** roads between two places, when the town can count them; without it habit keeps its fixed preferences */
+  hops?(from: string, to: string): number | null;
 }
 
 /**
@@ -33,13 +35,14 @@ export function habit(a: AgentState, v: HabitView): Action {
     return next ? { kind: "move", to: next } : { kind: "wait" };
   }
 
-  // Hunger: buy food where it is sold, if it can be afforded.
+  // Hunger: eat what is carried, buy what is sold here. A shift is worked hungry and the meal comes after; walking off to look for food is for the hours outside it, unless the body is already failing. The mind can overrule any of this.
+  const onShift = !!a.job && v.weekday !== 0 && (() => { const j = v.jobs.get(a.job!); return !!j && v.hour >= j.hours[0] && v.hour < j.hours[1]; })() && a.starving < 2;
   if (a.needs.hunger > 0.6) {
     const has = a.inventory.find((i) => FOOD_ITEMS.has(i));
     if (has) return { kind: "use", item: has };
     const cheapest = cheapestFood(here, v);
     if (cheapest && a.coins >= cheapest.price) return { kind: "trade", with: here.id, buy: cheapest.item, coins: cheapest.price };
-    const target = nearestFoodPlace(a, v);
+    const target = onShift ? null : nearestFoodPlace(a, v);
     if (target && target !== a.location) {
       const next = v.path(a.location, target);
       if (next) return { kind: "move", to: next };
@@ -75,8 +78,10 @@ export function habit(a: AgentState, v: HabitView): Action {
     const open = [...v.jobs.values()].filter((j) => j.holders.length < j.slots);
     if (open.length > 0) {
       // pick a place with work and keep walking to it: the list of open jobs shifts every minute as people are taken on, and a person who re-picked each minute walked in circles
-      const places = open.map((j) => j.place);
-      const target = places.includes(a.location) ? a.location : a.heading && places.includes(a.heading) ? a.heading : places[Math.floor(a.persona.traits.ambition * places.length) % places.length]!;
+      // the ambitious pick by their own lights; everyone else takes the nearest post going
+      const places = [...new Set(open.map((j) => j.place))];
+      const nearest = v.hops ? [...places].sort((x, y) => (v.hops!(a.location, x) ?? 99) - (v.hops!(a.location, y) ?? 99))[0]! : null;
+      const target = places.includes(a.location) ? a.location : a.heading && places.includes(a.heading) ? a.heading : a.persona.traits.ambition > 0.6 || !nearest ? places[Math.floor(a.persona.traits.ambition * places.length) % places.length]! : nearest;
       if (target !== a.location) { if (!a.heading) a.heading = target; const next = v.path(a.location, target); if (next) return { kind: "move", to: next }; } // a heading the town set (a bell, a gathering) is never overwritten
       return { kind: "wait" };
     }
@@ -120,10 +125,11 @@ function cheapestFood(here: Place, v: HabitView): { item: string; price: number 
   return best;
 }
 
-/** Where food is on the shelf and within the purse today; the market first, then the inn, the bakery, the fields. Nothing sold-out draws anyone. */
+/** Where food is on the shelf and within the purse today: the nearest such place by the roads, the market first among equals; failing that, the nearest place that sells food at all. Nothing sold-out draws anyone. */
 function nearestFoodPlace(a: AgentState, v: HabitView): string | null {
-  const order = ["market", "inn", "bakery", "fields", ...[...v.places.values()].filter((p) => p.kind === "shop" && p.owner).map((p) => p.id)];
-  for (const id of order) { const p = v.places.get(id); if (!p) continue; const c = cheapestFood(p, v); if (c && a.coins >= c.price) return id; }
-  for (const id of order) { const p = v.places.get(id); if (p && p.sells.some((s) => FOOD_ITEMS.has(s.item))) return id; }
-  return null;
+  const order = ["market", "inn", "bakery", "fields"]; const rank = (id: string) => { const i = order.indexOf(id); return i < 0 ? order.length : i; };
+  const far = (id: string) => v.hops ? (v.hops(a.location, id) ?? 99) : 0;
+  const sellers = [...v.places.values()].filter((p) => p.sells.some((s) => FOOD_ITEMS.has(s.item))).sort((x, y) => far(x.id) - far(y.id) || rank(x.id) - rank(y.id));
+  for (const p of sellers) { const c = cheapestFood(p, v); if (c && a.coins >= c.price) return p.id; }
+  return sellers[0]?.id ?? null;
 }

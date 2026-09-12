@@ -55,3 +55,19 @@ describe("institutions with teeth", () => {
     expect(town.events.some((e) => e.kind === "agent.leave" && e.actors[0] === c.id && (e.payload as { reason: string }).reason === "exiled")).toBe(true);
   });
 });
+
+describe("the vote", () => {
+  it("records who voted, takes one vote per citizen per proposal, and puts the vote on the record", () => {
+    const town = new Town({ seed: 13, brain: none }); const rng = new Rng(13);
+    const a = town.addAgent({ persona: persona("A", rng) }), b = town.addAgent({ persona: persona("B", rng) });
+    a.location = b.location = "council";
+    expect(town.apply(a, { kind: "propose", law: "Bread may cost no more than 2 coins" }, "test")).toBe(true);
+    const law = town.laws[0]!; expect(law.voters).toEqual([a.id]);
+    expect(town.apply(b, { kind: "vote", proposal: "Bread may cost", yes: true }, "test")).toBe(true);
+    expect(law.yes).toBe(2); expect(law.voters).toEqual([a.id, b.id]);
+    const vote = town.events.at(-1)!; expect(vote.kind).toBe("law.vote"); expect(vote.actors).toEqual([b.id, a.id]); expect(vote.importance).toBe(0.3);
+    expect(town.apply(b, { kind: "vote", proposal: "Bread may cost", yes: false }, "test")).toBe(false); expect(law.no).toBe(0);
+    expect(town.apply(a, { kind: "vote", proposal: "Bread may cost", yes: true }, "test")).toBe(false); expect(law.yes).toBe(2);
+    expect(town.apply(b, { kind: "vote", proposal: "No such thing", yes: true }, "test")).toBe(false);
+  });
+});

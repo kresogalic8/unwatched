@@ -29,15 +29,15 @@ export const Persona = z.object({
     ambition: z.number().min(0).max(1),
   }),
   /** The depth a person has beyond the sheet: how they talk, a habit, a skill, a flaw, why they came. Written once by the town's mind when missing. */
-  voice: z.array(z.string().max(160)).max(3).optional().describe("Two or three lines the way this person actually talks"),
-  habit: z.string().max(160).optional().describe("A tic or a habit others notice"),
+  voice: z.array(z.string().max(240)).max(3).optional().describe("Two or three lines the way this person actually talks"),
+  habit: z.string().max(240).optional().describe("A tic or a habit others notice"),
   skill: z.string().max(120).optional().describe("One thing they are genuinely good at"),
-  flaw: z.string().max(160).optional().describe("The thing that costs them"),
+  flaw: z.string().max(240).optional().describe("The thing that costs them"),
   cameBecause: z.string().max(200).optional().describe("Why they came to the island, in a sentence"),
 });
 export type Persona = z.infer<typeof Persona>;
 /** What the town's mind answers when asked to deepen a person. */
-export const PersonaDepth = z.object({ voice: z.array(z.string().max(160)).min(2).max(3), habit: z.string().max(160), skill: z.string().max(120), flaw: z.string().max(160), cameBecause: z.string().max(200) });
+export const PersonaDepth = z.object({ voice: z.array(z.string().max(240)).min(2).max(3), habit: z.string().max(240), skill: z.string().max(120), flaw: z.string().max(240), cameBecause: z.string().max(200) });
 export type PersonaDepth = z.infer<typeof PersonaDepth>;
 
 /** The action kinds the town can carry out. Nothing else exists. */
@@ -139,8 +139,8 @@ export type DigestText = z.infer<typeof DigestText>;
 export const Perception = z.object({
   type: z.literal("perceive"),
   agent_id: AgentId,
-  /** The island's ways: the rules the council has passed that bite, and the sayings it has kept. */
-  town: z.object({ rules: z.array(z.string()), sayings: z.array(z.string()) }).optional(),
+  /** The island's ways: the rules the council has passed that bite, and the sayings it has kept; and the town sheet: where the people this person knows or saw today are right now. */
+  town: z.object({ rules: z.array(z.string()), sayings: z.array(z.string()), people: z.array(z.object({ name: z.string(), place: PlaceId, asleep: z.boolean() })).optional() }).optional(),
   time: z.object({ sim: z.string(), day: z.number().int(), minute: z.number().int(), season: z.string(), weather: z.string(), weekday: z.string().optional(), occasion: z.string().optional(), gathering: z.string().optional(), temperature_c: z.number().optional() }),
   self: z.object({
     location: PlaceId,
@@ -148,6 +148,10 @@ export const Perception = z.object({
     coins: z.number().int(),
     inventory: z.array(z.string()),
     job: z.string().nullable(),
+    /** The post they hold: where, what it pays, and the hours; null without one. */
+    shift: z.object({ place: PlaceId, wage: z.number().int(), hours: z.tuple([z.number().int(), z.number().int()]) }).nullable().optional(),
+    /** The needs in words, on a scale that ends in the body failing. */
+    feels: z.object({ hunger: z.string(), rest: z.string(), social: z.string() }).optional(),
     debts: z.array(z.object({ to: z.string(), coins: z.number().int(), overdue: z.boolean() })).optional(),
     family: z.object({ partner: z.string().nullable(), children: z.array(z.string()) }).optional(),
     /** Days without a proper meal, and whether the body has begun to fail. */
@@ -167,12 +171,13 @@ export const Perception = z.object({
   nearby: z.array(z.object({
     agent: AgentId, name: z.string(),
     relation: z.object({ trust: z.number(), affection: z.number(), opinion: z.string().optional() }).optional(),
+    asleep: z.boolean().optional(),
   })),
   place: z.object({ id: PlaceId, name: z.string(), kind: z.string(), for_sale: z.array(z.object({ item: z.string(), price: z.number() })), jobs_open: z.array(z.string()), exits: z.array(PlaceId),
     owner: z.string().nullable().optional(),
     /** For someone who works here: what is in the store room, and whether the place is broken. */
     stock: z.record(z.string(), z.number()).optional(), broken: z.boolean().optional(),
-    plot: z.object({ free: z.boolean(), house: z.object({ coins: z.number(), mornings: z.number() }), shop: z.object({ coins: z.number(), mornings: z.number() }) }).optional(),
+    plot: z.object({ free: z.boolean(), house: z.object({ coins: z.number(), mornings: z.number() }), shop: z.object({ coins: z.number(), mornings: z.number() }), planks: z.number().int().optional() }).optional(),
     site: z.object({ what: z.string(), name: z.string(), by: z.string(), done: z.number(), of: z.number() }).optional(),
     /** At the harbor: the other islands a boat runs to. Leave with `to` to cross; you arrive there with what you carry and what you remember. */
     boats_to: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
@@ -188,7 +193,7 @@ export const Perception = z.object({
   hint: z.string().optional(),
   /** Something just happened that whoever sent them would want to hear about; the minute to write home, if they will. */
   crossroads: z.string().optional(),
-  today: z.object({ mood: z.string(), goals: z.array(z.string()), steps: z.array(z.object({ hour: z.number().int(), do: z.string(), place: PlaceId.nullable(), done: z.boolean() })) }).nullable(),
+  today: z.object({ mood: z.string(), goals: z.array(z.string()), steps: z.array(z.object({ hour: z.number().int(), do: z.string(), place: PlaceId.nullable(), done: z.boolean(), missed: z.boolean().optional() })) }).nullable(),
   options: z.array(ActionKind),
   deadline_ms: z.number().int(),
 });
@@ -200,7 +205,7 @@ export const EventKind = z.enum([
   "agent.move", "agent.say", "agent.give", "agent.take", "agent.trade",
   "agent.work", "agent.hired", "agent.quit", "agent.fired", "agent.sleep", "agent.wake",
   "agent.eat", "agent.rent", "agent.evicted", "agent.reflect", "agent.letter",
-  "relation.change", "economy.price", "weather.change", "law.proposed", "law.passed", "law.failed",
+  "relation.change", "economy.price", "weather.change", "law.proposed", "law.vote", "law.passed", "law.failed",
   "conversation", "action.rejected", "town.notice", "town.book", "town.mayor", "town.works", "town.verdict", "town.gathering", "town.fire", "boat.cargo", "cart.leg", "agent.do", "agent.became", "town.recipe", "town.named", "town.rule", "town.saying", "agent.search", "town.expose", "law.passed", "law.failed", "agent.plan", "agent.build", "town.built", "agent.unpaid", "agent.hire", "agent.lend", "agent.lodge", "agent.debt", "agent.weak", "agent.died", "town.born", "town.of_age", "agent.inherit", "boat.news",
 ]);
 export type EventKind = z.infer<typeof EventKind>;

@@ -9,8 +9,19 @@ export type { WorldPack, PlaceSpec, JobSpec, ProduceSpec, SupplySpec, ExportSpec
 export function makePlaces(pack: WorldPack = ISLAND): Map<string, Place> {
   const list: Place[] = pack.places.map((p) => ({ id: p.id, name: p.name, kind: p.kind, district: p.district, sprite: p.sprite, x: p.x, y: p.y, exits: [...p.exits], sells: p.sells ? p.sells.map((s) => ({ ...s })) : [], owner: null, site: null, treasury: pack.float[p.id] ?? 0, stock: { ...(p.stock ?? {}) }, ...(p.beds ? { beds: { ...p.beds }, freeBeds: p.beds.capacity } : {}) }));
   for (const p of list) for (const e of p.exits) { const q = list.find((x) => x.id === e); if (q && !q.exits.includes(p.id)) q.exits.push(p.id); }
+  for (const p of list) stockShelf(pack, p);
   return new Map(list.map((p) => [p.id, p]));
 }
+
+/** What a shelf starts with when the pack says nothing: the cart's ceiling where the cart fills it, else a few. A shelf with no count would be a bottomless one. */
+export function startingStock(pack: WorldPack, placeId: string, item: string): number {
+  const line = pack.supply.find((l) => l.to === placeId && l.item === item); if (line?.upTo !== undefined) return line.upTo;
+  return FOOD_ITEMS.has(item) ? 6 : 4;
+}
+/** Every item on sale gets a count, so nothing sells that is not there. */
+export function stockShelf(pack: WorldPack, place: Place): void { for (const s of place.sells) if (place.stock[s.item] === undefined) place.stock[s.item] = startingStock(pack, place.id, s.item); }
+/** What goes off on the shelf overnight. Grain, flour, planks, stone, timber, rope and oil keep. */
+export const PERISHABLE = new Set(["bread", "fish", "soup"]);
 
 export function makeJobs(pack: WorldPack = ISLAND): Map<string, Job> {
   return new Map(pack.jobs.map((j) => [j.id, { ...j, hours: [...j.hours] as [number, number], holders: [] }]));

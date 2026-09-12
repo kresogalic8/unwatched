@@ -65,7 +65,7 @@ export interface Budget {
   tier2Left: number;
 }
 
-export interface OwnerLetter { id: number; text: string; t: number; read: boolean }
+export interface OwnerLetter { id: number; text: string; t: number; read: boolean; /** set once the citizen has written back to this letter; one answer per letter */ answered?: boolean }
 
 export interface AgentState {
   id: AgentId;
@@ -126,10 +126,18 @@ export interface AgentState {
   beliefs: { about: string; belief: string; confidence: number; since: number }[];
   /** Someone this person went over to talk with this minute; the next conversation pairs them. */
   seek: AgentId | null;
+  /** Who they have been in the same place as today. With the people they know, this is the town sheet they carry. Cleared at midnight. */
+  seenToday: AgentId[];
+  /** Trust in each person as the day began, and how it moved on the days before: the digest reads the gap. */
+  trustDawn: Record<AgentId, number>; trustLog: { day: number; other: AgentId; delta: number }[];
+  /** When the body and the calendar last interrupted the mind: hunger every two hours at most, the first day of starving once, a debt due once a day, a gathering once. */
+  lastHungerThought: number; starvingThoughtDay: number; debtThoughtDay: number; gatheringThoughtId: number | null;
+  /** The owner letter the next letter home answers, so a reply is not held to the daily cap and a letter is answered once. */
+  replyTo: number | null;
 }
 
-/** A DayPlan once the engine has it: dated, with each step ticked off as its thought is spent. */
-export interface ActivePlan { day: number; mood: DayPlan["mood"]; goals: DayPlan["goals"]; steps: { hour: number; do: string; place: PlaceId | null; done: boolean }[] }
+/** A DayPlan once the engine has it: dated, each step done when they were at its place from its hour, missed when the hour went by without them. */
+export interface ActivePlan { day: number; mood: DayPlan["mood"]; goals: DayPlan["goals"]; steps: { hour: number; do: string; place: PlaceId | null; done: boolean; missed?: boolean }[] }
 
 export type Tier = 1 | 2 | 3;
 
@@ -145,6 +153,13 @@ export interface ReflectContext {
   agent: AgentState; day: number; dayMemories: string[]; keyMemories: string[];
   relationships: { id: AgentId; name: string; trust: number; opinion: string }[];
   unreadLetters: string[];
+  /** What they meant to do this morning and what came of each step; what they carry across weeks; what they believe; what they chose to watch. Shown so a night's answer keeps what it means to keep. */
+  plan: { mood: string; goals: string[]; steps: { hour: number; do: string; place: string | null; done: boolean; missed: boolean }[] } | null;
+  projects: { title: string; why: string; progress: string; since: number }[];
+  beliefs: { about: string; belief: string; confidence: number }[];
+  watch: string[];
+  /** A day with nothing in it: no event of weight, no trust moved, no letter either way, nothing begun or finished. A cheaper mind may take these. */
+  quiet: boolean;
 }
 
 export interface PlanContext {
@@ -158,10 +173,12 @@ export interface PlanContext {
 
 export interface DigestContext {
   agent: AgentState; name: string; day: number; daysAway: number;
-  events: string[]; plan: { mood: string; goals: string[] } | null; letter: string | null; people: { name: string; trust: number; opinion: string }[];
+  events: string[]; plan: { mood: string; goals: string[]; steps: { hour: number; do: string; place: string | null; done: boolean; missed: boolean }[] } | null; letter: string | null; people: { name: string; trust: number; opinion: string }[];
   coins: number; job: string | null; home: string | null;
   /** their own words, from the last reflection, and what they mean to do next */
   reflection: string | null; intentions: string[];
+  /** what they are working toward over weeks, and whose trust in them moved since the owner last looked, by how much */
+  projects: { title: string; progress: string; since: number }[]; trust: { name: string; delta: number }[];
 }
 
 /** What the town's mind is told when a child is born: who the parents are, what shaped them. It answers with who the child will be. */
@@ -223,7 +240,7 @@ export interface AgentSnapshot {
   state: {
     needs: AgentState["needs"]; location: PlaceId; coins: number; inventory: string[]; job: string | null;
     home: AgentState["home"]; asleep: boolean; budget: Budget; intentions: string[]; rumors: string[];
-    letters?: OwnerLetter[]; lastConversation?: number; lastThought?: number; instructions?: string; brainKind?: AgentState["brainKind"]; thinkEvery?: number | null; plan?: ActivePlan | null; debts?: { to: AgentId; coins: number; due: number }[]; starving?: number; roofless?: number; convictions?: number; secretsKnown?: Record<AgentId, string>; watch?: string[]; selves?: AgentState["selves"]; lastSelfDay?: number; projects?: AgentState["projects"]; beliefs?: AgentState["beliefs"];
+    letters?: OwnerLetter[]; lastConversation?: number; lastThought?: number; instructions?: string; brainKind?: AgentState["brainKind"]; thinkEvery?: number | null; plan?: ActivePlan | null; debts?: { to: AgentId; coins: number; due: number }[]; starving?: number; roofless?: number; convictions?: number; secretsKnown?: Record<AgentId, string>; watch?: string[]; selves?: AgentState["selves"]; lastSelfDay?: number; projects?: AgentState["projects"]; beliefs?: AgentState["beliefs"]; trustLog?: AgentState["trustLog"];
   };
   relationships: { other: AgentId; trust: number; affection: number; lastSeen: number; opinion: string }[];
   memory: Memory[];
@@ -241,7 +258,7 @@ export interface TownSnapshot {
   jobs?: { id: string; title: string; place: PlaceId; wage: number; hours: [number, number]; slots: number }[];
   agents: AgentSnapshot[];
   papers: Paper[];
-  laws: { text: string; by: AgentId; yes: number; no: number; open: boolean }[];
+  laws: { text: string; by: AgentId; yes: number; no: number; open: boolean; voters?: AgentId[] }[];
   children?: Child[];
   /** The institutions: who is mayor, since when, and what the council has built. */
   civic?: { mayor: AgentId | null; elected: number; works: string[]; gatherings?: Gathering[]; wedded?: string[]; chain?: Seal[]; rules?: Rule[]; sayings?: { text: string; by: AgentId[] }[] };

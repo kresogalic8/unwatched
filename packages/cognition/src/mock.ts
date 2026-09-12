@@ -20,8 +20,10 @@ export class MockBrain implements Brain {
       if (!follows && tr.pride > 0.7 && this.rng.chance(0.3)) return { action: { kind: "message_owner", text: `I read what you wrote. "${l.text.slice(0, 40)}" I will decide that for myself.` }, remember: [`Whoever sent me wrote: "${l.text}". I did not care for the tone.`] };
       return { action: { kind: "wait" }, remember: [`Whoever sent me wrote: "${l.text}". ${follows ? "I will keep it in mind." : "Noted."}`] };
     }
+    // A letter that asked something: the town has set a crossroads; answer it, in this person's voice.
+    if (p.crossroads && /asks something of you/.test(p.crossroads) && a.owner) return { action: { kind: "message_owner", text: `You asked. ${p.self.feels?.hunger === "fed" ? "I am fed" : "I have eaten what I could"}, I have ${p.self.coins} coins${p.self.job ? ` and work as ${p.self.job}` : " and no work yet"}. ${tr.pride > 0.6 ? "I will do it my way, but I heard you." : "I will do as you say, as far as the island lets me."}` }, remember: ["I wrote back to whoever sent me."] };
     // Standing on land for sale with the coins and no roof: build.
-    if (p.place.plot?.free && (p.self.housing === null || p.self.housing.nights_left === 0) && p.self.coins >= p.place.plot.house.coins && (tr.ambition > 0.4 || this.rng.chance(0.3))) return { action: { kind: "build", what: "house", at: p.place.id }, intent: "a roof of my own", remember: ["I bought the land. Now the work."] };
+    if (p.place.plot?.free && (p.place.plot.planks ?? 6) >= 6 && (p.self.housing === null || p.self.housing.nights_left === 0) && p.self.coins >= p.place.plot.house.coins && (tr.ambition > 0.4 || this.rng.chance(0.3))) return { action: { kind: "build", what: "house", at: p.place.id }, intent: "a roof of my own", remember: ["I bought the land. Now the work."] };
     if (p.place.site) return { action: { kind: "work" }, intent: "raise the frame", remember: [] };
     // Broke and jobless: ask for work, or do something desperate.
     if (p.self.job === null && p.place.jobs_open.length > 0) {
@@ -37,9 +39,11 @@ export class MockBrain implements Brain {
       const exit = this.rng.pick(p.place.exits);
       return { action: { kind: "move", to: exit }, intent: "look for work elsewhere", remember: [] };
     }
-    // Someone spoke: answer.
-    if (p.heard.length > 0) {
-      const h = p.heard[p.heard.length - 1]!;
+    // Someone spoke and is still here and awake: answer. Words to an empty room are not worth the minute.
+    const awake = p.nearby.filter((n) => !n.asleep);
+    const spoken = [...p.heard].reverse().find((h) => awake.some((n) => n.agent === h.from));
+    if (spoken) {
+      const h = spoken;
       const rel = p.nearby.find((n) => n.agent === h.from)?.relation;
       const cold = rel && rel.trust < 0.25;
       const text = cold ? this.rng.pick(["I have nothing to say to you.", "Not now.", "Say that again and mean it."]) : this.rng.pick([`Morning, ${h.name.split(" ")[0]}.`, "Is that so.", "You heard that from Rosa, I suppose.", "The boat was late again.", `${a.persona.want.split(".")[0]}. That is all I want.`]);
@@ -54,8 +58,8 @@ export class MockBrain implements Brain {
     }
     // Ambition: quit a poor job now and then, out of pride.
     if (p.self.job && tr.pride > 0.75 && tr.ambition > 0.7 && this.rng.chance(0.02)) return { action: { kind: "quit" }, intent: "this was never going to be it", remember: ["I folded the apron on the counter and left."] };
-    if (p.nearby.length > 0 && this.rng.chance(0.5)) {
-      const n = this.rng.pick(p.nearby);
+    if (awake.length > 0 && this.rng.chance(0.5)) {
+      const n = this.rng.pick(awake);
       return { action: { kind: "say", to: n.agent, text: this.rng.pick(["Any work going?", "Did you hear about the mill?", "The bread is two coins now. Two.", "You look like you slept badly.", "Who is that surveyor, really?"]) }, remember: [] };
     }
     return { action: { kind: "wait" }, remember: [] };
