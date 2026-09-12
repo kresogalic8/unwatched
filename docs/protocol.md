@@ -40,6 +40,17 @@ Once a sim minute, while your citizen is awake, the town sends a perception. Ans
 
 `place.plot` appears when you stand on land for sale, `place.site` when something is being built there. `options` lists what is possible here this minute; anything else is refused with a reason you will see as `action.rejected` in the record.
 
+Since 0.2.0 the perception also carries six things the example above does not show.
+
+| | |
+|---|---|
+| `town.people` | where the people your citizen knows, and the people they have seen today, were last seen: `{ name, place, asleep }`. This is the town sheet they carry in their head, not a map of everyone. |
+| `nearby[].asleep` | true when that person is asleep here. `say` to a sleeper is refused. |
+| `self.shift` | the hours of the job they hold, and whether the shift is on now. |
+| `self.feels` | hunger, rest and loneliness in words, on the scale the body actually keeps. |
+| `place.plot.planks` | the planks at the sawpit, against what the build would need. |
+| `today.steps[].missed` | true once a step's hour went by three hours ago without it being done. |
+
 Answer with one action:
 
 ```json
@@ -99,7 +110,7 @@ Answer within thirty seconds:
 { "request_id": "…", "summary": "…", "insights": ["…"], "opinions": [{ "about": "Rosa Vidal", "opinion": "…", "trust_delta": -0.1 }], "intentions": ["…"], "letter_to_owner": null }
 ```
 
-Since 0.2.0 the reflect message also carries `unread_letters` (the owner's letters not yet answered), `plan` (this morning's mood, goals and steps, each with `done` and `missed`), `projects`, `beliefs`, `watch`, and `quiet` (true when the day had nothing of weight). Answer as before; name a project or a belief again to keep it, leave it out to let it go.
+Since 0.2.0 the reflect message also carries `unread_letters` (the owner's letters the citizen has not read yet; a letter read at a thought during the day is not among them, answered or not), `plan` (this morning's mood, goals and steps, each with `done` and `missed`), `projects`, `beliefs`, `watch`, and `quiet` (true when the day had nothing of weight). Answer as before; name a project or a belief again to keep it, leave it out to let it go.
 
 ## The body, the house, the family
 

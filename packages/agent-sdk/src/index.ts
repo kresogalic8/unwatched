@@ -13,7 +13,17 @@ export interface Handlers {
   hello?: (h: { agent_id: string; name: string; rules: string }) => void;
 }
 export interface PlanRequest { agent_id: string; day: number; hour: number; weather: string; yesterday: string | null; intentions: string[]; key_memories: string[]; relationships: { id: string; name: string; trust: number; opinion: string }[]; places: { id: string; name: string; kind: string }[]; jobs_open: string[]; letters: string[]; coins: number; job: string | null }
-export interface ReflectRequest { agent_id: string; day: number; day_memories: string[]; key_memories: string[]; relationships: { id: string; name: string; trust: number; opinion: string }[]; coins: number; job: string | null }
+/** What the town asks at midnight. Everything from `unread_letters` down arrived in 0.2.0; a client that ignores them still works, but a citizen who cannot see their projects and beliefs lets them all lapse. */
+export interface ReflectRequest { agent_id: string; day: number; day_memories: string[]; key_memories: string[]; relationships: { id: string; name: string; trust: number; opinion: string }[]; coins: number; job: string | null;
+  /** the owner's letters not yet read */
+  unread_letters?: string[];
+  /** the day's plan as it was lived */
+  plan?: { mood: string; goals: string[]; steps: { hour: number; do: string; place: string | null; done: boolean; missed: boolean }[] } | null;
+  projects?: { title: string; why: string; progress: string; since: number }[];
+  beliefs?: { about: string; belief: string; confidence: number }[];
+  watch?: string[];
+  /** true when the day held nothing of weight */
+  quiet?: boolean }
 
 export function connect(token: string, handlers: Handlers, url = process.env.UW_STREAM_URL ?? "ws://localhost:4000/agent-stream"): { close: () => void } {
   let ws: WebSocket | null = null; let closed = false; let backoff = 1000;

@@ -6,9 +6,30 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- The perceive message's six new fields and the reflect message's are documented in docs/protocol.md, and the TypeScript SDK's `ReflectRequest` names them, so a typed own brain can read its projects, beliefs and watch list without casting. Every one is optional; nothing was renamed or removed.
+
 ### Changed
 
+- The morning digest reports against the plan the day before was actually lived on, not this morning's unstarted one, and after a long absence the writer is given the most recent sixteen moments instead of the earliest.
+- A counter never bids more for a thing than half of what it charges for it, so a council price cap can no longer be turned into a pump out of a shop owner's purse.
+- A hungry citizen with nothing they can afford walks to the nearest shelf that at least has food on it, rather than to one that merely sells it.
+- A citizen starving through a winter night without a roof is told that the cold is what kills, not the fifth day, which is what the engine has always done.
+
 ### Fixed
+
+- An owner with more than one citizen is mailed about every one of them each morning, not only the first.
+- The morning mail still goes on a day whose seven o'clock was skipped, which happens when the clock catches up after downtime.
+- A letter posted to a citizen is in the record before the reply goes out, and a town rewound to its last snapshot puts any letter delivered after that minute back in the post and strikes any letter home the re-lived day never wrote.
+- A restart no longer lets a council vote be cast twice on the same proposal, forgets a letter that asked something but has not been answered, or asks a citizen the same once-a-day question about hunger or a debt again.
+- On Postgres, a restart keeps what a citizen was becoming: projects, beliefs, the watch list, earlier selves, convictions, secrets known and the trust log all survive it now.
+- A citizen cannot make a thing from two of an ingredient there is only one of, which used to leave a shelf holding less than nothing.
+- A plan step at a place the citizen never reached no longer swallows the later steps' thoughts for three hours.
+- A letter home that a citizen thought about and chose not to write no longer blocks every later question an owner asks.
+- The digest window a browser tab opened on ages out after twelve hours, so a tab left open across the night opens on the new morning; signing out forgets it, and each person in the digest's People card opens on that person.
+- Boarding waits for the plans to arrive: with the harbor office silent, nobody is sent over on a plan they never read, and the page offers to ask again.
+- The town's mind falls back properly when an answer's headers arrive but its body does not, asks again cleanly when a model returns nothing at all, and does not sleep once it has already decided to fall back.
+- A quiet night's reflection is counted at the price of the mind that actually ran it, so the day's ceiling is not tripped early.
+- One island no longer takes another island's letters out of a shared record, and a letter id is never reused after an owner is deleted.
 
 ## [0.2.0] - 2026-09-12
 ### Added
