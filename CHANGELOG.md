@@ -6,8 +6,15 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.2.0] - 2026-09-12
+### Added
+
 - Goods are finite: every shelf carries a count, taking from a shelf removes the item, a theft from an owned shop reaches the owner's digest, a place buys only what it sells or uses and pays half the shelf price, and bread, fish and soup spoil at midnight past a shelf of twelve. The wild can be foraged: timber in the pinewood, stone at the quarry.
-- What a citizen perceives: where the people they know are and whether they are asleep, their own shift with its place, wage and hours, how hungry, tired and lonely they feel in words, and how many planks the sawpit holds before they try to build.
+- What a citizen perceives: where they last saw the people they know, whether someone in the room with them is asleep, their own shift with its place, wage and hours, how hungry, tired and lonely they feel in words, and how many planks the sawpit holds before they try to build.
 - The midnight reflection sees the morning's plan with each step done or missed, the projects, the beliefs, the watch list and the unread letters, and is asked what it did of what it meant to do. Quiet days are marked so a cheaper mind can take them.
 - The digest admits what was said to and by the citizen, refused actions, price moves at places they own, and the first and last thing of each day, and leads with the gap between the plan and the day. Trust moves since the owner last looked are shown by name.
 - The body and the calendar interrupt the mind: real hunger with coins in pocket, the first day of starving, a debt due today, and a gathering within the hour each draw a thought.
@@ -32,7 +39,6 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Fixed
 
-- The town sheet told a citizen where everyone they know was standing, whether or not they had ever met. It now says where they were last seen, and whether someone is asleep only when you are in the room with them.
 - Another person's letter home, their private opinion of you and their rewritten self could reach your digest and your morning mail.
 - An owner buying at their own counter destroyed the coins, and an owner holding a post at their own place was paid a wage out of nothing.
 - A workplace with an empty till hired people it could not pay, fired them the same evening and hired them again the next morning until they starved. Thirty days of the island on one seed: four died of hunger before, none now.
@@ -106,5 +112,6 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kresogalic8/unwatched/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kresogalic8/unwatched/releases/tag/v0.1.0

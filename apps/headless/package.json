@@ -1,6 +1,6 @@
 {
   "name": "@unwatched/headless",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,5 +12,9 @@
     "@unwatched/engine": "workspace:*",
     "@unwatched/protocol": "workspace:*"
   },
-  "devDependencies": { "tsx": "^4.23.0", "typescript": "^5.8.0", "@types/node": "^22.15.0" }
+  "devDependencies": {
+    "tsx": "^4.23.0",
+    "typescript": "^5.8.0",
+    "@types/node": "^22.15.0"
+  }
 }
