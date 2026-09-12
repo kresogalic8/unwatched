@@ -10,6 +10,11 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Fixed
 
+## [0.10.1] - 2026-09-12
+### Added
+
+### Fixed
+
 - Keep the scripted garden scenario clock monotonic when construction starts on the proposal day; its generated record now checks event ordering.
 
 ## [0.10.0] - 2026-09-12
@@ -273,7 +278,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/kresogalic8/unwatched/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/kresogalic8/unwatched/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/kresogalic8/unwatched/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/kresogalic8/unwatched/compare/v0.7.0...v0.8.0
