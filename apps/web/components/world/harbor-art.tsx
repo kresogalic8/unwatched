@@ -140,4 +140,3 @@ export function Boat({u,v,className}:{u:number;v:number;className?:string}){cons
  <path d="M-43 -9L3 12M-22 -16L23 3M-1 -20L40 -6" stroke="#9e9275" strokeWidth="6"/><path d="M-32 -24L33 28" stroke="#7d7e59" strokeWidth="2.8" strokeLinecap="round"/><path d="M29 25L44 38" stroke="#a28d64" strokeWidth="5.5" strokeLinecap="round"/>
  <path d="M-2 22Q29 15 43 2" stroke="#cf8a67" strokeWidth="4" fill="none"/><path d="M-68 24Q-19 45 34 37M-42 45Q-8 53 23 47" stroke="#d1e2ce" strokeWidth="1.3" fill="none" opacity=".7"/>
  </g>;}
-
