@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Page, Card, Label, Tide, Bubble, LinkButton } from "@/components/ui";
 import { useMyAgent } from "@/lib/useAgent";
 
 export default function People() {
   const { agent, reason } = useMyAgent(); const [sel, setSel] = useState<string | null>(null);
+  // arrived from the digest with someone named: open on them
+  useEffect(() => { try { const id = new URLSearchParams(location.search).get("id"); if (id) setSel(id); } catch {} }, []);
   if (reason !== "ok" || !agent) return <Page><Card className="max-w-[560px]"><Label>People</Label><h1 className="text-[28px] font-bold">{reason === "loading" ? "Asking around…" : "Nobody to know yet."}</h1>{reason !== "loading" && <LinkButton href={reason === "signed-out" ? "/gate" : "/board"}>{reason === "signed-out" ? "Sign in" : "Send someone over"}</LinkButton>}</Card></Page>;
   const p = agent.people.find((x) => x.id === sel) ?? agent.people[0];
   const first = agent.name.split(" ")[0];

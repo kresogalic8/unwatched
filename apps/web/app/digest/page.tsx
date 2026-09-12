@@ -7,8 +7,13 @@ import { useMyAgent } from "@/lib/useAgent";
 import { Loading, Offline, SignedOut, NoAgent } from "@/components/states";
 
 const tideWord = (t: number) => t < 0.2 ? "gone" : t < 0.3 ? "ebbing" : t < 0.45 ? "steady" : t < 0.65 ? "rising" : "close";
-/** The window this browser session opened on: kept, so a refresh reads the same days and not the ten minutes since. */
+/**
+ * The window this browser session opened on: kept, so a refresh reads the same days and not the ten minutes since.
+ * It ages out after twelve hours, because a citizen gets the same seconds as the reader: a tab left open across the
+ * night opens on the new morning, not on the week it was first opened on.
+ */
 const sinceKey = (id: string) => `ft.since.${id}`;
+const KEEP_MS = 12 * 60 * 60 * 1000;
 
 export default function DigestPage() {
   const { agent, reason } = useMyAgent();
@@ -17,8 +22,9 @@ export default function DigestPage() {
   useEffect(() => { try { const q = new URLSearchParams(location.search); if (q.get("plan") === "unbought") { setUnbought(true); history.replaceState(null, "", location.pathname); } } catch {} }, []);
   const load = () => {
     if (!agent) return; setDown(false);
-    let since: string | null = null; try { since = sessionStorage.getItem(sinceKey(agent.id)); } catch {}
-    void api<Digest>(`/api/agents/${agent.id}/digest${since ? `?since=${encodeURIComponent(since)}` : ""}`).then((x) => { try { sessionStorage.setItem(sinceKey(agent.id), String(x.since)); } catch {} setD(x); }).catch(() => setDown(true));
+    let since: string | null = null;
+    try { const kept = JSON.parse(sessionStorage.getItem(sinceKey(agent.id)) ?? "null") as { since: number; at: number } | null; if (kept && typeof kept.since === "number" && Date.now() - kept.at < KEEP_MS) since = String(kept.since); else sessionStorage.removeItem(sinceKey(agent.id)); } catch {}
+    void api<Digest>(`/api/agents/${agent.id}/digest${since ? `?since=${encodeURIComponent(since)}` : ""}`).then((x) => { try { sessionStorage.setItem(sinceKey(agent.id), JSON.stringify({ since: x.since, at: Date.now() })); } catch {} setD(x); }).catch(() => setDown(true));
     void api<Paper>("/api/papers/latest").then(setPaper).catch(() => {});
   };
   useEffect(load, [agent]);
@@ -55,7 +61,7 @@ export default function DigestPage() {
         <div className="flex flex-col gap-4">
           {d.letters.length > 0 && <Card tone="glass"><div className="flex justify-between items-baseline"><Label tone="teal">A letter from {first}</Label><span className="text-xs text-teal">{clock(d.letters[d.letters.length - 1]!.t)}</span></div><p className="italic text-[17px] leading-[1.4]">“{d.letters[d.letters.length - 1]!.text}”</p><div className="flex gap-2.5"><LinkButton href="/letters">Write back</LinkButton><LinkButton href="/town" kind="tertiary">Visit</LinkButton></div></Card>}
           {d.letters.length === 0 && <Card><Label>Letters</Label><div className="display text-xl font-semibold">Nothing yet.</div><p className="text-sm text-ink2">{canWrite === 0 ? `On this plan ${first} cannot write home: a letter takes a careful decision, and the plan carries none. You can still write; they read it in the morning.` : canWrite === 1 ? `${first} has one careful decision a day, so a letter home is possible but rare. You can write first.` : `${first} writes when something is at stake, usually within the first three days. You can write first.`}</p><div className="flex gap-2 flex-wrap"><LinkButton href="/letters" kind="secondary" size={36}>Write to {first}</LinkButton>{canWrite === 0 && <LinkButton href="/account/credits" kind="tertiary" size={36}>Change the plan</LinkButton>}</div></Card>}
-          <Card><div className="flex justify-between items-baseline"><Label>People</Label><Link href="/people" className="text-[13px] font-bold text-teal">Everyone {first} knows</Link></div>{agent.people.length ? agent.people.slice(0, 5).map((p) => <Link key={p.id} href="/people" className="block rounded-xl -mx-2 px-2 py-0.5 hover:bg-glass transition-colors"><Tide name={p.name} trust={p.trust} word={p.tide} /></Link>) : <p className="text-sm text-drift">Nobody yet. Trust grows with every conversation, and shrinks without them.</p>}</Card>
+          <Card><div className="flex justify-between items-baseline"><Label>People</Label><Link href="/people" className="text-[13px] font-bold text-teal">Everyone {first} knows</Link></div>{agent.people.length ? agent.people.slice(0, 5).map((p) => <Link key={p.id} href={`/people?id=${encodeURIComponent(p.id)}`} className="block rounded-xl -mx-2 px-2 py-0.5 hover:bg-glass transition-colors"><Tide name={p.name} trust={p.trust} word={p.tide} /></Link>) : <p className="text-sm text-drift">Nobody yet. Trust grows with every conversation, and shrinks without them.</p>}</Card>
           {(agent.watch?.length || agent.selves?.length || agent.projects?.length || agent.beliefs?.length) ? <Card><Label>Who {first} is becoming</Label>{agent.watch?.length ? <p className="text-sm"><span className="text-drift">Keeping an eye on: </span>{agent.watch.join(", ")}</p> : null}{agent.projects?.filter((x) => !x.done).length ? <div className="text-sm"><span className="text-drift">Working toward: </span>{agent.projects.filter((x) => !x.done).map((x) => `${x.title} (${x.progress})`).join("; ")}</div> : null}{agent.beliefs?.length ? <div className="text-sm"><span className="text-drift">Believes: </span>{agent.beliefs.map((b) => `${b.belief} (${Math.round(b.confidence * 100)}% sure)`).join("; ")}</div> : null}{agent.selves?.length ? <details className="text-sm"><summary className="cursor-pointer text-ink2">{agent.selves.length === 1 ? "Rewrote themself once" : `Rewrote themself ${agent.selves.length} times`}; now wants {String(agent.persona.want ?? "")}</summary>{agent.selves.slice().reverse().map((sv) => <div key={sv.day} className="mt-2 pl-3 border-l border-line"><div className="text-xs text-drift">until day {sv.day}</div><div>wanted {sv.want} · feared {sv.fear}</div></div>)}</details> : null}</Card> : null}
           <Card><Label>Money and roof</Label><div className="grid grid-cols-2 gap-3"><div><div className="display text-2xl font-semibold tabular">{agent.coins}</div><div className="text-xs text-drift">coins</div></div><div><div className="display text-2xl font-semibold">{agent.home ? `${agent.nightsPaid} night${agent.nightsPaid === 1 ? "" : "s"}` : "no roof"}</div><div className="text-xs text-drift">{agent.home ? `paid at the ${agent.home === "inn" ? "inn" : agent.home}` : "sleeping rough"}</div></div></div><div className="text-sm text-ink2">{agent.job ? `Works as ${agent.job}.` : "No work yet."}</div></Card>
         </div>

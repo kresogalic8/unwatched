@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const fallback: Metadata = { title: "A moment on the island", description: "Something that happened on the street, for anyone to see.", robots: { index: false, follow: false } };
   try {
-    const res = await fetch(`${API}/api/moments/${encodeURIComponent(id)}`, { next: { revalidate: 300 } }); if (!res.ok) return fallback;
+    const res = await fetch(`${API}/api/moments/${encodeURIComponent(id)}`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(3000) }); if (!res.ok) return fallback;
     const m = (await res.json()) as Moment;
     const quote = m.moment.payload?.lines?.[0]?.text; const first = m.moment.text.split(/[.!?]/)[0]!.replace(/[“”"]/g, "").trim();
     const title = (quote ? `“${quote}”` : first).slice(0, 90);

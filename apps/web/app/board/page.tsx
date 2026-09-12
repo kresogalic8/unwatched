@@ -53,7 +53,9 @@ export default function Board() {
   type PlanRow = { name: string; price: number; tier1: number; tier2: number; reflect: boolean; blurb: string; gets: string[] };
   // the plans come from the server, the one place they are written; until they arrive the list says so
   const [plans, setPlans] = useState<Record<string, PlanRow> | null>(null);
-  useEffect(() => { void api<{ plans: Record<string, PlanRow> }>("/api/plans").then((r) => setPlans(r.plans)).catch(() => {}); }, []);
+  const [plansDown, setPlansDown] = useState(false);
+  const loadPlans = () => { setPlansDown(false); void api<{ plans: Record<string, PlanRow> }>("/api/plans").then((r) => setPlans(r.plans)).catch(() => setPlansDown(true)); };
+  useEffect(loadPlans, []);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   useEffect(() => { void currentOwner().then((o) => setSignedIn(!!o)).catch(() => setSignedIn(false)); }, []);
   const [ownKey, setOwnKey] = useState(""); const [models, setModels] = useState({ routine: MODELS[0]!, stakes: MODELS[1]!, reflect: MODELS[2]! }); const [cap, setCap] = useState(2);
@@ -172,12 +174,12 @@ export default function Board() {
             )}
             {brain === "own_brain" && <div className="bg-glass rounded-[20px] p-5 text-sm text-ink2"><b className="text-kelp">After boarding you get a token.</b> Your process opens a WebSocket with it, receives what {p.name.split(" ")[0] || "they"} perceive once a minute, and answers with one action. The protocol is on the <Link href="/developers" className="text-teal font-bold">developers page</Link>.</div>}
             <label className="bg-sand rounded-[20px] p-5 flex flex-col gap-2"><span className="text-[13px] font-bold text-drift">Standing instructions, optional</span><textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Find honest work first. Don't borrow. Write to me before any big decision." className="bg-transparent min-h-[60px] text-[15px]" /><span className="text-[13px] text-drift">They read these every morning. Whether they follow them depends on who they are.</span></label>
-            <div className="mt-auto flex justify-between items-center"><Button kind="tertiary" onClick={() => setStep(2)}>Back</Button><div className="flex items-center gap-4"><span className="text-sm text-drift">Step 4 of 5</span><Button onClick={() => setStep(4)}>Next, boarding</Button></div></div>
+            <div className="mt-auto flex justify-between items-center"><Button kind="tertiary" onClick={() => setStep(2)}>Back</Button><div className="flex items-center gap-4"><span className="text-sm text-drift">Step 4 of 5</span><Button disabled={brain === "hosted" && !plans} onClick={() => setStep(4)}>Next, boarding</Button></div></div>
           </div>
           <div className={`bg-shell rounded-[28px] p-6 sm:p-9 flex flex-col gap-3.5 transition-opacity ${brain === "hosted" ? "" : "opacity-40 pointer-events-none"}`} aria-disabled={brain !== "hosted"}>
             <Label>Hosted plans</Label>
             <p className="text-[13px] text-ink2">Nobody thinks for free on the island. Each plan is a daily allowance of thinking; credits top it up.</p>
-            {!plans && <div className="flex flex-col gap-3" aria-live="polite">{[0, 1, 2].map((k) => <div key={k} className="rounded-[20px] bg-sand p-5 flex flex-col gap-2"><div className="h-4 w-1/3 rounded-full bg-line" /><div className="h-3 w-3/4 rounded-full bg-line" /></div>)}<p className="text-[13px] text-drift">Fetching the plans from the harbor office.</p></div>}
+            {!plans && <div className="flex flex-col gap-3" aria-live="polite">{[0, 1, 2].map((k) => <div key={k} className="rounded-[20px] bg-sand p-5 flex flex-col gap-2"><div className="h-4 w-1/3 rounded-full bg-line" /><div className="h-3 w-3/4 rounded-full bg-line" /></div>)}<p className="text-[13px] text-drift" role="status">{plansDown ? "The harbor office is not answering. Nobody boards on a plan they have not read." : "Fetching the plans from the harbor office."}</p>{plansDown && <Button kind="tertiary" size={36} onClick={loadPlans}>Ask again</Button>}</div>}
             {plans && (["visitor", "resident", "patron"] as const).map((k) => { const pl = plans[k]; if (!pl) return null; const on = plan === k; return <button key={k} type="button" aria-pressed={on} onClick={() => setPlan(k)} className={`text-left rounded-[20px] p-5 flex flex-col gap-2 transition-colors ${on ? "bg-teal text-sand" : "bg-sand hover:bg-sand-2"}`}><div className="flex justify-between items-baseline"><span className="font-bold text-[17px]">{pl.name}</span><span className="display font-bold text-xl">${pl.price}<span className="text-[13px] font-semibold opacity-70"> / mo</span></span></div><span className={`text-[13px] ${on ? "opacity-80" : "text-ink2"}`}>{pl.blurb}</span><ul className={`text-[13px] flex flex-col gap-0.5 pl-4 m-0 list-disc ${on ? "opacity-90" : "text-ink2"}`}>{pl.gets.map((g) => <li key={g}>{g}</li>)}</ul></button>; })}
             <p className="text-[13px] text-drift">Per citizen, per month, before tax. The plan is bought right after boarding, on Stripe's page. Credits never buy coins. Coins are earned on the island only.</p>
           </div>
@@ -207,7 +209,7 @@ export default function Board() {
               ? <div className="bg-glass rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="font-bold">The harbor office needs to see you first.</div><div className="text-[13px] text-ink2">Your ticket is saved. Sign in and you will come straight back here.</div></div><LinkButton href="/gate?next=/board" size={44}>Sign in at the harbor office</LinkButton></div>
               : <div className="text-[13px] text-coral">{err}</div>)}
             {away && <div className="bg-glass rounded-[18px] p-4 text-sm"><b>{p.name} boarded for {away.island}.</b> Their story goes on there, on that island's own pages{away.url ? <>: <a className="text-teal font-bold" href={away.url.replace(/\/engine$/, "")}>{away.url.replace(/\/engine$/, "")}</a></> : "."} Sign in there with the same account to read their digest.</div>}
-            <div className="mt-auto flex justify-between items-center"><Button kind="tertiary" onClick={() => setStep(3)}>Back</Button><Button size={52} disabled={busy || (brain === "own_key" && ownKey.trim().length < 8)} onClick={board}>{busy ? "Boarding…" : "Send someone over"}</Button></div>
+            <div className="mt-auto flex justify-between items-center"><Button kind="tertiary" onClick={() => setStep(3)}>Back</Button><Button size={52} disabled={busy || (brain === "own_key" && ownKey.trim().length < 8) || (brain === "hosted" && !plans)} onClick={board}>{busy ? "Boarding…" : "Send someone over"}</Button></div>
           </div>
         </div>
       )}
