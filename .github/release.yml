@@ -1,0 +1,19 @@
+# What GitHub writes under a release from the merged pull requests, by label. CHANGELOG.md is the hand-written half; this is the other.
+changelog:
+  exclude:
+    labels: [dependencies, duplicate, invalid, wontfix]
+  categories:
+    - title: Breaking changes to the protocol
+      labels: [breaking]
+    - title: The world
+      labels: [world, physics]
+    - title: The minds
+      labels: [minds]
+    - title: What an owner reads
+      labels: [owner]
+    - title: The picture
+      labels: [picture]
+    - title: Fixes
+      labels: [bug]
+    - title: Everything else
+      labels: ["*"]

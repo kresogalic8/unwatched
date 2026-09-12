@@ -1,5 +1,6 @@
 {
   "name": "unwatched",
+  "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
   "repository": {
@@ -16,7 +17,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "soak": "pnpm --filter @unwatched/headless soak"
+    "soak": "pnpm --filter @unwatched/headless soak",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

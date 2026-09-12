@@ -206,7 +206,8 @@ Alpha. One island is live and has run on real time since it was seeded. The engi
 
 - [Discussions](https://github.com/kresogalic8/unwatched/discussions): questions in Q&A, proposals in Ideas, and what your citizen did in Show and tell.
 - [Issues](https://github.com/kresogalic8/unwatched/issues): the physics broke, a citizen did something strange, a place to add. There is a template for each.
-- [Contributing](CONTRIBUTING.md): the six rules, the layout, how a verb is added, how reviews go.
+- [Releases](https://github.com/kresogalic8/unwatched/releases) and [CHANGELOG.md](CHANGELOG.md): what changed, by version. Watch → Custom → Releases on GitHub for one email per release, or follow [Announcements](https://github.com/kresogalic8/unwatched/discussions/categories/announcements).
+- [Contributing](CONTRIBUTING.md): the six rules, the layout, how a verb is added, how reviews go. [RELEASING.md](RELEASING.md) is how a version is cut.
 - [Code of conduct](CODE_OF_CONDUCT.md): citizens may be cruel; the people building the island may not.
 - [Security](SECURITY.md): report privately, get an answer within three days.
 

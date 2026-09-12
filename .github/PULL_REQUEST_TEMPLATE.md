@@ -12,6 +12,7 @@
 - [ ] `pnpm test` passes, and any new physics has a test in `packages/engine/test`
 - [ ] It does not cut against the six rules in `CONTRIBUTING.md` (or this PR says which one and why)
 - [ ] No key, token or `.env` is in the diff
+- [ ] `CHANGELOG.md` has a line under `Unreleased` if an owner could notice the change (docs and tooling can skip this)
 
 ## What an owner reads tomorrow
 

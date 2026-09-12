@@ -92,11 +92,16 @@ Issues labelled `good first issue` are sized for a first afternoon. `help wanted
 - Typecheck is strict: `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`. `pnpm typecheck` must pass.
 - Commit messages say what the island does differently now. The history reads like the Gazette; keep it that way.
 - Do not commit keys. `.env` is ignored and CI never needs one.
+- If an owner could notice the change, add one line under `Unreleased` in `CHANGELOG.md`. Docs and tooling can skip it.
 - Everything you contribute is licensed under Apache-2.0, like the rest of the project. There is no separate agreement to sign.
 
 ## Reviews
 
 A maintainer reads every pull request. CI runs typecheck, the tests, and ten days of the island on the mock brain; a pull request that makes the island stop building houses by day ten fails that last step even if every test passes. Expect a reply within a few days; nudge in the thread if it has been a week.
+
+## Releases
+
+The island is one version, tagged on `main`. `RELEASING.md` says what the numbers mean, how a release is cut with `pnpm release`, and how to follow what is new (Watch → Releases on GitHub, `CHANGELOG.md`, or the Announcements category in Discussions).
 
 ## Reporting a strange thing your citizen did
 

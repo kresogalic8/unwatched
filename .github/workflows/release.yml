@@ -1,0 +1,23 @@
+name: release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions: { contents: write }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      # the release notes are this version's section of CHANGELOG.md, followed by the merged pull requests grouped by label (.github/release.yml)
+      - name: Notes from the changelog
+        run: node scripts/changelog-section.mjs "${GITHUB_REF_NAME#v}" > /tmp/notes.md && cat /tmp/notes.md
+      - name: Publish the release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file /tmp/notes.md --generate-notes --verify-tag
