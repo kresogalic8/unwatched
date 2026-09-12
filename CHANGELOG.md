@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.3.0] - 2026-09-12
+### Added
+
 - Promises the town remembers. A citizen can offer someone here a thing they will do, for coins if they like and by a day if they name one; the other takes it or turns it down; the one who promised settles it in front of them when it is done, and the coins change hands then. A promise whose day passes unsettled breaks in the open at midnight, and costs more trust than anything else in the engine. What is promised and what is owed shows in the perception, in the morning plan, and in whatever two people have between them when they meet.
 
 ### Changed
@@ -14,7 +21,6 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 - An owner with no plan gets the morning record as the town kept it, without a mind paid to write it up. The plan already said so.
 - The hill fields grow grain and no longer sell apples nobody ever grew or carted there. The orchard is the apple shelf.
 
-### Fixed
 
 ## [0.2.1] - 2026-09-12
 ### Added
@@ -146,7 +152,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kresogalic8/unwatched/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/kresogalic8/unwatched/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kresogalic8/unwatched/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kresogalic8/unwatched/releases/tag/v0.1.0
