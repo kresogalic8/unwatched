@@ -51,7 +51,10 @@ export function drawGround(o: TerrainOptions, season: string): Graphics {
   const {W,H,cy,inside,outline,places,oldTown}=o; const g=new Graphics();
   const poly=(pts:[number,number][])=>{g.moveTo(...pts[0]!);for(const p of pts.slice(1))g.lineTo(...p);return g.closePath();};
   // A continuous landscape replaces the old diamond terrain grid.
+  poly(outline(1.09)).fill({color:0x95bcaf,alpha:.23});
   poly(outline(1.055)).fill({color:0xc5d8c9,alpha:.65});
+  const shallows=outline(1.065);
+  for(let i=0;i<shallows.length-1;i+=3){const a=shallows[i]!,b=shallows[i+1]!;g.moveTo(...a).lineTo(...b).stroke({width:1.3,color:0xe8edda,alpha:.55,cap:"round"});}
   poly(outline(1).map(([x,y])=>[x+9,y+22] as [number,number])).fill({color:0x527d70,alpha:.15});
   poly(outline(1)).fill(0xc3c6a8);poly(outline(.98)).fill(0xded7bb);
   poly(outline(.92)).fill(season==="winter"?0xc8cbbd:season==="autumn"?0xcac6a4:0xc4c9a6);
@@ -71,8 +74,8 @@ export function drawGround(o: TerrainOptions, season: string): Graphics {
   }
   // Sparse, chipped stones interrupt the paving instead of covering town in a checkerboard.
   for(let row=-8;row<H/10+8;row++)for(let col=-4;col<W/38+4;col++) {
-    const x=col*38+(row%2)*19,y=row*10;
-    if(hash2(col+311,row+91)<.58)continue;
+    const x=col*38+(row%2)*19+(hash2(col,row+41)-.5)*18,y=row*10+(hash2(col+52,row)-.5)*7;
+    if(hash2(col+311,row+91)<.76)continue;
     if(urbanity(x,y)>1+noise(x/110,y/80)*.18)continue;
     const pts:[number,number][]=[[x-2,y-8],[x+15,y-1],[x+16,y+1],[x+1,y+8],[x-15,y+1],[x-16,y-1]];
     if(pts.some(([xx,yy])=>inside(xx,yy)>.973))continue;
@@ -105,10 +108,11 @@ export function drawRoads(segs: Seg[]): Graphics {
   const g=new Graphics();
   segs.forEach((s,i)=>{
     const L=Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y);if(L<1)return;
+    ribbon(g,s.a,s.b,s.cobbled?20:27,0x9ba58a,.12,5,i);
     if(!s.cobbled) {ribbon(g,s.a,s.b,22,0xcfc5a8,.34,4,i);ribbon(g,s.a,s.b,15,0xe2d7b9,.65,3,i);}
     const ux=(s.b.x-s.a.x)/L,uy=(s.b.y-s.a.y)/L;
     for(let t=7;t<L;t+=14){const h=hash2(Math.round(t),i),x=s.a.x+ux*t,y=s.a.y+uy*t;
-      if(s.cobbled)g.moveTo(x-8,y).lineTo(x,y-4).lineTo(x+8,y).lineTo(x,y+4).closePath().fill({color:h>.5?0xe3ddc5:0xd4ceb5,alpha:.55});
+      if(s.cobbled && h>.4)g.moveTo(x-8,y).lineTo(x,y-4).lineTo(x+8,y).lineTo(x,y+4).closePath().fill({color:h>.5?0xe3ddc5:0xd4ceb5,alpha:.55});
       else if(h>.65)g.ellipse(x+7,y+3,1.8,.8).fill({color:0xb0b394,alpha:.45});
     }
   });return g;

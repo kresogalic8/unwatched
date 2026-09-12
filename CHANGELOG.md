@@ -8,6 +8,14 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Changed
 
+- Street lighting separates the lantern glow from an elliptical pool on the ground. Broader, quieter bloom and reduced window flicker preserve the Harbor material colors after dark.
+
+- Orchards now show pruned trees instead of grain rows. Harbor piers gain plank wear, fasteners and mooring wraps; rowboats gain hull seams and coiled rope. Coastal rocks gain waterlines and quarry terraces gain stone joints.
+
+- Landscape paving is less repetitive, roads gain softer edges and the coast gains shallow water and broken foam. Trees use irregular foliage silhouettes and visible branchwork. Sawmills now have a dedicated workbench; market bins and nets gain details, live stock aligns with the counter, and empty-stock signs clear building names. Interior windows and floors share Harbor materials; construction reveals the actual roof instead of a separate teal triangle.
+
+- Harbor buildings gain recessed window frames, shutter hardware, corner masonry, deeper eaves, drainpipes and individually highlighted roof tiles. Street furniture gains wood grain and fasteners; barrels, lamps, wells, laundry and towers gain material details. Rebuilt shared day/night artwork keeps the town and study consistent.
+
 ### Fixed
 
 ## [0.7.0] - 2026-09-12

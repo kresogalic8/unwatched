@@ -52,7 +52,8 @@ export function lightWorldArt(root:Container,lit:boolean):void {
 export function drawConstruction(done:number,needed:number,kind:string):Container {
   const c=new Container(),building=drawThing(kind==="shop"?"shop":"house");if(!building)return c;
   const ratio=Math.max(0,Math.min(1,done/Math.max(1,needed))),mask=new Graphics();
-  mask.rect(-200,-Math.max(8,210*ratio),400,Math.max(8,210*ratio)+10).fill(0xffffff);
+  const bounds=building.c.getLocalBounds(); const visible=Math.max(8,bounds.height*ratio);
+  mask.rect(bounds.x-1,bounds.y+bounds.height-visible,bounds.width+2,visible+1).fill(0xffffff);
   c.addChild(building.c,mask);building.c.mask=mask;return c;
 }
 /** A fresh drawing of the named thing, or null if the atlas still has to stand in. */
@@ -97,7 +98,7 @@ export function drawStock(sprite: string, stock: Record<string, number>): Graphi
       ["apples", 3, (q) => { g.circle(q[0], q[1] - 3, 3).fill(CORAL).stroke({ width: 1, color: KELP }); }],
     ];
     let any = false;
-    rows.forEach(([item, per, draw], r) => { const k = n(item, per, 6); for (let i = 0; i < k; i++) { draw(P(8 + i * 10, d - 8 - r * 9, 20)); any = true; } });
+    rows.forEach(([item, per, draw], r) => { const k = n(item, per, 6); for (let i = 0; i < k; i++) { draw([-36+i*11+r*7,-13+i*.9-r*5]); any = true; } });
     return any ? g : null;
   }
   if (sprite === "sawpit") {

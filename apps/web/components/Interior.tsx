@@ -14,7 +14,7 @@ function furnish(g: Graphics, kind: string, sprite: string, W: number, H: number
   const table = (x: number, w = 70) => { g.rect(x, floorY - 30, w, 5).fill(WOOD).stroke({ width: .65, color: INK }); g.rect(x + 6, floorY - 25, 4, 22).fill(WOOD); g.rect(x + w - 10, floorY - 25, 4, 22).fill(WOOD); for (const cx of [x-10,x+w+10]) { g.moveTo(cx-7,floorY-1).lineTo(cx-7,floorY-32).lineTo(cx+7,floorY-32).lineTo(cx+7,floorY-1).moveTo(cx-7,floorY-14).lineTo(cx+7,floorY-14).stroke({width:1.8,color:WOOD}); } seats.push([x - 10, floorY - 2], [x + w + 10, floorY - 2]); };
   const bench = (x: number, w = 80) => { g.rect(x, floorY - 34, w, 8).fill(WOOD).stroke({ width: .65, color: INK }); g.rect(x + 6, floorY - 26, 5, 24).fill(WOOD); g.rect(x + w - 11, floorY - 26, 5, 24).fill(WOOD); benches.push([x + w / 2, floorY - 2]); };
   const shelf = (x: number, y: number, w: number) => { g.rect(x, y, w, 4).fill(WOOD); for (let i = 0; i < Math.floor(w / 14); i++) g.roundRect(x + 4 + i * 14, y - 12, 9, 12, 2).fill([CLOTH, CORAL, FLOOR, DRIFT][i % 4]!); };
-  const window_ = (x: number, y: number) => { g.roundRect(x, y, 34, 30, 3).fill(GLASS).stroke({ width: .7, color: INK }); g.moveTo(x + 17, y).lineTo(x + 17, y + 30).stroke({ width: .65, color: INK }); g.moveTo(x, y + 15).lineTo(x + 34, y + 15).stroke({ width: .65, color: INK }); };
+  const window_ = (x: number, y: number) => { g.rect(x-3,y-3,40,37).fill(0xd6ceb4).stroke({width:.6,color:0xa5a58b}); g.rect(x-4,y+31,43,3).fill(0xeee2c6); g.roundRect(x, y, 34, 30, 3).fill(GLASS).stroke({ width: .7, color: INK }); g.moveTo(x+2,y+3).lineTo(x+15,y+3).lineTo(x+2,y+24).closePath().fill({color:0xe5ebd0,alpha:.3}); g.moveTo(x + 17, y).lineTo(x + 17, y + 30).stroke({ width: .65, color: INK }); g.moveTo(x, y + 15).lineTo(x + 34, y + 15).stroke({ width: .65, color: INK }); };
   const oven = (x: number) => { g.roundRect(x, floorY - 54, 54, 54, 6).fill(DRIFT).stroke({ width: .7, color: INK }); g.roundRect(x + 10, floorY - 34, 34, 18, 9).fill(0x2b2f31); g.roundRect(x + 14, floorY - 30, 26, 10, 5).fill(CORAL); benches.push([x + 27, floorY - 2]); };
   const barrel = (x: number) => { g.roundRect(x, floorY - 26, 20, 26, 5).fill(WOOD).stroke({ width: .65, color: INK }); g.rect(x, floorY - 18, 20, 2).fill(INK); g.rect(x, floorY - 9, 20, 2).fill(INK); };
   window_(W * 0.18, 26); window_(W * 0.7, 26);
@@ -58,7 +58,9 @@ export function Interior({ kind, sprite, hour, people }: { kind: string; sprite:
       const room = new Graphics();
       room.rect(0, 0, W, floorY).fill(night ? WALL2 : WALL); for (let i = 0; i < 6; i++) room.rect(0, 12 + i * 22, W, 1).fill({ color: WALL2, alpha: 0.8 });
       room.rect(0, floorY, W, H - floorY).fill(FLOOR); for (let i = 0; i < 14; i++) room.rect(i * 22, floorY, 1, H - floorY).fill(FLOOR2);
-      room.rect(0, floorY - 1, W, 2).fill(INK);
+      room.rect(0,floorY-9,W,8).fill(0xc8c2a7); room.rect(0,floorY-10,W,1).fill(0xebe1c6);
+      for(let i=0;i<13;i++){const x=7+i*22;room.moveTo(x,floorY+4).quadraticCurveTo(x+4,floorY+13,x+2,H-3).stroke({width:.6,color:0x8d7d61,alpha:.45});}
+      room.rect(0, floorY - 1, W, 2).fill({color:INK,alpha:.4});
       stage.addChild(room);
       const fur = new Graphics(); const spots = furnish(fur, kind, sprite, W, H, floorY); stage.addChild(fur);
       if (night) { const lamp = new Graphics(); lamp.circle(W / 2, 40, 70).fill({ color: LIGHT.lamp, alpha: 0.35 }); lamp.circle(W / 2, 22, 6).fill(LIGHT.lamp); stage.addChild(lamp); }

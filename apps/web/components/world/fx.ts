@@ -20,7 +20,7 @@ function rnd(seed: number): () => number { let a = seed >>> 0; return () => { a 
 /** Two colours, a way between them. */
 export function mix(a: number, b: number, t: number): number { t = Math.max(0, Math.min(1, t)); const ch = (sh: number) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t); return (ch(16) << 16) | (ch(8) << 8) | ch(0); }
 
-export type LightSource = { x: number; y: number; r: number; color: number; strength: number; flicker?: number; noHole?: boolean };
+export type LightSource = { x: number; y: number; r: number; color: number; strength: number; flicker?: number; noHole?: boolean; aspect?: number };
 
 /** A streak of rain: a thin line, bright in the middle, gone at both ends. */
 function streak(): Texture {
@@ -59,11 +59,11 @@ export class Lighting {
       const s = sources[i]; const h = this.holes[i]!, w = this.warms[i]!, c = this.cores[i]!;
       if (!s) { h.visible = w.visible = c.visible = false; continue; }
       const fl = s.flicker ? 1 + Math.sin(tick / 3.7 + i * 1.9) * s.flicker * 0.5 + Math.sin(tick / 1.3 + i) * s.flicker * 0.25 : 1;
-      const r = s.r * fl;
+      const r = s.r * fl; const aspect = s.aspect ?? 1;
       h.visible = !s.noHole; w.visible = c.visible = true;
-      h.position.set(s.x, s.y); h.width = h.height = r * 2.2; h.alpha = Math.min(1, s.strength) * k;
-      w.position.set(s.x, s.y); w.width = w.height = r * 1.4; w.tint = s.color; w.alpha = 0.22 * s.strength * k;
-      c.position.set(s.x, s.y); c.width = c.height = r * 0.5; c.tint = s.color; c.alpha = 0.45 * s.strength * k; // the bright heart of the bloom
+      h.position.set(s.x, s.y); h.width = r * 2.2; h.height = r * 2.2 * aspect; h.alpha = Math.min(1, s.strength) * k;
+      w.position.set(s.x, s.y); w.width = r * 1.8; w.height = r * 1.8 * aspect; w.tint = s.color; w.alpha = 0.15 * s.strength * k;
+      c.position.set(s.x, s.y); c.width = r * .3; c.height = r * .3 * aspect; c.tint = s.color; c.alpha = 0.3 * s.strength * k; // the bright heart of the bloom
     }
   }
 }

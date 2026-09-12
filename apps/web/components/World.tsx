@@ -218,7 +218,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           for (const y of [-40, -76]) r.moveTo(-72, y).lineTo(72, y).stroke({ width: 3, color: 0xc9b58f });
           r.moveTo(-72, -40).lineTo(-24, -76).moveTo(24, -40).lineTo(72, -76).stroke({ width: 2, color: 0xc9b58f, alpha: 0.8 });
           r.moveTo(80, 6).lineTo(96, -72).moveTo(88, 6).lineTo(104, -72).stroke({ width: 2.5, color: 0xa3906d }); for (let k = 0; k < 7; k++) { const t = k / 7; r.moveTo(80 + 16 * t, 6 - 78 * t).lineTo(88 + 16 * t, 6 - 78 * t).stroke({ width: 2, color: 0xa3906d }); }
-          if (done >= 0.8) { r.moveTo(-76, -70).lineTo(0, p.site.what === "house" ? -120 : -100).lineTo(76, -70).closePath().fill(C.teal).stroke({ width: 1.4, color: C.kelp }); } // the roof goes on last
+          // The shared construction mask reveals the actual clay roof as work completes.
           g.addChild(r);
           // the plank pile and the sand heap by the site
           const pile = new Graphics(); for (let k = 0; k < 4; k++) pile.rect(-118, -6 - k * 5, 40, 4).fill(k % 2 ? 0xc4b08c : 0xd6c49e).stroke({ width: 1, color: C.kelp }); pile.ellipse(-90, 6, 14, 5).fill({ color: C.sand, alpha: 0.9 }).stroke({ width: 1, color: C.kelp, alpha: 0.4 }); g.addChild(pile);
@@ -231,7 +231,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           local(p.sprite);
           if (p.stock) { const st = drawStock(p.sprite, p.stock); if (st) { st.zIndex = 1; g.addChild(st); } }
           // the shelf is bare: a board leans by the door until the cart or the work fills it again
-          if (p.stock && (p.kind === "shop" || p.kind === "workplace" || p.kind === "market") && Object.values(p.stock).every((v) => v <= 0)) { const sg = drawSign("nothing left"); sg.position.set(-46, 26); sg.zIndex = 2; g.addChild(sg); const st = new Text({ text: "nothing left", style: { ...smallStyle, fontSize: 7 } }); st.anchor.set(0.5, 0.5); st.position.set(-46, 3); st.zIndex = 3; g.addChild(st); }
+          if (p.stock && (p.kind === "shop" || p.kind === "workplace" || p.kind === "market") && Object.values(p.stock).every((v) => v <= 0)) { const sg = drawSign("nothing left"); sg.position.set(-58, -10); sg.zIndex = 2; g.addChild(sg); const st = new Text({ text: "Sold out", style: { ...smallStyle, fontSize: 7, stroke: { color: 0xeee3cc, width: 0 } } }); st.anchor.set(0.5, 0.5); st.position.set(-58, -33); st.zIndex = 3; g.addChild(st); }
           // owned: the owner's name on a board by the door
           if (p.owner && p.kind !== "plot") { const nb = new Graphics(); nb.roundRect(-30, -12, 60, 11, 2).fill(C.shell).stroke({ width: 1.2, color: C.kelp }); nb.position.set(48, -6); nb.zIndex = 2; g.addChild(nb); const nt = new Text({ text: p.owner.split(" ").slice(-1)[0]!.toUpperCase(), style: { ...smallStyle, fontSize: 7 } }); nt.anchor.set(0.5, 0.5); nt.position.set(48, -12.5); nt.zIndex = 3; g.addChild(nt); }
         }
@@ -556,8 +556,11 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           water.update({ time: tick / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
           const sources: LightSource[] = [];
           if (night.alpha > 0.03) {
-            for (const d of decor) if (d.sprite === "lamp") sources.push({ x: d.x + 14, y: d.y - 58, r: 110, color: LIGHT.lamp, strength: 0.95, flicker: 0.06 });
-            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && p.kind !== "harbor" && p.kind !== "market") sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.8, flicker: 0.12 });
+            for (const d of decor) if (d.sprite === "lamp") {
+              sources.push({ x: d.x + 14, y: d.y - 58, r: 90, color: LIGHT.lamp, strength: .72, flicker: .025 });
+              sources.push({ x: d.x + 18, y: d.y + 2, r: 62, aspect: .38, color: LIGHT.lamp, strength: .42 });
+            }
+            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && p.kind !== "harbor" && p.kind !== "market") sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 });
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
           sources.push(...life.lights);
