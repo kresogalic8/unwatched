@@ -93,7 +93,8 @@ export interface AgentState {
   coins: number;
   inventory: string[];
   job: string | null;
-  home: { place: PlaceId; nightsPaid: number } | null;
+  /** Where they live, the nights already paid for, and what has run up unpaid since. */
+  home: { place: PlaceId; nightsPaid: number; arrears?: number } | null;
   asleep: boolean;
   arrivedAt: number;
   relationships: Map<AgentId, Relation>;

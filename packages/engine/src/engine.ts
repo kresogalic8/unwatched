@@ -634,10 +634,18 @@ export class Town {
       case "sleep": {
         if (!a.asleep) {
           const beds = here.beds!;
-          const isHome = a.home?.place === here.id && a.home.nightsPaid > 0;
-          if (isHome) a.home!.nightsPaid--;
+          const isHome = a.home?.place === here.id; // the bed where someone lives is theirs; a guest takes one of what is left
+          if (isHome && a.home!.nightsPaid > 0) a.home!.nightsPaid--;
+          else if (isHome && here.owner) {
+            // a landlord lets it run: they pay what they can, after keeping enough to eat, and the rest runs up against them
+            const rent = this.bedPrice(here); const owed = (a.home!.arrears ?? 0) + rent; const paid = Math.min(Math.max(0, a.coins - 2), owed);
+            a.coins -= paid; a.home!.arrears = owed - paid;
+            const o = this.agents.get(here.owner); if (o) o.coins += paid;
+            if (a.home!.arrears > 0) this.emit("agent.rent", [a.id, here.owner], here.id, `${name} could not cover the night at ${here.name}; ${a.home!.arrears} coins of rent are owed now.`, 0.4);
+          }
           else if (here.owner === a.id) { here.freeBeds = (here.freeBeds ?? 1) - 1; }
-          else if (beds.price > 0) { const bp = this.bedPrice(here); a.coins -= bp; here.freeBeds = (here.freeBeds ?? 1) - 1; const o = here.owner ? this.agents.get(here.owner) : null; if (o) o.coins += bp; else here.treasury += bp; this.emit("agent.rent", [a.id], here.id, `${name} paid ${beds.price} for a bed at ${here.name}${o ? `, to ${o.persona.name}` : ""}.`, o ? 0.2 : 0.05); }
+          else if (beds.price === 0) { here.freeBeds = (here.freeBeds ?? 1) - 1; }
+          else { const bp = this.bedPrice(here); a.coins -= bp; here.freeBeds = (here.freeBeds ?? 1) - 1; const o = here.owner ? this.agents.get(here.owner) : null; if (o) o.coins += bp; else here.treasury += bp; this.emit("agent.rent", [a.id], here.id, `${name} paid ${beds.price} for a bed at ${here.name}${o ? `, to ${o.persona.name}` : ""}.`, o ? 0.2 : 0.05); }
           a.asleep = true;
           this.emit("agent.sleep", [a.id], here.id, `${name} went to sleep at ${here.name}.`, 0.01);
         }
@@ -898,6 +906,31 @@ export class Town {
       a.starving = hungry ? a.starving + 1 : 0; a.roofless = roof ? 0 : a.roofless + 1;
       if (a.starving >= 2 && !wasWeak) { this.emit("agent.weak", [a.id], a.location, `${a.persona.name} is weak with hunger and cannot work.`, 0.6); this.remember(a, "I have not eaten properly in two days. I am too weak to work.", 0.9); for (const w of this.nearby(a)) this.remember(w, `${a.persona.name} looks weak with hunger.`, 0.6, "rumor"); }
       if (a.starving === 3) a.hint = "You have not eaten in three days and you will not survive many more. Something must change today: ask for help, steal, sell something, write home, or take the boat.";
+      // a paid stay at a house with no proprietor ends when the nights do: the harbor inn takes coins, not promises
+      if (a.home && a.home.nightsPaid <= 0 && !(a.home.arrears ?? 0)) {
+        const inn = this.places.get(a.home.place);
+        if (inn && !inn.owner && inn.owner !== a.id) {
+          a.home = null;
+          this.emit("agent.rent", [a.id], inn.id, `${a.persona.name}'s nights at ${inn.name} are up.`, 0.45);
+          this.remember(a, `My nights at ${inn.name} are paid out. I need a bed of my own, or the shed.`, 0.85);
+          a.hint = `Your nights at ${inn.name} are up. Find a bed you can pay for, a roof of your own, or the boat shed.`;
+        }
+      }
+      // rent that has run three nights behind puts a person out; what they owe follows them, and the landlord has a debt instead of a lodger
+      if (a.home && (a.home.arrears ?? 0) > 0) {
+        const place = this.places.get(a.home.place);
+        if (place && place.owner !== a.id && (a.home.arrears ?? 0) >= this.bedPrice(place) * 3) {
+          const owed = a.home.arrears ?? 0, owner = place.owner ? this.agents.get(place.owner) : null;
+          a.home = null; a.heading = null;
+          if (owner) { const d = owner ? a.debts.find((x) => x.to === owner.id) : null; if (d) d.coins += owed; else a.debts.push({ to: owner.id, coins: owed, due: this.t + 7 * MINUTES_PER_DAY }); }
+          this.emit("agent.evicted", [a.id, ...(owner ? [owner.id] : [])], place.id, `${a.persona.name} was put out of ${place.name}, ${owed} coins behind on the rent.`, 0.8);
+          this.remember(a, `I was put out of ${place.name}. I owe ${owed} coins and I have nowhere to sleep.`, 0.95);
+          if (owner) { this.remember(owner, `I put ${a.persona.name} out of ${place.name}. They owe me ${owed} coins.`, 0.85); const r = this.rel(a, owner.id); r.trust = clamp(r.trust - 0.2); }
+          a.hint = `You were put out of ${place.name} for ${owed} coins of rent. Find a bed tonight, or the shed, and find the coins.`;
+        }
+      }
+      // a night with no roof over you wears on a body in any season
+      if (!roof) a.needs.rest = Math.min(1, a.needs.rest + 0.08);
       const winterRough = this.season === "winter" && a.roofless >= 3 && a.starving >= 3;
       if (a.starving >= 5 || winterRough) {
         const how = winterRough ? "of hunger and cold, sleeping rough in winter" : "of hunger";
@@ -913,6 +946,18 @@ export class Town {
       this.emit("agent.debt", [a.id, lender.id], a.location, `${a.persona.name} still owes ${lender.persona.name} ${d.coins} coins, and the day has come.`, 0.6);
       this.remember(lender, `${a.persona.name} has not paid back the ${d.coins} coins. It was due today.`, 0.85); this.remember(a, `I owe ${lender.persona.name} ${d.coins} coins and it is overdue.`, 0.8);
       const r = this.rel(lender, a.id); r.trust = clamp(r.trust - 0.2);
+    }
+    // what is overdue grows: a tenth a day, a coin at the least, and never past twice what was lent
+    for (const a of this.agents.values()) for (const d of a.debts) {
+      if (this.t < d.due) continue;
+      const principal = (d as { principal?: number }).principal ?? d.coins; (d as { principal?: number }).principal = principal;
+      const grown = Math.min(principal * 2, d.coins + Math.max(1, Math.floor(d.coins / 10)));
+      if (grown === d.coins) continue;
+      const was = d.coins; d.coins = grown; const lender = this.agents.get(d.to); if (!lender) continue;
+      if (was < principal * 2 && grown >= principal * 2) {
+        this.emit("agent.debt", [a.id, lender.id], a.location, `${a.persona.name} now owes ${lender.persona.name} ${grown} coins, twice what was lent, and it stops growing there.`, 0.7);
+        this.remember(a, `What I owe ${lender.persona.name} has doubled to ${grown} coins. It will not grow past that, but it will not go away.`, 0.9);
+      }
     }
     // a promise whose day has passed and which nobody settled is a promise broken, and the other side remembers it
     for (const a of this.agents.values()) for (const d of a.deals) {
@@ -1498,7 +1543,15 @@ export class Town {
       this.emit("town.gathering", g.actors, g.place, `The council heard ${accuser} against ${b.persona.name} (“${g.note}”) in front of ${who}. The record shows ${guilt} offence${guilt === 1 ? "" : "s"}${b.convictions ? " and a conviction already" : ""}: the boat.`, 1, { kind: g.kind, verdict: "exile", guilt, crowd: crowd.map((c) => c.id), held: true });
       this.removeAgent(b.id, "exiled", `Found against by the council, accused by ${accuser}.`);
     } else {
-      const fine = Math.min(b.coins, 4 * guilt); b.coins -= fine; council.treasury += fine; b.convictions++;
+      const owed = a ? b.debts.find((d) => d.to === a.id) : null; // a creditor who brought them here is paid first, out of what the fine would have been
+      const fine = Math.min(b.coins, 4 * guilt); b.coins -= fine; b.convictions++;
+      const paid = owed && a ? Math.min(fine, owed.coins) : 0;
+      if (owed && a && paid > 0) {
+        a.coins += paid; owed.coins -= paid; if (owed.coins <= 0) b.debts = b.debts.filter((d) => d !== owed);
+        this.emit("agent.debt", [b.id, a.id], council.id, `The council took ${paid} coins from ${b.persona.name} and gave them to ${a.persona.name} against what was owed${owed.coins > 0 ? `; ${owed.coins} coins are still owed` : ", and it is settled"}.`, 0.7);
+        this.remember(a, `The council made ${b.persona.name} pay me ${paid} coins of what they owed.`, 0.9); this.remember(b, `The council took ${paid} coins off me and gave them to ${a.persona.name}.`, 0.9);
+      }
+      council.treasury += fine - paid;
       this.remember(b, `The council fined me ${fine} coins on ${accuser}'s word, in front of everyone. One more and they will put me on the boat.`, 0.95);
       if (a) { this.remember(a, `The council fined ${b.persona.name} ${fine} coins on my word.`, 0.7); const r = b.relationships.get(a.id); if (r) r.trust = Math.max(0, r.trust - 0.4); }
       for (const w of witnesses) { this.nudge(w, b.id, -0.1, -0.05); this.remember(w, `The council fined ${b.persona.name} ${fine} coins for "${g.note}".`, 0.6, "rumor"); }

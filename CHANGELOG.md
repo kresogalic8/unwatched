@@ -6,6 +6,9 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Rent, arrears and eviction. A bed is paid for the night it is slept in, out of what is left after a person has kept enough to eat. A landlord lets it run and the shortfall stands against the tenant; three nights behind and they are put out, with what they owe following them as a debt. The harbor inn gives no credit: the three nights an arrival is given end when they are paid out, and after that it is a bed like any other.
+- What is overdue grows: a tenth a day, a coin at the least, and never past twice what was lent. A council that finds against a debtor now pays the creditor out of the fine before the town takes the rest.
+
 ### Changed
 
 ### Fixed
@@ -17,6 +20,8 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Changed
 
+- Every bed on the island is finite, the free ones in the boat shed included. The bed where a person lives is theirs and nobody else can take it.
+- A night with no roof over you wears on the body in any season, not only in a winter cold enough to kill.
 - What the island keeps back from the morning boat is the shelf that food keeps to, so a surplus of bread or fish goes to the mainland for coins instead of going stale on the shelf overnight.
 - An owner with no plan gets the morning record as the town kept it, without a mind paid to write it up. The plan already said so.
 - The hill fields grow grain and no longer sell apples nobody ever grew or carted there. The orchard is the apple shelf.

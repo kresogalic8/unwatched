@@ -226,10 +226,10 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       const beds = here.beds;
       if (!beds) return { ok: false, reason: "no bed here" };
       if (here.brokenUntil && here.brokenUntil > (v.day ?? 0)) return { ok: false, reason: `${here.name} is burnt out; nobody sleeps here yet` };
-      const isHome = a.home?.place === here.id && a.home.nightsPaid > 0;
+      if (here.owner === a.id) return { ok: true }; // their own roof always has room for them
+      if (a.home?.place === here.id) return { ok: true }; // where they live: the bed is theirs, and what is owed on it is settled at midnight, not at the door
+      if ((here.freeBeds ?? 0) <= 0) return { ok: false, reason: "every bed here is taken" }; // a free bed is still a bed somebody else cannot have
       if (beds.price === 0) return { ok: true };
-      if (isHome || here.owner === a.id) return { ok: true };
-      if ((here.freeBeds ?? 0) <= 0) return { ok: false, reason: "no beds free" };
       if (a.coins < (v.bedPrice ? v.bedPrice(here) : beds.price)) return { ok: false, reason: "cannot pay for a bed" };
       return { ok: true };
     }
