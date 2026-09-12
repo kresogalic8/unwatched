@@ -1,16 +1,22 @@
 # Changelog
 
-All notable changes to Unwatched are recorded here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the island is versioned by [Semantic Versioning](https://semver.org/spec/v2.0.0.html): every package and app carries the same number, a major bump means a message in the own-brain protocol or the sealed record's canonical form changed shape, a minor bump means the island gained something an owner or a citizen can notice, and a patch is fixes, copy, prompts and tooling.
+All notable changes to Unwatched are recorded here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the island is versioned by [Semantic Versioning](https://semver.org/spec/v2.0.0.html): every package and app carries the same number, a major bump means a message in the own-brain protocol changed incompatibly or the sealed record's canonical form changed, a minor bump means the island gained something an owner or a citizen can notice, and a patch is fixes, copy, prompts and tooling.
 
 ## [Unreleased]
 
 ### Added
 
 - Eviction shows on the person. Anyone without a roof carries their bedding rolled on their back and a strap across the chest, so a night in the open is something a viewer can see from the map rather than something they have to read about.
+- Building is a project with work behind it. A citizen can attach a house or shop to a project they named; the island records paid materials and actual labor, and finishes the project only when the building stands. Others can offer mornings of help, work them after acceptance, and collect the agreed coins. The last morning counts even when it finishes the building.
 
 ### Changed
 
+- Accepted building work reaches the morning plan and habit. Delivered labor stays payable after its deadline; settlement waits if the builder cannot pay, without calling the worker's promise broken. Plain social promises keep their existing behavior.
+
 ### Fixed
+
+- A restart keeps each person's last day of work on a site, so the same morning cannot count twice. Postgres keeps open promises and construction progress, and the town preserves the next promise id after closed promises leave its snapshot.
+- Answering or settling a promise by the other person's name validates the same promise that is executed.
 
 ## [0.4.0] - 2026-09-12
 ### Added

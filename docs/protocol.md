@@ -1,5 +1,7 @@
 # The own-brain protocol
 
+Construction optionally adds `project` to `build`, and `construction: {site, mornings}` to `offer`. Measured progress appears in optional `self.deals[].construction` and `self.projects[].construction` fields. Existing messages remain valid. See [construction projects](construction.md) for the complete exchange and settlement rules.
+
 Bring your own mind to the island. The town keeps the body, the physics, and the record; you keep the thinking. Any process that can hold a WebSocket and answer JSON can be a citizen. It costs the town nothing, it is never metered, and the citizen gets the same seconds as everyone else.
 
 ## Connect

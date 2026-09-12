@@ -77,7 +77,7 @@ export const Action = z.discriminatedUnion("kind", [
   /** Call the place you stand in by a name of your own. When three people call it that, the island does too. */
   z.object({ kind: z.literal("call"), name: z.string().min(2).max(40) }),
   /** Build on the plot you stand on. "what" is the kind of place (a house, a shop, a workshop); "look" is how it should look, in a sentence, and the island draws it that way. */
-  z.object({ kind: z.literal("build"), what: z.string(), at: PlaceId, name: z.string().max(60).optional(), look: z.string().max(200).optional() }),
+  z.object({ kind: z.literal("build"), what: z.string(), at: PlaceId, name: z.string().max(60).optional(), look: z.string().max(200).optional(), project: z.string().trim().min(1).max(80).optional() }),
   z.object({ kind: z.literal("message_owner"), text: z.string().min(1).max(1200) }),
   z.object({ kind: z.literal("sleep") }),
   z.object({ kind: z.literal("wait") }),
@@ -86,7 +86,7 @@ export const Action = z.discriminatedUnion("kind", [
   /** Coins now, remembered by both, due in so many days. Repay with give. */
   z.object({ kind: z.literal("lend"), to: AgentRef, coins: z.number().int().positive(), days: z.number().int().min(1).max(30) }),
   // a promise the town remembers: what you will do for someone, by when, and for how many coins if any
-  z.object({ kind: z.literal("offer"), to: AgentRef, what: z.string().min(3).max(200), coins: z.number().int().min(0).max(500).optional(), days: z.number().int().min(1).max(30).optional() }),
+  z.object({ kind: z.literal("offer"), to: AgentRef, what: z.string().min(3).max(200), coins: z.number().int().min(0).max(500).optional(), days: z.number().int().min(1).max(30).optional(), construction: z.object({ site: PlaceId, mornings: z.number().int().min(1).max(30) }).optional() }),
   z.object({ kind: z.literal("accept"), deal: z.number().int().optional(), from: AgentRef.optional() }),
   z.object({ kind: z.literal("refuse"), deal: z.number().int().optional(), from: AgentRef.optional(), why: z.string().max(200).optional() }),
   z.object({ kind: z.literal("settle"), deal: z.number().int().optional(), to: AgentRef.optional() }),
@@ -159,7 +159,7 @@ export const Perception = z.object({
     feels: z.object({ hunger: z.string(), rest: z.string(), social: z.string() }).optional(),
     debts: z.array(z.object({ to: z.string(), coins: z.number().int(), overdue: z.boolean() })).optional(),
     /** Promises: yours to keep, and the ones made to you. An offered one is waiting on an answer; an open one is owed. */
-    deals: z.array(z.object({ id: z.number().int(), with: z.string(), what: z.string(), coins: z.number().int(), mine: z.boolean(), state: z.enum(["offered", "open"]), due_in_days: z.number().int().nullable() })).optional(),
+    deals: z.array(z.object({ id: z.number().int(), with: z.string(), what: z.string(), coins: z.number().int(), mine: z.boolean(), state: z.enum(["offered", "open"]), due_in_days: z.number().int().nullable(), construction: z.object({ site: PlaceId, mornings: z.number().int(), done: z.number().int() }).optional() })).optional(),
     family: z.object({ partner: z.string().nullable(), children: z.array(z.string()) }).optional(),
     /** Days without a proper meal, and whether the body has begun to fail. */
     days_hungry: z.number().int().optional(), weak: z.boolean().optional(),
@@ -167,7 +167,7 @@ export const Perception = z.object({
     /** What this person chose to keep an eye on. */
     watching: z.array(z.string()).optional(),
     /** What they are working toward over weeks, and where each stands. */
-    projects: z.array(z.object({ title: z.string(), progress: z.string(), since_day: z.number().int() })).optional(),
+    projects: z.array(z.object({ title: z.string(), progress: z.string(), since_day: z.number().int(), construction: z.object({ site: PlaceId, labor: z.number().int(), needed: z.number().int() }).optional() })).optional(),
     /** What they believe, and how sure they are. Not necessarily true. */
     believes: z.array(z.object({ about: z.string(), belief: z.string(), confidence: z.number() })).optional(),
     /** Secrets learned by going through someone's things, or read in an exposé. Heavy to carry; heavier to use. */

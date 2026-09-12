@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "../src/file.ts";
+import { TownStore } from "../src/index.ts";
 import { Town } from "@unwatched/engine";
 import type { Brain, AgentState, Tier } from "@unwatched/engine";
 import type { Perception, ActionProposal } from "@unwatched/protocol";
@@ -19,6 +20,38 @@ const none: Brain = {
 const fresh = () => new FileStore(mkdtempSync(join(tmpdir(), "uw-store-")), "test");
 
 describe("the file record", () => {
+  it("keeps a building, its project and both copies of paid-work progress in file and Postgres snapshots", async () => {
+    const town = new Town({ seed: 3, brain: none }); town.t = 540;
+    const owner = town.addAgent({ persona: persona("Builder") });
+    const helper = town.addAgent({ persona: persona("Helper") });
+    owner.location = helper.location = "shore-1";
+    expect(town.apply(owner, { kind: "build", what: "house", at: "shore-1", project: "A home" }, "test")).toBe(true);
+    expect(town.apply(helper, { kind: "offer", to: owner.id, what: "two mornings of work", coins: 4, construction: { site: "shore-1", mornings: 2 } }, "test")).toBe(true);
+    town.apply(owner, { kind: "accept" }, "test"); town.apply(helper, { kind: "work" }, "test");
+    const s = fresh(); await s.ensureTown("The island", 3); await s.snapshot(town);
+    const back = new Town({ seed: 3, brain: none }); back.restore((await s.loadSnapshot())!);
+    const h = back.agents.get(helper.id)!;
+    back.apply(h, { kind: "work" }, "test");
+    expect(back.places.get("shore-1")!.site!.labor).toBe(1);
+    expect(h.deals[0]!.construction!.done).toBe(1);
+    expect(back.agents.get(owner.id)!.projects[0]!.construction!.labor).toBe(1);
+
+    // Capture the actual PostgREST writes. No external database or network is used.
+    const writes: { url: string; body: unknown }[] = [];
+    vi.stubGlobal("fetch", async (url: unknown, init: RequestInit) => {
+      writes.push({ url: String(url), body: JSON.parse(String(init.body)) });
+      return new Response(null, { status: 204 });
+    });
+    try {
+      const pg = new TownStore("https://store.test", "test-service-key", "test");
+      await pg.snapshot(back);
+      const agents = writes.find((w) => w.url.includes("/agents"))!.body as { id: string; state: { deals: unknown[]; projects: unknown[] } }[];
+      expect(agents.find((a) => a.id === helper.id)!.state.deals[0]).toMatchObject({ construction: { done: 1, mornings: 2 } });
+      expect(agents.find((a) => a.id === owner.id)!.state.deals[0]).toMatchObject({ construction: { done: 1 } });
+      expect(agents.find((a) => a.id === owner.id)!.state.projects[0]).toMatchObject({ construction: { labor: 1 } });
+      expect(writes.find((w) => w.url.includes("/towns"))!.body).toMatchObject({ civic: { nextDealId: 2 }, places: expect.arrayContaining([expect.objectContaining({ id: "shore-1", site: expect.objectContaining({ workedDay: { [helper.id]: 1 } }) })]) });
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("delivers a letter once: one posted through the API is already read, one written straight in waits for the hour", async () => {
     const s = fresh();
     await s.saveLetter("a1", "owner", "to_agent", "Find work first.", 100, 100); // the API delivered it on the spot

@@ -65,8 +65,9 @@ export function habit(a: AgentState, v: HabitView): Action {
     }
   }
 
-  // A site of your own: turn up and work on it whenever you are not at your job.
-  const site = [...v.places.values()].find((p) => p.site?.by === a.id);
+  // Carry out building work already chosen: an accepted promise first, then a site of your own.
+  const promised = a.deals.find((d) => d.mine && d.state === "open" && d.construction && d.construction.done < d.construction.mornings && v.places.get(d.construction.site)?.site?.startedDay === d.construction.startedDay && v.places.get(d.construction.site)?.site?.by === d.with);
+  const site = (promised?.construction ? v.places.get(promised.construction.site) : undefined) ?? [...v.places.values()].find((p) => p.site?.by === a.id);
   if (site && v.hour >= 8 && v.hour < 18 && !(a.job && (() => { const j = v.jobs.get(a.job!); return j && v.hour >= j.hours[0] && v.hour < j.hours[1]; })())) {
     if (a.location === site.id) return { kind: "work" };
     const next = v.path(a.location, site.id);

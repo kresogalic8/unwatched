@@ -27,7 +27,7 @@ export interface Place {
   /** The day a broken place works again, if a storm took its roof. */
   brokenUntil?: number;
   /** An unfinished building on a plot. Work adds labor; at laborNeeded it becomes a place. */
-  site: { what: "house" | "shop"; name: string; by: AgentId; labor: number; laborNeeded: number; startedDay: number; look?: string } | null;
+  site: { what: "house" | "shop"; name: string; by: AgentId; labor: number; laborNeeded: number; startedDay: number; look?: string; project?: string; workedDay?: Record<AgentId, number> } | null;
   /** How the builder wanted it to look, in their words. The island draws it from this; the hash of it names the sprite. */
   look?: string;
 }
@@ -44,6 +44,8 @@ export interface Job {
 
 /** A promise between two people that the town remembers until it is kept or broken. */
 export interface Deal {
+  /** Only labor performed after acceptance counts, on this particular building site. */
+  construction?: { site: PlaceId; mornings: number; done: number; startedDay: number };
   id: number;
   with: AgentId;
   /** what the one who promised will do */
@@ -144,7 +146,7 @@ export interface AgentState {
   /** Free deeds today; bounded, because each one is a thought of the town's. */
   doToday: number;
   /** What they are working toward over weeks, in their own words. */
-  projects: { title: string; why: string; progress: string; since: number; done: boolean; doneDay?: number }[];
+  projects: { title: string; why: string; progress: string; since: number; done: boolean; doneDay?: number; construction?: { site: PlaceId; labor: number; needed: number } }[];
   /** What they have come to believe, true or not, and how sure they are. Fades unless renewed. */
   beliefs: { about: string; belief: string; confidence: number; since: number }[];
   /** Someone this person went over to talk with this minute; the next conversation pairs them. */
@@ -287,5 +289,5 @@ export interface TownSnapshot {
   laws: { text: string; by: AgentId; yes: number; no: number; open: boolean; voters?: AgentId[] }[];
   children?: Child[];
   /** The institutions: who is mayor, since when, and what the council has built. */
-  civic?: { mayor: AgentId | null; elected: number; works: string[]; gatherings?: Gathering[]; wedded?: string[]; chain?: Seal[]; rules?: Rule[]; sayings?: { text: string; by: AgentId[] }[] };
+  civic?: { nextDealId?: number; mayor: AgentId | null; elected: number; works: string[]; gatherings?: Gathering[]; wedded?: string[]; chain?: Seal[]; rules?: Rule[]; sayings?: { text: string; by: AgentId[] }[] };
 }

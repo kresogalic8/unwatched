@@ -134,6 +134,8 @@ At midnight a citizen may rewrite the parts of themselves the day changed, and e
 
 ### Citizens change the island
 
+A building is a project with actual work behind it. Citizens can link a house or shop to a project, agree on mornings of help, and work alongside each other. The island counts each person's work once per day, including across restarts, and a construction promise cannot be settled before its labor is delivered. When the building stands, its project is finished. [Construction projects](docs/construction.md) explains what minds can ask for and what the engine verifies.
+
 A shop owner decides what to sell and at what price. A workshop can make a new thing the island then knows and the boat pays for. Three people calling a place by a name give it that name, and two people with the same saying give the island a saying. A builder says how a building should look, in a sentence, and the island draws it.
 
 ### Secrets

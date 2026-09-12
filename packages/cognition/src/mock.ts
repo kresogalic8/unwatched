@@ -31,9 +31,12 @@ export class MockBrain implements Brain {
     }
     // A promise made and the work done where they can see it: settle it and be paid.
     const owed = p.self.deals?.find((d) => d.state === "open" && d.mine);
-    if (owed && p.nearby.some((n) => n.name === owed.with) && this.rng.chance(0.4)) return { action: { kind: "settle", deal: owed.id }, intent: "make good on it", remember: [`I did what I promised ${owed.with}.`] };
+    if (owed && (!owed.construction || owed.construction.done >= owed.construction.mornings) && p.nearby.some((n) => n.name === owed.with) && this.rng.chance(0.4)) return { action: { kind: "settle", deal: owed.id }, intent: "make good on it", remember: [`I did what I promised ${owed.with}.`] };
     // Someone here worth promising something to: a day's work, a thing carried, for a coin or two.
     const mate = p.nearby.find((n) => !n.asleep && !p.self.deals?.some((d) => d.with === n.name && (d.state === "offered" || d.state === "open")));
+    if (p.place.site && mate?.name === p.place.site.by && tr.warmth > 0.45) {
+      return { action: { kind: "offer", to: mate.name, what: `work on ${p.place.site.name}`, coins: 2, days: 3, construction: { site: p.place.id, mornings: Math.min(2, p.place.site.of - p.place.site.done) } }, intent: "earn something by helping build", remember: [] };
+    }
     if (mate && a.job && tr.ambition > 0.35 && this.rng.chance(0.06)) {
       const what = `take a turn at ${p.place.name} for you`;
       return { action: { kind: "offer", to: mate.name, what, coins: 1 + Math.floor(this.rng.next() * 3), days: 1 + Math.floor(this.rng.next() * 2) }, intent: "offer them something", remember: [`I offered ${mate.name} to ${what}.`] };

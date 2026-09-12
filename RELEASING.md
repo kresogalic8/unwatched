@@ -4,11 +4,13 @@ The island is one version. Every package and app carries the same number, and a 
 
 ## What a version number means here
 
-- **Major** when a message in the own-brain protocol changes shape, or the sealed record's canonical form changes. Own brains and anyone recomputing seals must update.
+- **Major** when a message in the own-brain protocol changes incompatibly, or the sealed record's canonical form changes. Own brains and anyone recomputing seals must update.
 - **Minor** when the island gains something an owner or a citizen can notice: a verb, a place, an institution, a mechanic, a page, a plan.
 - **Patch** for fixes, copy, prompts and tooling that change nothing an owner would name.
 
 Changing a prompt is a patch even when it changes how a citizen talks. The rule is whether an owner could point at a new thing.
+
+Optional additive fields that keep existing messages valid are minor when they introduce a mechanic, and patch when they only expose existing context. Document defaults and keep older snapshots readable.
 
 ## When to cut one
 

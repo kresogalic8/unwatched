@@ -226,7 +226,7 @@ export class Town {
     this.children.splice(0, this.children.length, ...(snap.children ?? []));
     if (snap.civic) { this.mayor = snap.civic.mayor && this.agents.has(snap.civic.mayor) ? snap.civic.mayor : null; this.electedDay = snap.civic.elected; this.works = [...snap.civic.works]; this.gatherings = (snap.civic.gatherings ?? []).map((g) => ({ ...g })); this.wedded = new Set(snap.civic.wedded ?? []); this.chain = [...(snap.civic.chain ?? [])]; this.rules = [...(snap.civic.rules ?? [])]; this.sayings = [...(snap.civic.sayings ?? [])]; this.nextGatheringId = 1 + Math.max(0, ...this.gatherings.map((g) => g.id)); }
     this.nextLetterId = 1 + Math.max(0, ...[...this.agents.values()].flatMap((a) => a.letters.map((l) => l.id)));
-    this.nextDealId = 1 + Math.max(0, ...[...this.agents.values()].flatMap((a) => a.deals.map((d) => d.id)));
+    this.nextDealId = Math.max(snap.civic?.nextDealId ?? 1, 1 + Math.max(0, ...[...this.agents.values()].flatMap((a) => a.deals.map((d) => d.id))));
   }
 
   snapshot(): TownSnapshot {
@@ -240,7 +240,7 @@ export class Town {
         relationships: [...a.relationships.entries()].map(([other, r]) => ({ other, ...r })),
         memory: a.memory,
       })),
-      papers: this.papers.slice(-14), laws: this.laws, children: this.children.map((c) => ({ ...c })), civic: { mayor: this.mayor, elected: this.electedDay, works: [...this.works], gatherings: this.gatherings.filter((g) => !g.held).map((g) => ({ ...g })), wedded: [...this.wedded], chain: this.chain.slice(-400), rules: [...this.rules], sayings: this.sayings.slice(-40) },
+      papers: this.papers.slice(-14), laws: this.laws, children: this.children.map((c) => ({ ...c })), civic: { nextDealId: this.nextDealId, mayor: this.mayor, elected: this.electedDay, works: [...this.works], gatherings: this.gatherings.filter((g) => !g.held).map((g) => ({ ...g })), wedded: [...this.wedded], chain: this.chain.slice(-400), rules: [...this.rules], sayings: this.sayings.slice(-40) },
     };
   }
 
@@ -372,10 +372,10 @@ export class Town {
       type: "perceive", agent_id: a.id,
       ...((this.rules.length || this.sayings.some((x) => x.by.length >= 2) || people.length) ? { town: { ...this.ways(), ...(people.length ? { people } : {}) } } : {}),
       time: { sim: this.clock(), day: this.day, minute: this.minuteOfDay, season: this.season, weather: this.weather, weekday: this.weekdayName, ...(this.occasion ? { occasion: this.occasion } : {}), ...(this.nextGathering() ? { gathering: this.nextGathering()! } : {}), ...(this.temperatureC !== null ? { temperature_c: this.temperatureC } : {}) },
-      self: { location: a.location, needs: { ...a.needs }, feels: this.feels(a), coins: a.coins, inventory: [...a.inventory], job: a.job ? (this.jobs.get(a.job)?.title ?? a.job) : null, shift: job ? { place: job.place, wage: job.wage, hours: [job.hours[0], job.hours[1]] } : null, debts: a.debts.map((d) => ({ to: this.agents.get(d.to)?.persona.name ?? d.to, coins: d.coins, overdue: this.t >= d.due })), ...(a.deals.some((d) => d.state === "offered" || d.state === "open") ? { deals: a.deals.filter((d) => d.state === "offered" || d.state === "open").map((d) => ({ id: d.id, with: this.agents.get(d.with)?.persona.name ?? d.with, what: d.what, coins: d.coins, mine: d.mine, state: d.state as "offered" | "open", due_in_days: d.due === null ? null : Math.max(0, Math.ceil((d.due - this.t) / MINUTES_PER_DAY)) })) } : {}), days_hungry: a.starving, weak: a.starving >= 2, family: { partner: this.partnerOf(a)?.persona.name ?? null, children: this.children.filter((c) => c.parents.includes(a.id)).map((c) => `${c.name}, ${this.day - c.bornDay} days old`) }, owns: [...this.places.values()].filter((p) => p.owner === a.id).map((p) => p.name), housing: a.home ? { kind: a.home.place, nights_left: a.home.nightsPaid } : null ,
+      self: { location: a.location, needs: { ...a.needs }, feels: this.feels(a), coins: a.coins, inventory: [...a.inventory], job: a.job ? (this.jobs.get(a.job)?.title ?? a.job) : null, shift: job ? { place: job.place, wage: job.wage, hours: [job.hours[0], job.hours[1]] } : null, debts: a.debts.map((d) => ({ to: this.agents.get(d.to)?.persona.name ?? d.to, coins: d.coins, overdue: this.t >= d.due })), ...(a.deals.some((d) => d.state === "offered" || d.state === "open") ? { deals: a.deals.filter((d) => d.state === "offered" || d.state === "open").map((d) => ({ id: d.id, with: this.agents.get(d.with)?.persona.name ?? d.with, what: d.what, coins: d.coins, mine: d.mine, state: d.state as "offered" | "open", ...(d.construction ? { construction: { site: d.construction.site, mornings: d.construction.mornings, done: d.construction.done } } : {}), due_in_days: d.due === null ? null : Math.max(0, Math.ceil((d.due - this.t) / MINUTES_PER_DAY)) })) } : {}), days_hungry: a.starving, weak: a.starving >= 2, family: { partner: this.partnerOf(a)?.persona.name ?? null, children: this.children.filter((c) => c.parents.includes(a.id)).map((c) => `${c.name}, ${this.day - c.bornDay} days old`) }, owns: [...this.places.values()].filter((p) => p.owner === a.id).map((p) => p.name), housing: a.home ? { kind: a.home.place, nights_left: a.home.nightsPaid } : null ,
         ...(this.mayor === a.id ? { mayor: true } : {}), ...(a.convictions ? { convictions: a.convictions } : {}),
         ...(a.watch.length ? { watching: [...a.watch] } : {}),
-        ...(a.projects.some((x) => !x.done) ? { projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, progress: x.progress, since_day: x.since })) } : {}),
+        ...(a.projects.some((x) => !x.done) ? { projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, progress: x.progress, since_day: x.since, ...(x.construction ? { construction: { ...x.construction } } : {}) })) } : {}),
         ...(a.beliefs.length ? { believes: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })) } : {}),
         ...(Object.keys(a.secretsKnown).length ? { knows: Object.entries(a.secretsKnown).map(([id, secret]) => ({ who: this.agents.get(id)?.persona.name ?? id, secret })) } : {}), },
       nearby,
@@ -423,7 +423,7 @@ export class Town {
       case "build": return { ...action, at: this.resolvePlace(action.at) };
       case "say": return action.to ? { ...action, to: this.resolveRef(action.to, near) } : action;
       case "give": return { ...action, to: this.resolveRef(action.to, near) };
-      case "offer": return { ...action, to: this.resolveRef(action.to, near) };
+      case "offer": return { ...action, to: this.resolveRef(action.to, near), ...(action.construction ? { construction: { ...action.construction, site: this.resolvePlace(action.construction.site) } } : {}) };
       case "accept": case "refuse": return action.from ? { ...action, from: this.resolveRef(action.from, near) } : action;
       case "settle": return action.to ? { ...action, to: this.resolveRef(action.to, near) } : action;
       case "accuse": return { ...action, who: this.resolveRef(action.who, [...this.agents.values()]) };
@@ -522,6 +522,15 @@ export class Town {
         if (sawpit) { sawpit.stock.planks = Math.max(0, (sawpit.stock.planks ?? 0) - spec.planks); const sawyer = sawpit.owner ? this.agents.get(sawpit.owner) : null; if (sawyer) sawyer.coins += forPlanks; else sawpit.treasury += forPlanks; }
         const look = (action.look ?? (/\s/.test(action.what.trim()) ? action.what : "")).trim().slice(0, 200);
         here.site = { what: kind, name: siteName(kind, name, action.name), by: a.id, labor: 0, laborNeeded: spec.labor, startedDay: this.day, ...(look ? { look } : {}) };
+        const title = action.project?.trim() ?? here.site.name;
+        let project = a.projects.find((p) => !p.done && !p.construction && p.title.toLowerCase() === title.toLowerCase());
+        if (!project) {
+          project = { title, why: a.persona.want, progress: "", since: this.day, done: false };
+          a.projects.push(project);
+        }
+        project.construction = { site: here.id, labor: 0, needed: spec.labor };
+        project.progress = `${here.id}: 0 of ${spec.labor} mornings worked; materials paid for`;
+        here.site.project = project.title;
         this.emit("agent.build", [a.id], here.id, `${name} paid ${spec.coins} coins for ${here.name} and marked out ${kind === "house" ? "a house" : "a shop"}: ${here.site.name}.`, 0.7, { what: kind, site: here.id });
         this.remember(a, `I bought ${here.name} and started building ${here.site.name}. It needs ${spec.labor} mornings of work.`, 0.8);
         for (const w of this.nearby(a)) this.remember(w, `${name} is building ${here.site.name} on ${here.name}.`, 0.5, "rumor");
@@ -663,10 +672,11 @@ export class Town {
       case "offer": {
         const b = this.agents.get(action.to)!; const id = this.nextDealId++;
         const coins = action.coins ?? 0, due = action.days ? this.t + action.days * MINUTES_PER_DAY : null;
-        const row = { id, what: action.what, coins, state: "offered" as const, due, at: this.t };
-        a.deals.push({ ...row, with: b.id, mine: true }); b.deals.push({ ...row, with: a.id, mine: false });
+        const row = { id, what: action.what, coins, state: "offered" as const, due, at: this.t,
+          ...(action.construction ? { construction: { ...action.construction, done: 0, startedDay: this.places.get(action.construction.site)!.site!.startedDay } } : {}) };
+        a.deals.push({ ...structuredClone(row), with: b.id, mine: true }); b.deals.push({ ...structuredClone(row), with: a.id, mine: false });
         const forCoins = coins ? ` for ${coins} coin${coins > 1 ? "s" : ""}` : "", by = action.days ? `, within ${action.days} day${action.days > 1 ? "s" : ""}` : "";
-        this.emit("deal.offered", [a.id, b.id], here.id, `${name} offered ${b.persona.name}: ${action.what}${forCoins}${by}.`, 0.5, { deal: id });
+        this.emit("deal.offered", [a.id, b.id], here.id, `${name} offered ${b.persona.name}: ${action.what}${forCoins}${by}${row.construction ? `; ${row.construction.mornings} mornings of work on ${here.site!.name}` : ""}.`, 0.5, { deal: id, ...(row.construction ? { construction: row.construction } : {}) });
         this.remember(a, `I offered ${b.persona.name} that I would ${action.what}${forCoins}.`, 0.7); this.remember(b, `${name} offered to ${action.what}${forCoins}. I have not answered yet.`, 0.7);
         b.hint = `${name} offered you this: ${action.what}${forCoins}${by}. Take it or turn it down.`;
         break;
@@ -871,7 +881,7 @@ export class Town {
       // projects across weeks: a title repeated is the same project, updated; done is done, and the record hears of it
       for (const pr of ref.projects ?? []) {
         const title = pr.title.trim(); if (!title) continue; const have = a.projects.find((x) => x.title.toLowerCase() === title.toLowerCase() && !x.done);
-        if (have) { if (pr.progress) have.progress = pr.progress.trim(); if (pr.why) have.why = pr.why.trim(); if (pr.done) { have.done = true; have.doneDay = this.day; this.emit("town.notice", [a.id], a.location, `${a.persona.name} has finished what they set out to do: ${have.title}.`, 0.5, { project: have.title }); this.remember(a, `Done: ${have.title}. ${have.progress}`, 0.9, "reflect"); } }
+        if (have) { if (pr.why) have.why = pr.why.trim(); if (have.construction) continue; if (pr.progress) have.progress = pr.progress.trim(); if (pr.done) { have.done = true; have.doneDay = this.day; this.emit("town.notice", [a.id], a.location, `${a.persona.name} has finished what they set out to do: ${have.title}.`, 0.5, { project: have.title }); this.remember(a, `Done: ${have.title}. ${have.progress}`, 0.9, "reflect"); } }
         else if (!pr.done && a.projects.filter((x) => !x.done).length < 3) { a.projects.push({ title, why: (pr.why ?? "").trim(), progress: (pr.progress ?? "just begun").trim(), since: this.day, done: false }); this.remember(a, `I have set myself something: ${title}. ${pr.why ?? ""}`.trim(), 0.7, "reflect"); }
       }
       if (a.projects.length > 12) a.projects = [...a.projects.filter((x) => !x.done), ...a.projects.filter((x) => x.done).slice(-6)];
@@ -897,7 +907,6 @@ export class Town {
       a.budget.tier1Left = a.budget.tier1Max; a.budget.tier2Left = a.budget.tier2Max;
     }
     for (const a of this.agents.values()) { a.doToday = 0; a.seenToday = []; }
-    this.workedOnSite.clear();
     // the body: a day that ends hungry counts; a night without a roof counts; two hungry days weaken, five can kill
     for (const a of [...this.agents.values()]) {
       const roof = a.asleep && !!this.places.get(a.location)?.beds;
@@ -962,6 +971,7 @@ export class Town {
     // a promise whose day has passed and which nobody settled is a promise broken, and the other side remembers it
     for (const a of this.agents.values()) for (const d of a.deals) {
       if (!d.mine || d.state !== "open" || d.due === null || this.t < d.due) continue;
+      if (d.construction && d.construction.done >= d.construction.mornings) continue; // work delivered, payment or a meeting still owed
       const b = this.agents.get(d.with); d.state = "broken"; if (!b) continue;
       const theirs = b.deals.find((x) => x.id === d.id); if (theirs) theirs.state = "broken";
       this.emit("deal.broken", [a.id, b.id], a.location, `${a.persona.name} did not do what was promised ${b.persona.name}: ${d.what}.`, 0.8, { deal: d.id });
@@ -995,11 +1005,24 @@ export class Town {
   /** A morning's work on a site. Anyone may help; the builder's own hands count the same. */
   private buildOn(a: AgentState, here: Place): void {
     const site = here.site!; const name = a.persona.name;
-    if (this.workedOnSite.has(`${a.id}:${here.id}:${this.day}`)) { a.needs.rest = Math.min(1, a.needs.rest + 0.01); return; } // one morning of labor per person per day
-    this.workedOnSite.add(`${a.id}:${here.id}:${this.day}`);
+    if (site.workedDay?.[a.id] === this.day) { a.needs.rest = Math.min(1, a.needs.rest + 0.01); return; } // one morning per person, including across restarts
+    (site.workedDay ??= {})[a.id] = this.day;
     site.labor++; a.needs.rest = Math.min(1, a.needs.rest + 0.05);
+    const deal = a.deals.find((d) => d.mine && d.state === "open" && d.with === site.by && d.construction?.site === here.id && d.construction.startedDay === site.startedDay && d.construction.done < d.construction.mornings);
+    if (deal?.construction) {
+      deal.construction.done++;
+      const other = this.agents.get(deal.with)?.deals.find((d) => d.id === deal.id);
+      if (other?.construction) other.construction.done = deal.construction.done;
+      this.remember(a, `Worked ${deal.construction.done} of ${deal.construction.mornings} promised mornings on ${site.name}.`, 0.6);
+    }
+    const project = this.agents.get(site.by)?.projects.find((p) => !p.done && p.construction?.site === here.id);
+    if (project?.construction) {
+      project.construction.labor = site.labor;
+      project.progress = `${here.id}: ${site.labor} of ${site.laborNeeded} mornings worked`;
+      if (site.labor >= site.laborNeeded) { project.done = true; project.doneDay = this.day; project.progress += `; ${site.name} is finished`; }
+    }
     if (site.labor < site.laborNeeded) {
-      this.emit("agent.work", [a.id], here.id, `${name} worked on ${site.name}: ${site.labor} of ${site.laborNeeded} mornings done.`, site.by === a.id ? 0.05 : 0.3);
+      this.emit("agent.work", [a.id], here.id, `${name} worked on ${site.name}: ${site.labor} of ${site.laborNeeded} mornings done.`, site.by === a.id ? 0.05 : 0.3, { labor: site.labor, needed: site.laborNeeded, ...(deal ? { deal: deal.id, mornings: deal.construction!.done } : {}) });
       if (site.by !== a.id) { const b = this.agents.get(site.by); if (b) { this.remember(b, `${name} came and worked a morning on ${site.name}.`, 0.6); const r = this.rel(b, a.id); r.trust = clamp(r.trust + 0.08); } }
       return;
     }
@@ -1009,11 +1032,10 @@ export class Town {
     if (site.look) { here.look = site.look; here.sprite = `look:${lookHash(site.look)}`; } else delete here.look;
     if (site.what === "house") { here.kind = "home"; if (!site.look) here.sprite = "house"; here.beds = { price: 2, capacity: 2 }; here.freeBeds = 2; if (builder) builder.home = { place: here.id, nightsPaid: 36500 }; }
     else { here.kind = "shop"; if (!site.look) here.sprite = "shop"; here.sells = [{ item: "bread", base: 1 }, { item: "soup", base: 2 }, { item: "drink", base: 1 }]; stockShelf(this.pack, here); const jid = `${here.id}.help`; if (!this.jobs.has(jid)) this.jobs.set(jid, { id: jid, title: `help at ${here.name}`, place: here.id, wage: 2, hours: [9, 17], slots: 1, holders: [] }); }
-    this.emit("town.built", [site.by, ...(a.id !== site.by ? [a.id] : [])], here.id, `${bname} finished ${here.name}${site.what === "house" ? ", a new house" : ", a new shop"} on the ${here.district}. It took ${site.laborNeeded} mornings.`, 0.9, { what: site.what, place: here.id, ...(site.look ? { look: site.look, hash: lookHash(site.look) } : {}) });
+    this.emit("town.built", [site.by, ...(a.id !== site.by ? [a.id] : [])], here.id, `${bname} finished ${here.name}${site.what === "house" ? ", a new house" : ", a new shop"} on the ${here.district}. It took ${site.laborNeeded} mornings.`, 0.9, { what: site.what, place: here.id, ...(project ? { project: project.title } : {}), ...(site.look ? { look: site.look, hash: lookHash(site.look) } : {}) });
     if (builder) this.remember(builder, `${here.name} is finished. It is mine.`, 0.95);
     for (const w of this.agents.values()) if (w.id !== site.by && (w.location === here.id || this.rng.chance(0.4))) this.remember(w, `${bname} built ${here.name} on the ${here.district}.`, 0.5, "rumor");
   }
-  private workedOnSite = new Set<string>();
 
   /** What makes a meeting matter: low trust, or coins owed either way. */
   /** The promise an accept, a refusal or a settling is about: the one named, else the oldest with that person, else the oldest waiting. */
@@ -1293,7 +1315,7 @@ export class Town {
     if (!tier) { a.plan = { day: this.day, mood: "", goals: [], steps: [] }; return; } // cannot afford to plan today; habit carries them
     const yesterday = [...a.memory].reverse().find((m) => m.kind === "reflect")?.text ?? null;
     const ctx = {
-      agent: a, day: this.day, weather: this.weather, hour: this.hour, yesterday, intentions: [...a.intentions],
+      agent: a, day: this.day, weather: this.weather, hour: this.hour, yesterday, intentions: [...a.intentions, ...a.deals.filter((d) => d.state === "open" || d.state === "offered").map((d) => `${d.mine ? "I promised" : "Promised to me"}: ${d.what}${d.construction ? ` at ${d.construction.site}, ${d.construction.done}/${d.construction.mornings} mornings worked` : ""}; ${d.coins} coins; ${d.state}`)],
       keyMemories: retrieve(a.memory, a.persona.want, this.t, 6).map((m) => m.text),
       relationships: [...a.relationships.entries()].map(([id, r]) => ({ id, name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion })),
       places: [...this.places.values()].map((p) => ({ id: p.id, name: p.name, kind: p.kind })),

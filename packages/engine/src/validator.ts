@@ -151,6 +151,8 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if (here.site) return { ok: false, reason: here.site.by === a.id ? "already begun; work on it" : "someone else is building here" };
       const kind = buildKind(action.what);
       if (!kind) return { ok: false, reason: "can build a house or a shop" };
+      const project = action.project && a.projects.find((p) => p.title.toLowerCase() === action.project!.trim().toLowerCase());
+      if (project && (project.construction || project.done)) return { ok: false, reason: "that project already has a building or is finished; name a new project" };
       if (a.coins < BUILDS[kind].coins) return { ok: false, reason: `a ${kind} costs ${BUILDS[kind].coins} coins` };
       const planks = v.places.get("sawpit")?.stock.planks ?? 0; if (planks < BUILDS[kind].planks) return { ok: false, reason: `the sawpit has only ${planks} planks; a ${kind} takes ${BUILDS[kind].planks}` };
       return { ok: true };
@@ -168,21 +170,36 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if (b.location !== a.location) return { ok: false, reason: "they are not here to hear it" };
       if (b.asleep) return { ok: false, reason: "they are asleep" };
       if (a.deals.some((d) => d.with === b.id && d.state === "offered")) return { ok: false, reason: "there is already an offer between you waiting on an answer" };
+      if (action.construction) {
+        const site = v.places.get(action.construction.site)?.site;
+        if (!site || site.by !== b.id) return { ok: false, reason: "offer building help to the person with that unfinished site" };
+        if (a.location !== action.construction.site) return { ok: false, reason: "inspect the site together before offering building work" };
+        if (action.construction.mornings > site.laborNeeded - site.labor) return { ok: false, reason: "the building needs fewer mornings than that" };
+        if (a.deals.some((d) => d.mine && d.state === "open" && d.construction?.site === action.construction!.site)) return { ok: false, reason: "finish the building promise already open here first" };
+      }
       return { ok: true };
     }
     case "accept": case "refuse": {
-      const open = a.deals.filter((d) => d.state === "offered" && !d.mine);
+      const open = a.deals.filter((d) => d.state === "offered" && !d.mine && (!action.from || d.with === action.from));
       if (!open.length) return { ok: false, reason: "nobody has offered you anything" };
       if (action.deal !== undefined && !open.some((d) => d.id === action.deal)) return { ok: false, reason: "no such offer" };
+      const d = action.deal === undefined ? open[0]! : open.find((x) => x.id === action.deal)!;
+      if (!v.agents.has(d.with)) return { ok: false, reason: "the person who offered has left" };
+      if (action.kind === "accept" && d.construction) {
+        const site = v.places.get(d.construction.site)?.site;
+        if (!site || site.by !== a.id || site.startedDay !== d.construction.startedDay || site.laborNeeded - site.labor < d.construction.mornings) return { ok: false, reason: "the site no longer needs that work; ask for a new offer" };
+      }
       return { ok: true };
     }
     case "settle": {
-      const mine = a.deals.filter((d) => d.state === "open" && d.mine);
+      const mine = a.deals.filter((d) => d.state === "open" && d.mine && (!action.to || d.with === action.to));
       if (!mine.length) return { ok: false, reason: "you have promised nobody anything" };
       const d = action.deal !== undefined ? mine.find((x) => x.id === action.deal) : mine[0];
       if (!d) return { ok: false, reason: "no such promise" };
       const b = v.agents.get(d.with);
       if (!b || b.location !== a.location) return { ok: false, reason: "they are not here to see it done" };
+      if (d.construction && d.construction.done < d.construction.mornings) return { ok: false, reason: `only ${d.construction.done} of ${d.construction.mornings} promised mornings worked` };
+      if (d.construction && b.coins < d.coins) return { ok: false, reason: "the work is done, but they cannot pay yet; the promise stays open" };
       return { ok: true };
     }
     case "lend": {
