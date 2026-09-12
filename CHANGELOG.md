@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.7.0] - 2026-09-12
+### Added
+
 - Street camera zoom and recenter buttons, usable by touch and keyboard. Character preview can pause and honors reduced-motion preferences.
 - Harbor Street visual study with afternoon, blue-hour and coastal-rain views at `/harbor-study`. Its architectural drawings are the canonical source for the live world and building replay.
 - Interactive character standard at `/harbor-characters`: appearance components, fourteen animations, directions, age and weather, with a matching portrait. The approved live rig also supplies the Harbor study’s people.
@@ -224,7 +231,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kresogalic8/unwatched/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kresogalic8/unwatched/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kresogalic8/unwatched/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kresogalic8/unwatched/compare/v0.3.0...v0.4.0
