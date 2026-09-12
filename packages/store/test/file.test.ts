@@ -3,6 +3,18 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "../src/file.ts";
+import { Town } from "@unwatched/engine";
+import type { Brain, AgentState, Tier } from "@unwatched/engine";
+import type { Perception, ActionProposal } from "@unwatched/protocol";
+
+const persona = (n: string) => ({ name: n, age: 30, origin: "the mainland", summary: "A person.", want: "a quiet life", fear: "debt", secret: "none", strangers: "polite", advice: "listens", traits: { warmth: 0.5, pride: 0.4, caution: 0.5, honesty: 0.7, ambition: 0.5 } });
+const none: Brain = {
+  name: "none",
+  async decide(_p: Perception, _a: AgentState, _t: Tier): Promise<ActionProposal> { return { action: { kind: "wait" }, remember: [] }; },
+  async converse() { throw new Error("no"); }, async reflect() { throw new Error("no"); }, async plan() { throw new Error("no"); },
+  async digest() { return { text: "", headline: "" }; }, async child() { throw new Error("no"); }, async writePaper() { throw new Error("no"); }, async life() { throw new Error("no"); },
+  async judge() { return { happened: "it passed", plausible: true, coins_spent: 0, item_gained: null, item_lost: null, eases: null, trust: [] }; },
+};
 
 const fresh = () => new FileStore(mkdtempSync(join(tmpdir(), "uw-store-")), "test");
 
@@ -39,5 +51,37 @@ describe("the file record", () => {
     process.env.UW_DEV_EMAILS = "mira=mira@example.com, tomo=tomo@example.com";
     expect(await s.ownerEmail("tomo")).toBe("tomo@example.com");
     delete process.env.UW_DEV_EMAILS;
+  });
+  it("keeps who has voted, so a restart does not let the council vote twice", async () => {
+    const s = fresh();
+    const town = new Town({ seed: 3, brain: none });
+    const p0 = town.addAgent({ persona: persona("Proposer") }); const p1 = town.addAgent({ persona: persona("Voter") });
+    for (const x of [p0, p1]) x.location = "council";
+    town.apply(p0, { kind: "propose", law: "a tax on wages of one coin" }, "test");
+    expect(town.apply(p1, { kind: "vote", proposal: "a tax on wages", yes: true }, "test")).toBe(true);
+    await s.ensureTown("The island", 3); await s.snapshot(town);
+    const back = new Town({ seed: 3, brain: none }); back.restore((await s.loadSnapshot())!);
+    const voter = back.agents.get(p1.id)!; voter.location = "council";
+    expect(back.apply(voter, { kind: "vote", proposal: "a tax on wages", yes: true }, "test")).toBe(false);
+    expect(back.laws[0]!.yes).toBe(2);
+  });
+  it("gives every letter its own id, even after an owner is forgotten", async () => {
+    const s = fresh();
+    await s.saveLetter("a1", "gone", "to_agent", "First.", 10);
+    await s.saveLetter("a1", "stays", "to_agent", "Second.", 20);
+    await s.deleteOwner("gone");
+    await s.saveLetter("a1", "stays", "to_agent", "Third.", 30);
+    const ids = (await s.undeliveredLetters()).map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("puts a letter back in the post when the town rewinds past its delivery", async () => {
+    const s = fresh();
+    const town = new Town({ seed: 4, brain: none }); town.addAgent({ persona: persona("Reader") });
+    await s.ensureTown("The island", 4); await s.snapshot(town); // the record stands at this minute
+    await s.saveLetter("a1", "owner", "to_agent", "Read this.", town.t + 30, town.t + 30); // delivered after it, then the process died
+    await s.saveLetter("a1", "owner", "to_owner", "Never written.", town.t + 40, town.t + 40);
+    await s.loadSnapshot();
+    expect((await s.undeliveredLetters()).map((l) => l.text)).toEqual(["Read this."]);
+    expect((await s.lifeOf("a1")).letters.map((l) => l.text)).not.toContain("Never written.");
   });
 });

@@ -19,7 +19,7 @@ import { TownStore, FileStore } from "@unwatched/store";
 import { publicAgent, ownerAgent, clockOf, realClock, setPerks } from "./views.ts";
 import { BrainRouter, newToken, OwnBrain, OwnKeyBrain } from "./brains.ts";
 import type { BrainRow, Plan, Store, OwnerPrefs, OwnerRead } from "@unwatched/store";
-import { digestMail, letterMail, sendMail, mailEnabled } from "./mail.ts";
+import { digestMail, letterMail, sendMail, mailEnabled, mailDue } from "./mail.ts";
 import { Billing, PLANS, PACKS, COST } from "./billing.ts";
 import { Metrics } from "./ops.ts";
 import { RealWorld, parsePlace, resolveZone } from "./realworld.ts";
@@ -126,13 +126,18 @@ async function morningMail(): Promise<void> {
   const byOwner = new Map<string, AgentState[]>(); for (const a of town.agents.values()) if (a.owner) (byOwner.get(a.owner) ?? byOwner.set(a.owner, []).get(a.owner)!).push(a);
   for (const [owner, agents] of byOwner) {
     try {
-      const p = await prefsOf(owner); if (!p.notifyDigest || p.lastMailedDay === town.day) continue;
-      const email = store ? await store.ownerEmail(owner) : null; if (!email) { log(`no email on file for ${owner}; no morning mail`); continue; }
-      const a = agents[0]!; const first = a.persona.name.split(" ")[0]!;
-      const since = sinceFor(a, (await readOf(owner, a.id)).lastDigestT); const d = town.digest(a.id, since); const w = await writtenDigest(a, since);
-      const lines = [...d.items].sort((x, y) => y.importance - x.importance).slice(0, 3).sort((x, y) => x.t - y.t).map((e) => `${town.clockAt(e.t)}: ${e.text}`);
-      const m = digestMail({ to: email, name: a.persona.name, day: town.day, headline: w?.headline ?? (d.items.length ? d.headline : `Nothing changed for ${first}.`), text: w?.text ?? (d.items.length ? `What the record shows for ${first} since you last read.` : `${first} worked, ate at the inn, and slept. No coral today, and that is allowed.`), lines, url: `${SITE_URL}/digest` });
-      if (await sendMail(m, log)) { await savePrefs({ ...p, lastMailedDay: town.day }); log(`morning mail to ${owner} about ${a.persona.name}`); }
+      const p = await prefsOf(owner); if (!p.notifyDigest || !mailDue(town.hour, town.day, p.lastMailedDay)) continue;
+      // an owner with no inbox is marked for the day too, or the log says so every hour from seven on
+      const email = store ? await store.ownerEmail(owner) : null; if (!email) { log(`no email on file for ${owner}; no morning mail`); await savePrefs({ ...p, lastMailedDay: town.day }); continue; }
+      let sent = 0;
+      for (const a of agents) { // one mail per citizen: a second boarding is not a citizen nobody hears about
+        const first = a.persona.name.split(" ")[0]!;
+        const since = sinceFor(a, (await readOf(owner, a.id)).lastDigestT); const d = town.digest(a.id, since); const w = await writtenDigest(a, since);
+        const lines = [...d.items].sort((x, y) => y.importance - x.importance).slice(0, 3).sort((x, y) => x.t - y.t).map((e) => `${town.clockAt(e.t)}: ${e.text}`);
+        const m = digestMail({ to: email, name: a.persona.name, day: town.day, headline: w?.headline ?? (d.items.length ? d.headline : `Nothing changed for ${first}.`), text: w?.text ?? (d.items.length ? `What the record shows for ${first} since you last read.` : `${first} worked, ate at the inn, and slept. No coral today, and that is allowed.`), lines, url: `${SITE_URL}/digest` });
+        if (await sendMail(m, log)) { sent++; log(`morning mail to ${owner} about ${a.persona.name}`); }
+      }
+      if (sent === agents.length) await savePrefs({ ...p, lastMailedDay: town.day }); // the day is marked only when every citizen has been covered
     } catch (err) { log(`morning mail for ${owner}: ${(err as Error).message}`); }
   }
 }
@@ -160,7 +165,8 @@ async function loop() {
         const plannedAfter = [...town.agents.values()].filter((a) => a.plan?.day === town.day).length;
         if (store && plannedAfter > plannedBefore) void store.snapshot(town).catch((e: Error) => log(`plan snapshot failed: ${e.message}`));
         if (real) { const lag = real.lag(); if (lag > 3) { town.skip(lag); log(`caught up ${lag} minutes with ${real.place.name}`); } realClock.temperatureC = real.state.temperatureC; realClock.sunrise = real.state.sunrise; realClock.sunset = real.state.sunset; }
-        if (town.hour !== lastHour) { lastHour = town.hour; broadcast({ type: "clock", clock: clockOf(town) }); if (town.hour === 7) { await sailCargo(); void morningMail(); } await hourly(); }
+        // a clock caught up past seven still posts the day's mail; morningMail keeps its own once-a-day mark
+        if (town.hour !== lastHour) { lastHour = town.hour; broadcast({ type: "clock", clock: clockOf(town) }); if (town.hour === 7) await sailCargo(); if (town.hour >= 7) void morningMail(); await hourly(); }
       } catch (err) { log(`tick failed: ${(err as Error).message}`); }
       ticking = false;
     }
@@ -178,6 +184,7 @@ async function hourly() {
   const undelivered = await store.undeliveredLetters();
   for (const l of undelivered) town.sendLetter(l.agent_id, l.text);
   await store.markDelivered(undelivered.map((l) => l.id), town.t);
+  if (undelivered.length) await store.snapshot(town); // the delivery is in the record before the hour turns, so a crash cannot swallow it
   for (const p of await store.pendingArrivals()) {
     const persona = Persona.safeParse(p.persona); if (!persona.success) continue;
     const a = town.addAgent({ persona: persona.data, owner: p.owner_id, funded: true }, p.id);
@@ -323,7 +330,8 @@ app.post("/api/agents/:id/letters", async (c) => {
   const body = z.object({ text: z.string().min(1).max(1200) }).safeParse(await c.req.json()); if (!body.success) return c.json({ error: "a letter needs words" }, 400);
   if (/https?:\/\/|www\.|@[a-z0-9.-]+\.[a-z]{2,}/i.test(body.data.text)) metrics.hold("watch", `A letter to ${a.persona.name} carries a link or an address. Delivered; worth a look.`, "letters");
   town.sendLetter(a.id, body.data.text);
-  if (store) await store.saveLetter(a.id, owner, "to_agent", body.data.text, town.t, town.t); // delivered now, so the hourly replay leaves it be
+  // delivered now, so the hourly replay leaves it be; snapshotted now, so a crash before the next hour does not lose it
+  if (store) { await store.saveLetter(a.id, owner, "to_agent", body.data.text, town.t, town.t); await store.snapshot(town).catch((err: Error) => log(`letter snapshot failed: ${err.message}`)); }
   return c.json({ ok: true, readsAt: "tomorrow morning" });
 });
 app.post("/api/agents/:id/possess", async (c) => {

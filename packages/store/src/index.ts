@@ -9,7 +9,7 @@ export interface OwnerPrefs { ownerId: string; notifyDigest: boolean; notifyLett
 /** Where one owner's reading of one citizen stands: the digest watermark, and the last island day a letter notice was mailed. */
 export interface OwnerRead { ownerId: string; agentId: string; lastDigestT: number | null; lastLetterMailDay: number | null }
 export interface BrainRow { agent_id: string; kind: "hosted" | "own_key" | "own_brain"; provider: string | null; api_key: string | null; models: { routine: string; stakes: string; reflect: string } | null; think_every: number | null; daily_cap_usd: number | null; token: string | null; memory: "lease" | "own" }
-import { compress } from "@unwatched/engine";
+import { compress, asksSomething } from "@unwatched/engine";
 
 /**
  * The town's record on Supabase. The engine writes with the service role; owners and visitors read through RLS.
@@ -105,6 +105,9 @@ export class TownStore {
     if (!town) return null;
     // Anything recorded after the last snapshot belongs to a timeline that is about to be re-lived. Drop it, or the record doubles.
     await this.sb.from("events").delete().eq("town_id", this.townId).gt("t", Number(town.sim_t));
+    // the same for the post: a letter delivered after that minute goes back to undelivered, and a letter home the re-lived day never wrote is struck
+    await this.sb.from("letters").update({ read_at: null }).eq("town_id", this.townId).eq("direction", "to_agent").gt("read_at", Number(town.sim_t));
+    await this.sb.from("letters").delete().eq("town_id", this.townId).eq("direction", "to_owner").gt("t", Number(town.sim_t));
     const { data: ids0 } = await this.sb.from("agents").select("id").eq("town_id", this.townId);
     if (ids0?.length) await this.sb.from("memories").delete().in("agent_id", ids0.map((r) => r.id as string)).gt("t", Number(town.sim_t));
     const { data: rows, error } = await this.sb.from("agents").select("id, owner_id, name, persona, appearance, funded, arrived_t, state").eq("town_id", this.townId).is("left_t", null).not("arrived_t", "is", null);
@@ -123,7 +126,8 @@ export class TownStore {
       const st = (r.state ?? {}) as Partial<AgentSnapshot["state"]>;
       return {
         id: r.id, persona: r.persona as AgentSnapshot["persona"], owner: r.owner_id ?? (st as { owner?: string | null }).owner ?? null, funded: r.funded, appearance: (r.appearance as Record<string, unknown>) ?? null, arrivedAt: Number(r.arrived_t),
-        state: { needs: st.needs ?? { hunger: 0.3, rest: 0.2, social: 0.4 }, location: st.location ?? "harbor", coins: st.coins ?? 40, inventory: st.inventory ?? [], job: st.job ?? null, home: st.home ?? null, asleep: st.asleep ?? false, budget: st.budget ?? { tier1Max: 50, tier2Max: 5, tier1Left: 50, tier2Left: 5 }, intentions: st.intentions ?? [], plan: (st as { plan?: AgentSnapshot["state"]["plan"] }).plan ?? null, debts: st.debts ?? [], starving: st.starving ?? 0, roofless: st.roofless ?? 0, rumors: st.rumors ?? [], letters: st.letters ?? [], ...(st.lastConversation !== undefined ? { lastConversation: st.lastConversation } : {}), ...(st.lastThought !== undefined ? { lastThought: st.lastThought } : {}) },
+        // whatever the engine put in state comes back; the defaults are only for a row written before the field existed
+        state: { ...st, needs: st.needs ?? { hunger: 0.3, rest: 0.2, social: 0.4 }, location: st.location ?? "harbor", coins: st.coins ?? 40, inventory: st.inventory ?? [], job: st.job ?? null, home: st.home ?? null, asleep: st.asleep ?? false, budget: st.budget ?? { tier1Max: 50, tier2Max: 5, tier1Left: 50, tier2Left: 5 }, intentions: st.intentions ?? [], plan: st.plan ?? null, debts: st.debts ?? [], starving: st.starving ?? 0, roofless: st.roofless ?? 0, rumors: st.rumors ?? [], letters: st.letters ?? [] },
         relationships: relBy.get(r.id) ?? [],
         memory: compress((memBy.get(r.id) ?? []).reverse()),
       };
@@ -239,13 +243,13 @@ export class TownStore {
 
   /** Letters written straight into the record (another process, the web app's own insert) that the engine has not delivered yet. */
   async undeliveredLetters(): Promise<{ id: number; agent_id: string; text: string }[]> {
-    const { data, error } = await this.sb.from("letters").select("id, agent_id, text").eq("direction", "to_agent").is("read_at", null);
+    const { data, error } = await this.sb.from("letters").select("id, agent_id, text").eq("town_id", this.townId).eq("direction", "to_agent").is("read_at", null);
     if (error) { console.error("letters read failed:", error.message); return []; }
     return data ?? [];
   }
   async markDelivered(ids: number[], t: number): Promise<void> {
     if (!ids.length) return;
-    await this.sb.from("letters").update({ read_at: t }).in("id", ids);
+    await this.sb.from("letters").update({ read_at: t }).eq("town_id", this.townId).in("id", ids);
   }
 
   /** What an owner asked to be told by mail. Defaults are on: a morning digest and a note when their citizen writes. */
@@ -287,7 +291,8 @@ export class TownStore {
       id: a.id, town_id: this.townId, owner_id: a.owner && /^[0-9a-f-]{36}$/.test(a.owner) ? a.owner : null, name: a.persona.name, persona: a.persona,
       appearance: a.appearance ?? {},
       brain: "hosted", funded: a.funded, arrived_t: a.arrivedAt,
-      state: { needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, owner: a.owner, plan: a.plan, debts: a.debts, starving: a.starving, roofless: a.roofless, brainKind: a.brainKind, thinkEvery: a.thinkEvery },
+      // the same fields the engine snapshots, or a restart on Postgres quietly forgets who someone was becoming
+      state: { needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, owner: a.owner, plan: a.plan, lastPlan: a.lastPlan, debts: a.debts, starving: a.starving, roofless: a.roofless, brainKind: a.brainKind, thinkEvery: a.thinkEvery, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60), replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId },
     };
   }
 }

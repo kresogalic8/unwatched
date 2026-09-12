@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { digestMail, letterMail, sendMail, mailEnabled } from "../src/mail.ts";
+import { digestMail, letterMail, sendMail, mailEnabled, mailDue } from "../src/mail.ts";
 
 describe("the morning mail", () => {
   it("writes the digest as paper and ink, with the three lines and one button, and no outside assets", () => {
@@ -34,5 +34,15 @@ describe("the morning mail", () => {
     expect(seen!.url).toBe("https://api.resend.com/emails");
     expect((seen!.init.headers as Record<string, string>).Authorization).toBe("Bearer re_test");
     expect(JSON.parse(String(seen!.init.body))).toMatchObject({ to: ["a@b.c"], subject: "s" });
+  });
+});
+
+describe("when the morning mail goes", () => {
+  it("waits for seven, goes once a day, and still goes on a day whose seven o'clock was skipped", () => {
+    expect(mailDue(6, 9, null)).toBe(false);
+    expect(mailDue(7, 9, null)).toBe(true);
+    expect(mailDue(7, 9, 9)).toBe(false);          // already gone today
+    expect(mailDue(9, 9, 8)).toBe(true);           // the clock caught up from six to nine; the day is still owed its mail
+    expect(mailDue(23, 9, 8)).toBe(true);
   });
 });

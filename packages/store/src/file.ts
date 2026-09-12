@@ -18,7 +18,7 @@ interface Data {
   papers: Paper[];
   lives?: LifeRow[];
   looks?: { hash: string; look: string; svg: string; source: string; created_at: string }[];
-  laws: { text: string; by: string; yes: number; no: number; open: boolean }[];
+  laws: { text: string; by: string; yes: number; no: number; open: boolean; voters?: string[] }[];
   brains: BrainRow[];
   wallets: Wallet[];
   ledger: { owner_id: string; delta: number; reason: string; ref: string | null; at: string }[];
@@ -56,13 +56,16 @@ export class FileStore {
     const ids = new Set(town.agents.keys());
     this.d.relationships = this.d.relationships.filter((r) => !ids.has(r.agent_id));
     for (const a of town.agents.values()) for (const [other, r] of a.relationships) this.d.relationships.push({ agent_id: a.id, other_id: other, trust: r.trust, affection: r.affection, last_seen: r.lastSeen, opinion: r.opinion });
-    this.d.papers = town.papers.slice(-14); this.d.laws = town.laws.map((l) => ({ text: l.text, by: l.by, yes: l.yes, no: l.no, open: l.open }));
+    this.d.papers = town.papers.slice(-14); this.d.laws = town.laws.map((l) => ({ text: l.text, by: l.by, yes: l.yes, no: l.no, open: l.open, voters: [...(l.voters ?? [l.by])] })); // who has voted, or a restart lets them vote again
     this.save();
   }
   async appendMemories(a: AgentState, sinceT: number): Promise<void> { for (const m of a.memory) if (m.t >= sinceT) this.d.memories.push({ agent_id: a.id, t: m.t, kind: m.kind, text: m.text, importance: m.importance }); this.dirty = true; }
   async loadSnapshot(): Promise<TownSnapshot | null> {
     const t = this.d.town; if (!t) return null;
     this.d.events = this.d.events.filter((e) => e.t <= t.sim_t); this.d.memories = this.d.memories.filter((m) => m.t <= t.sim_t);
+    // a letter delivered after the last snapshot belongs to a timeline about to be re-lived: it goes back in the post, and a letter home that was never written is struck from the record
+    for (const l of this.d.letters) if (l.direction === "to_agent" && l.read_at !== null && l.read_at > t.sim_t) l.read_at = null;
+    this.d.letters = this.d.letters.filter((l) => !(l.direction === "to_owner" && l.t > t.sim_t));
     const agents: AgentSnapshot[] = this.d.agents.filter((r) => r.left_t === null && r.arrived_t !== null).map((r) => {
       const st = r.state as AgentSnapshot["state"] & { owner?: string | null };
       const memory = this.d.memories.filter((m) => m.agent_id === r.id).map((m) => ({ t: m.t, kind: m.kind as "obs", text: m.text, importance: m.importance }));
@@ -90,7 +93,7 @@ export class FileStore {
   async lives(): Promise<LifeRow[]> { return [...(this.d.lives ?? [])].sort((x, y) => y.leftDay - x.leftDay); }
   async life(agentId: string): Promise<LifeRow | null> { return (this.d.lives ?? []).find((l) => l.agentId === agentId) ?? null; }
   async savePaper(paper: Paper): Promise<void> { this.d.papers = [...this.d.papers.filter((p) => p.edition !== paper.edition), paper].slice(-14); this.save(); }
-  async saveLetter(agentId: string, ownerId: string | null, direction: "to_agent" | "to_owner", text: string, t: number, readAt: number | null = null): Promise<void> { this.d.letters.push({ id: this.d.letters.length + 1, agent_id: agentId, owner_id: ownerId, direction, text, t, read_at: readAt ?? (direction === "to_agent" ? null : t) }); this.save(); }
+  async saveLetter(agentId: string, ownerId: string | null, direction: "to_agent" | "to_owner", text: string, t: number, readAt: number | null = null): Promise<void> { this.d.letters.push({ id: 1 + Math.max(0, ...this.d.letters.map((l) => l.id)), agent_id: agentId, owner_id: ownerId, direction, text, t, read_at: readAt ?? (direction === "to_agent" ? null : t) }); this.save(); }
   async undeliveredLetters() { return this.d.letters.filter((l) => l.direction === "to_agent" && l.read_at === null).map(({ id, agent_id, text }) => ({ id, agent_id, text })); }
   async markDelivered(ids: number[], t: number): Promise<void> { for (const l of this.d.letters) if (ids.includes(l.id)) l.read_at = t; this.dirty = true; }
   async ownerPrefs(ownerId: string): Promise<OwnerPrefs> { return (this.d.prefs ?? []).find((p) => p.ownerId === ownerId) ?? { ownerId, notifyDigest: true, notifyLetters: true, lastMailedDay: null }; }

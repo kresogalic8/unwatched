@@ -49,3 +49,9 @@ export function letterMail(o: { to: string; name: string; day: number; text: str
   const body = `<tr><td style="padding:0 32px 16px;font-size:17px;line-height:1.5;font-style:italic">“${esc(o.text)}”</td></tr>`;
   return { to: o.to, subject, html: frame(`Day ${o.day} on the island`, subject, body, { text: "Write back", url: o.url }), text: `${subject}\n\n“${o.text}”\n\nWrite back: ${o.url}` };
 }
+
+/**
+ * Whether this owner's morning mail is still owed. Seven is when it goes, but a clock caught up after downtime can
+ * step from six to nine in one tick, so the day is what decides, not the exact hour.
+ */
+export function mailDue(hour: number, day: number, lastMailedDay: number | null): boolean { return hour >= 7 && lastMailedDay !== day; }
