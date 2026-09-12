@@ -10,6 +10,8 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Fixed
 
+- Keep the scripted garden scenario clock monotonic when construction starts on the proposal day; its generated record now checks event ordering.
+
 ## [0.10.0] - 2026-09-12
 ### Added
 
