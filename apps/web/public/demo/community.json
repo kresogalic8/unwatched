@@ -1,0 +1,302 @@
+{
+  "source": "Scripted engine scenario — no live model; not the production island",
+  "places": [
+    {
+      "id": "lane-1",
+      "community": {
+        "name": "A garden up the lane",
+        "why": "The first garden feeds the shore. Our neighbors up here could use one too.",
+        "by": "ag_3",
+        "proposed": 4924,
+        "phase": "funding",
+        "coins": 5,
+        "target": 18,
+        "members": [
+          {
+            "id": "ag_3",
+            "coins": 5,
+            "help": true,
+            "labor": 0,
+            "name": "Ana"
+          }
+        ],
+        "harvests": 0,
+        "foodProduced": 0,
+        "byName": "Ana"
+      },
+      "site": null,
+      "stock": {}
+    },
+    {
+      "id": "shore-1",
+      "community": {
+        "name": "The neighbors' table",
+        "why": "When the bakery runs out, we should have another place to find a meal.",
+        "by": "ag_1",
+        "proposed": 604,
+        "phase": "complete",
+        "coins": 18,
+        "target": 18,
+        "members": [
+          {
+            "id": "ag_1",
+            "coins": 6,
+            "help": true,
+            "labor": 2,
+            "name": "Mira"
+          },
+          {
+            "id": "ag_2",
+            "coins": 6,
+            "help": true,
+            "labor": 2,
+            "name": "Ivo"
+          },
+          {
+            "id": "ag_3",
+            "coins": 6,
+            "help": true,
+            "labor": 2,
+            "name": "Ana"
+          }
+        ],
+        "harvests": 3,
+        "foodProduced": 9,
+        "completedDay": 2,
+        "tendedDay": {
+          "ag_1": 4,
+          "ag_2": 4,
+          "ag_3": 4
+        },
+        "byName": "Mira"
+      },
+      "site": null,
+      "stock": {
+        "vegetables": 8
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": 5,
+      "t": 601,
+      "day": 1,
+      "kind": "knowledge.shared",
+      "actors": [
+        "ag_1",
+        "ag_2"
+      ],
+      "text": "Mira told Ivo: my recent attempts to buy bread at Ilić's bakery mostly worked. Check for yourself.",
+      "importance": 0.35,
+      "place": "bakery",
+      "payload": {
+        "source": "bakery",
+        "item": "bread",
+        "sourceT": 600,
+        "confidence": 0.6666590262429852
+      }
+    },
+    {
+      "id": 7,
+      "t": 603,
+      "day": 1,
+      "kind": "knowledge.shared",
+      "actors": [
+        "ag_2",
+        "ag_3"
+      ],
+      "text": "Ivo told Ana: my recent attempts to buy bread at Ilić's bakery mostly worked. Check for yourself.",
+      "importance": 0.35,
+      "place": "bakery",
+      "payload": {
+        "source": "bakery",
+        "item": "bread",
+        "sourceT": 602,
+        "confidence": 0.6666590262429852
+      }
+    },
+    {
+      "id": 8,
+      "t": 604,
+      "day": 1,
+      "kind": "project.proposed",
+      "actors": [
+        "ag_1"
+      ],
+      "text": "Mira proposed The neighbors' table, a shared garden: When the bakery runs out, we should have another place to find a meal.",
+      "importance": 0.7,
+      "place": "shore-1",
+      "payload": {
+        "target": 18,
+        "planks": 4,
+        "mornings": 6
+      }
+    },
+    {
+      "id": 9,
+      "t": 605,
+      "day": 1,
+      "kind": "project.contributed",
+      "actors": [
+        "ag_1"
+      ],
+      "text": "Mira contributed 6 coins to The neighbors' table and volunteered to work.",
+      "importance": 0.5,
+      "place": "shore-1",
+      "payload": {
+        "coins": 6,
+        "raised": 6,
+        "target": 18
+      }
+    },
+    {
+      "id": 10,
+      "t": 606,
+      "day": 1,
+      "kind": "project.contributed",
+      "actors": [
+        "ag_2"
+      ],
+      "text": "Ivo contributed 6 coins to The neighbors' table and volunteered to work.",
+      "importance": 0.5,
+      "place": "shore-1",
+      "payload": {
+        "coins": 6,
+        "raised": 12,
+        "target": 18
+      }
+    },
+    {
+      "id": 11,
+      "t": 607,
+      "day": 1,
+      "kind": "project.contributed",
+      "actors": [
+        "ag_3"
+      ],
+      "text": "Ana contributed 6 coins to The neighbors' table and volunteered to work.",
+      "importance": 0.5,
+      "place": "shore-1",
+      "payload": {
+        "coins": 6,
+        "raised": 18,
+        "target": 18
+      }
+    },
+    {
+      "id": 12,
+      "t": 607,
+      "day": 1,
+      "kind": "agent.build",
+      "actors": [
+        "ag_1"
+      ],
+      "text": "The neighbors' table has its materials: 18 contributed coins bought land and 4 planks. Six mornings of shared work remain.",
+      "importance": 0.7,
+      "place": "shore-1",
+      "payload": {
+        "what": "garden",
+        "site": "shore-1"
+      }
+    },
+    {
+      "id": 18,
+      "t": 2042,
+      "day": 2,
+      "kind": "town.built",
+      "actors": [
+        "ag_1",
+        "ag_3"
+      ],
+      "text": "Mira finished The neighbors' table, a shared garden on the north shore. It took 6 mornings.",
+      "importance": 0.9,
+      "place": "shore-1",
+      "payload": {
+        "what": "garden",
+        "place": "shore-1"
+      }
+    },
+    {
+      "id": 19,
+      "t": 4920,
+      "day": 4,
+      "kind": "garden.harvest",
+      "actors": [
+        "ag_1"
+      ],
+      "text": "Mira tended The neighbors' table and harvested 3 vegetables for the shared counter.",
+      "importance": 0.4,
+      "place": "shore-1",
+      "payload": {
+        "grown": 3,
+        "total": 3
+      }
+    },
+    {
+      "id": 20,
+      "t": 4921,
+      "day": 4,
+      "kind": "garden.harvest",
+      "actors": [
+        "ag_2"
+      ],
+      "text": "Ivo tended The neighbors' table and harvested 3 vegetables for the shared counter.",
+      "importance": 0.4,
+      "place": "shore-1",
+      "payload": {
+        "grown": 3,
+        "total": 6
+      }
+    },
+    {
+      "id": 21,
+      "t": 4922,
+      "day": 4,
+      "kind": "garden.harvest",
+      "actors": [
+        "ag_3"
+      ],
+      "text": "Ana tended The neighbors' table and harvested 3 vegetables for the shared counter.",
+      "importance": 0.4,
+      "place": "shore-1",
+      "payload": {
+        "grown": 3,
+        "total": 9
+      }
+    },
+    {
+      "id": 23,
+      "t": 4924,
+      "day": 4,
+      "kind": "project.proposed",
+      "actors": [
+        "ag_3"
+      ],
+      "text": "Ana proposed A garden up the lane, a shared garden: The first garden feeds the shore. Our neighbors up here could use one too.",
+      "importance": 0.7,
+      "place": "lane-1",
+      "payload": {
+        "target": 18,
+        "planks": 4,
+        "mornings": 6
+      }
+    },
+    {
+      "id": 24,
+      "t": 4925,
+      "day": 4,
+      "kind": "project.contributed",
+      "actors": [
+        "ag_3"
+      ],
+      "text": "Ana contributed 5 coins to A garden up the lane and volunteered to work.",
+      "importance": 0.5,
+      "place": "lane-1",
+      "payload": {
+        "coins": 5,
+        "raised": 5,
+        "target": 18
+      }
+    }
+  ]
+}

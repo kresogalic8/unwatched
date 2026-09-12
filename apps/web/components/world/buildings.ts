@@ -1,3 +1,4 @@
+import { gardenArt } from "./garden-art";
 import { BENCH_SCALE_Y } from "./seating";
 import { Container, Graphics, Assets, Sprite, type Texture } from "pixi.js";
 import { HARBOR_ATLAS } from "./harbor-atlas";
@@ -50,6 +51,7 @@ export function lightWorldArt(root:Container,lit:boolean):void {
   }
 }
 export function drawConstruction(done:number,needed:number,kind:string):Container {
+  if (kind === "garden") { const c = new Container(); c.addChild(new Graphics().svg(gardenArt(done / Math.max(1, needed)))); return c; }
   const c=new Container(),building=drawThing(kind==="shop"?"shop":"house");if(!building)return c;
   const ratio=Math.max(0,Math.min(1,done/Math.max(1,needed))),mask=new Graphics();
   const bounds=building.c.getLocalBounds(); const visible=Math.max(8,bounds.height*ratio);
@@ -57,7 +59,7 @@ export function drawConstruction(done:number,needed:number,kind:string):Containe
   c.addChild(building.c,mask);building.c.mask=mask;return c;
 }
 /** A fresh drawing of the named thing, or null if the atlas still has to stand in. */
-export function drawThing(name: string): Drawn | null { return harborDrawing(name); }
+export function drawThing(name: string): Drawn | null { if (name === "garden") { const c = new Container(); c.addChild(new Graphics().svg(gardenArt())); return { c, w: 220 }; } return harborDrawing(name); }
 
 /**
  * What is on the shelves, drawn onto the building: loaves, fish and apples on the market counter, the plank pile at the

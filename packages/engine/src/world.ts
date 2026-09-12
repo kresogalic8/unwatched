@@ -34,6 +34,7 @@ export const WORKS: Record<string, { coins: number; describe: string }> = {
   bathhouse: { coins: 60, describe: "a bathhouse: everyone sleeps better and wakes rested sooner" },
   bridge: { coins: 40, describe: "a bridge between the two places farthest apart, so the walk is short" },
 };
+export const GARDEN = { coins: 18, planks: 4, labor: 6, capacity: 24, yield: 3, growDays: 2 };
 export const BUILDS: Record<"house" | "shop", { coins: number; labor: number; planks: number; describe: string }> = {
   house: { coins: 15, labor: 6, planks: 6, describe: "a house with two beds; the builder sleeps free and can let the other bed; takes six planks from the sawpit" },
   shop: { coins: 30, labor: 10, planks: 10, describe: "a shop that sells bread, soup and drink, keeps what it earns, and can take on one helper; takes ten planks from the sawpit" },
@@ -55,6 +56,6 @@ export function siteName(kind: keyof typeof BUILDS, by: string, name: string | u
 export type BuildKind = keyof typeof BUILDS;
 export const owns = (p: Place, id: AgentId) => p.owner === id;
 
-export const FOOD_ITEMS = new Set(["bread", "soup", "apples", "fish"]);
+export const FOOD_ITEMS = new Set(["bread", "soup", "apples", "fish", "vegetables"]);
 export const MINUTES_PER_DAY = 24 * 60;
 export const SEASONS = ["winter", "spring", "summer", "autumn"] as const;

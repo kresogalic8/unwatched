@@ -25,6 +25,15 @@ export default function Profile() {
         </Card>
         <Card className="min-h-0 overflow-hidden"><div className="flex justify-between items-center"><h1 className="text-[26px] font-semibold">{own ? "Life" : "What the town knows"}</h1><span className="text-[13px] text-drift">{evs.length} things on the record</span></div><div className="overflow-auto"><Strip items={evs.slice(0, 60).map((e) => ({ t: `Day ${dayOf(e.t)} ${hhmm(e.t)}`, changed: e.importance >= 0.45, text: e.text.length > 220 ? e.text.slice(0, 218) + "…" : e.text }))} /></div></Card>
         <div className="flex flex-col gap-4">
+          <Card><Label>Knowledge passed on</Label><p className="text-sm text-ink2">Advice heard from neighbors. These are shared experiences, not guarantees.</p>
+            {(a.sharedKnowledge ?? []).slice(-4).reverse().map(k => <div key={k.eventId} className="border-t border-ink/10 pt-3 text-sm">
+              <p><a className="text-teal underline" href={`/agent/${k.from}`}>{k.name}</a> → {first}</p>
+              <p>{k.item} at {k.place}: {k.confidence >= .5 ? "recent attempts mostly worked" : "recent attempts were unreliable"}.</p>
+              <p className="text-xs text-drift">Experience from day {dayOf(k.sourceT)} · shared day {dayOf(k.sharedT)} · record #{k.eventId}</p>
+              {own && (() => { const test = (a as OwnerAgent).foodAdvice?.find(x=>x.eventId===k.eventId)?.tested; return <p className="mt-1 text-teal">{test ? `Checked on day ${dayOf(test.t)}: ${test.matched ? "this attempt agreed" : "this attempt disagreed"}.` : "Not checked firsthand yet."}</p>; })()}
+            </div>)}
+            {!a.sharedKnowledge?.length && <p className="text-sm text-drift">No practical advice has been shared with them yet.</p>}
+          </Card>
           <Card><Label>Observed routines</Label><p className="text-sm text-ink2">Purchases recorded by the town, not inferred thoughts.</p>
             {(a.observedPurchases ?? []).slice(-4).map(r=><div key={`${r.place}:${r.item}`} className="border-t border-ink/10 pt-3 text-sm"><b>{r.item} · {r.place}</b><p>{r.receipts.length} recent successful {r.receipts.length===1?"purchase":"purchases"}.</p><details><summary className="cursor-pointer text-teal">Show evidence</summary>{r.receipts.slice(-5).map(e=><p key={e.eventId}>Day {dayOf(e.t)}, {hhmm(e.t)} · {e.cost} coins · record #{e.eventId}</p>)}</details></div>)}
             {!a.observedPurchases?.length && <p className="text-sm text-drift">No purchase evidence recorded yet.</p>}

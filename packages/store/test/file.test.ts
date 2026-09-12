@@ -53,6 +53,26 @@ describe("the file record", () => {
       expect(writes.find((w) => w.url.includes("/towns"))!.body).toMatchObject({ civic: { nextDealId: 2 }, places: expect.arrayContaining([expect.objectContaining({ id: "shore-1", history: expect.objectContaining({ project: "A home", moments: expect.arrayContaining([expect.objectContaining({kind:"worked",labor:1})]) }), site: expect.objectContaining({ workedDay: { [helper.id]: 1 } }) })]) });
     } finally { vi.unstubAllGlobals(); }
   });
+  it("persists shared projects and food learning through file and actual PostgREST writes", async () => {
+    const town=new Town({seed:3,brain:none});town.t=600;
+    const a=town.addAgent({persona:persona("Mira")}),b=town.addAgent({persona:persona("Ivo")});
+    a.location=b.location="bakery";town.apply(a,{kind:"trade",buy:"bread"},"test");town.t++;
+    town.apply(a,{kind:"teach",to:b.id,place:"bakery",item:"bread"},"test");town.t++;town.apply(b,{kind:"trade",buy:"bread"},"test");
+    a.location="shore-1";town.apply(a,{kind:"start_project",at:a.location,name:"Our garden",why:"More food"},"test");town.apply(a,{kind:"contribute_project",at:a.location,coins:9,help:true},"test");
+    const s=fresh();await s.ensureTown("The island",3);await s.snapshot(town);
+    const back=new Town({seed:3,brain:none});back.restore((await s.loadSnapshot())!);
+    expect(back.agents.get(b.id)?.foodAdvice?.[0]?.tested?.matched).toBe(true);
+    expect(back.places.get("shore-1")?.community?.coins).toBe(9);
+    const writes:{url:string;body:any}[]=[];
+    vi.stubGlobal("fetch",async(url:unknown,init:RequestInit)=>{writes.push({url:String(url),body:JSON.parse(String(init.body))});return new Response(null,{status:204});});
+    try {
+      await new TownStore("https://store.test","test-service-key","test").snapshot(back);
+      const rows=writes.find(w=>w.url.includes("/agents"))!.body;
+      expect(rows.find((r:any)=>r.id===a.id).state.foodLessons).toHaveLength(1);
+      expect(rows.find((r:any)=>r.id===b.id).state.foodAdvice[0].tested.matched).toBe(true);
+      expect(writes.find(w=>w.url.includes("/towns"))!.body.places.find((p:any)=>p.id==="shore-1").community.coins).toBe(9);
+    } finally {vi.unstubAllGlobals();}
+  });
   it("delivers a letter once: one posted through the API is already read, one written straight in waits for the hour", async () => {
     const s = fresh();
     await s.saveLetter("a1", "owner", "to_agent", "Find work first.", 100, 100); // the API delivered it on the spot

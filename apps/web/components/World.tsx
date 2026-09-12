@@ -9,6 +9,7 @@ import { Application, Container, Graphics, Rectangle, Text, TextStyle } from "pi
 import { API, WS, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
 import { Citizen, lookFor, aged, type Look, type Pose } from "./world/citizen";
 import { Ambience } from "./world/ambience";
+import { ProjectDetails, type CommunityView } from "./CommunityProjects";
 import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason } from "./world/buildings";
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
@@ -26,7 +27,7 @@ import { Portrait } from "./Portrait";
  */
 const C = { ...GROUND, shell: CREAM, sage: SAGE, teal: TEAL, kelp: KELP, coral: CORAL, drift: DRIFT };
 
-type PlaceView = { hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
+type PlaceView = { community?: CommunityView; hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
 type TownView = Clock & { size: { w: number; h: number }; places: PlaceView[] };
 
 
@@ -100,7 +101,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
   const ambienceRef = useRef<Ambience | null>(null);
   const [sound, setSound] = useState(false);
   const [cleanUi, setCleanUi] = useState(false);
-  const [placeInfo, setPlaceInfo] = useState<{ hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
+  const [placeInfo, setPlaceInfo] = useState<{ community?: CommunityView; stock?: Record<string,number>; hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
   const [mini, setMini] = useState<{ w: number; h: number; places: { id: string; x: number; y: number; kind: string; crowd: number }[]; view: { x: number; y: number; w: number; h: number }; people: { x: number; y: number; mine: boolean }[] } | null>(null);
 
   useEffect(() => {
@@ -207,12 +208,16 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           for (let i = 0; i < 4; i++) { const x0 = -80 + (i % 2) * 160, y0 = -60 + Math.floor(i / 2) * 70; r.roundRect(x0 - 2.5, y0 - 14, 5, 15, 2).fill(0xc9b58f).stroke({ width: 1, color: C.kelp }); }
           if (p.owner) { r.roundRect(-16, -22, 32, 10, 2).fill(C.shell).stroke({ width: 1.2, color: C.kelp }); r.moveTo(0, -12).lineTo(0, 0).stroke({ width: 2, color: 0xc9b58f }); } // bought: a board on a post
           g.addChild(r);
+          if(p.community) { const t = new Text({text:`${p.community.name} · ${p.community.coins}/${p.community.target} coins`,style:smallStyle});t.anchor.set(.5,0);t.position.set(0,16);g.addChild(t); }
+        } else if (p.site?.what === "garden") {
+          g.addChild(drawConstruction(p.site.done, p.site.of, "garden"));
+          const t = new Text({ text: `${p.site.name} · ${p.site.done} of ${p.site.of}`, style: smallStyle }); t.anchor.set(.5,0); t.position.set(0,65); g.addChild(t);
         } else if (p.site) {
           // a site: timber frame, a crates pile, and how many mornings are done
           const r = new Graphics(); const done = Math.min(1, p.site.done / Math.max(1, p.site.of));
           r.rect(-70, -70, 140, 70).fill({ color: C.sand, alpha: 0.9 }); // the cleared ground
           // walls rise a course per morning worked, in the island's stone, with the door left open
-          g.addChild(drawConstruction(p.site.done,p.site.of,p.kind));
+          g.addChild(drawConstruction(p.site.done,p.site.of,p.site.what));
           // scaffold: poles, ledgers, braces, a ladder against it
           for (const x of [-72, -24, 24, 72]) r.moveTo(x, 4).lineTo(x, -78).stroke({ width: 4, color: 0xc9b58f, cap: "round" });
           for (const y of [-40, -76]) r.moveTo(-72, y).lineTo(72, y).stroke({ width: 3, color: 0xc9b58f });
@@ -238,7 +243,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
         const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(0, p.site ? 22 : 6); t.zIndex = 100000; g.addChild(t);
         g.position.set(p.x, p.y);
         g.eventMode = "static"; g.cursor = "pointer"; const bounds=g.getLocalBounds(); g.hitArea=new Rectangle(bounds.x-8,bounds.y-8,bounds.width+16,bounds.height+16);
-        g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); setPlaceInfo({ hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
+        g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); setPlaceInfo({ community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
       };
       for (const p of places.values()) drawPlace(p);
       const decor = keepOffRoads(decorFor([...places.values()]), segs);
@@ -373,7 +378,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
         return f;
       };
       const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) wear.step(f.place, place); f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
-      const refreshPlaces = async () => { try { const t = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock)) drawPlace(p); } } catch {} };
+      const refreshPlaces = async () => { try { const t = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock)) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
       poll = setInterval(() => { void fetch(`${API}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => { for (const a of list) ensure(a); }).catch(() => {}); void refreshPlaces(); }, 30000);
       ws = new WebSocket(WS);
@@ -391,6 +396,12 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           if (e.kind === "agent.work" && /worked on|mornings done/.test(e.text)) { const f = figs.current.get(e.actors[0]!); if (f) f.pose = "work"; }
           // whoever leaves walks to the boat and rides away on it; the deck carries them until the boat is out of sight
           if (e.kind === "agent.leave") { const f = figs.current.get(e.actors[0]!); if (f) { f.boarding = true; releaseSeat(f); f.asleep = false; f.tx = boat.position.x + 12; f.ty = boat.position.y - 2; } }
+          if (e.kind === "knowledge.shared") {
+            bubbles.current.set(e.actors[0]!, { text: e.text.split(": ").slice(1).join(": ") || e.text, until: Date.now() + 9000 });
+            for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "greet", until: Date.now() + 1800 }; }
+          }
+          if (e.kind === "garden.harvest") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "work", until: Date.now() + 8000 }; }
+          if (e.kind.startsWith("project.") || e.kind === "garden.harvest") void refreshPlaces();
           if (e.kind === "agent.say") { const q = /“([^”]+)”/.exec(e.text)?.[1]; if (q) bubbles.current.set(e.actors[0]!, { text: q, until: Date.now() + 7000 }); }
           if (e.kind === "conversation") { const lines = (e.payload?.lines as { speaker: string; text: string }[] | undefined) ?? []; const until = Date.now() + Math.max(5500, (lines.length - 1) * 2600 + 5500);
             for (const id of e.actors) dialogue.set(id, { peers: e.actors.filter(peer => peer !== id), until });
@@ -705,11 +716,12 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
       </svg>}
       {placeInfo && <div className="absolute right-3 top-14 sm:right-6 sm:top-16 w-[min(320px,calc(100%-24px))] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
         <div className="flex justify-between items-baseline gap-2"><div><div className="label">{placeInfo.district}</div><div className="display text-[20px] font-semibold">{placeInfo.name}</div></div><button onClick={() => setPlaceInfo(null)} className="text-sm text-drift">Close</button></div>
-        {placeInfo.kind !== "plot" && placeInfo.kind !== "wild" && <Interior kind={placeInfo.kind} sprite={placeInfo.sprite} hour={clock?.hour ?? 12} people={placeInfo.people} />}
+        {!placeInfo.community && placeInfo.kind !== "plot" && placeInfo.kind !== "wild" && <Interior kind={placeInfo.kind} sprite={placeInfo.sprite} hour={clock?.hour ?? 12} people={placeInfo.people} />}
+        {placeInfo.community && <ProjectDetails project={placeInfo.community} site={placeInfo.site} stock={placeInfo.stock} />}
         {placeInfo.hasHistory && <a href={`/built/${encodeURIComponent(placeInfo.id)}`} className="text-sm font-semibold text-teal underline underline-offset-4">Explore the building record →</a>}
         {placeInfo.owner && <div className="text-sm text-ink2">Owned by {placeInfo.owner}.</div>}
         {placeInfo.site && <div className="text-sm text-ink2">{constructionStage(placeInfo.site.done, placeInfo.site.of)} · {placeInfo.site.by} is building {placeInfo.site.name}: {placeInfo.site.done} of {placeInfo.site.of} mornings done.</div>}
-        {placeInfo.kind === "plot" && !placeInfo.site && <div className="text-sm text-ink2">Empty land. A house costs 15 coins and six mornings; a shop 30 and ten.</div>}
+        {placeInfo.kind === "plot" && !placeInfo.site && !placeInfo.community && <div className="text-sm text-ink2">Empty land. A house costs 15 coins and six mornings; a shop 30 and ten.</div>}
         <div className="text-sm">{placeInfo.people.length === 0 ? <span className="text-drift">Nobody here right now.</span> : placeInfo.people.map((pp) => <div key={pp.name} className="flex items-center gap-2 py-0.5"><Portrait name={pp.name} appearance={pp.appearance} age={pp.age ?? 30} size={26} /><span>{pp.name}{pp.asleep ? ", asleep" : pp.job ? `, ${pp.job}` : ""}</span></div>)}</div>
       </div>}
       <div hidden={cleanUi} className="absolute left-3 bottom-3 sm:left-6 sm:bottom-6 bg-shell rounded-card p-3 sm:p-4 w-[calc(100%-24px)] sm:w-[330px] flex flex-col gap-1.5 pointer-events-auto max-h-[38%] sm:max-h-none overflow-hidden">

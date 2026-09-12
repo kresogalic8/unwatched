@@ -46,10 +46,24 @@ export const ActionKind = z.enum([
   "propose", "vote", "write", "build", "message_owner", "sleep", "wait",
   "hire", "lend", "lodge", "leave",
   "fund", "accuse", "search", "do", "stock", "make", "call",
+  "start_project", "contribute_project", "withdraw_project", "teach",
 ]);
 export type ActionKind = z.infer<typeof ActionKind>;
 
+export const CommunityProject = z.object({
+  name: z.string(), why: z.string(), by: AgentId, proposed: z.number(),
+  phase: z.enum(["funding", "building", "complete"]), coins: z.number(), target: z.number(),
+  members: z.array(z.object({ id: AgentId, coins: z.number(), help: z.boolean(), labor: z.number() })),
+  completedDay: z.number().optional(), tendedDay: z.record(z.string(), z.number()).optional(),
+  harvests: z.number(), foodProduced: z.number(),
+});
+export type CommunityProject = z.infer<typeof CommunityProject>;
+
 export const Action = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("start_project"), at: PlaceId, name: z.string().trim().min(2).max(60), why: z.string().trim().min(3).max(240) }),
+  z.object({ kind: z.literal("contribute_project"), at: PlaceId, coins: z.number().int().min(0).max(500).default(0), help: z.boolean().default(true) }),
+  z.object({ kind: z.literal("withdraw_project"), at: PlaceId }),
+  z.object({ kind: z.literal("teach"), to: AgentRef, place: PlaceId, item: z.string().trim().min(1).max(30) }),
   z.object({ kind: z.literal("move"), to: PlaceId }),
   /** Words, to everyone here or to one person. With "to" and no text it means: go and talk with them; the town then lets the two of you speak, turn by turn. */
   z.object({ kind: z.literal("say"), to: AgentRef.optional(), text: z.string().max(400).optional() }),
@@ -145,7 +159,7 @@ export const Perception = z.object({
   type: z.literal("perceive"),
   agent_id: AgentId,
   /** The island's ways: the rules the council has passed that bite, and the sayings it has kept; and the town sheet: where the people this person knows or saw today are right now. */
-  town: z.object({ rules: z.array(z.string()), sayings: z.array(z.string()), people: z.array(z.object({ name: z.string(), place: PlaceId, asleep: z.boolean() })).optional() }).optional(),
+  town: z.object({ rules: z.array(z.string()), sayings: z.array(z.string()), people: z.array(z.object({ name: z.string(), place: PlaceId, asleep: z.boolean() })).optional(), projects: z.array(CommunityProject.extend({ place: PlaceId })).optional() }).optional(),
   time: z.object({ sim: z.string(), day: z.number().int(), minute: z.number().int(), season: z.string(), weather: z.string(), weekday: z.string().optional(), occasion: z.string().optional(), gathering: z.string().optional(), temperature_c: z.number().optional() }),
   self: z.object({
     learned_food: z.array(z.object({ place: PlaceId, item: z.string(), confidence: z.number(), observations: z.number() })).optional(),
@@ -169,6 +183,7 @@ export const Perception = z.object({
     watching: z.array(z.string()).optional(),
     /** What they are working toward over weeks, and where each stands. */
     projects: z.array(z.object({ title: z.string(), progress: z.string(), since_day: z.number().int(), construction: z.object({ site: PlaceId, labor: z.number().int(), needed: z.number().int() }).optional() })).optional(),
+    food_advice: z.array(z.object({ from: AgentId, name: z.string(), place: PlaceId, item: z.string(), confidence: z.number(), source_t: z.number(), shared_t: z.number(), trust: z.number(), tested: z.boolean().optional() })).optional(),
     /** What they believe, and how sure they are. Not necessarily true. */
     believes: z.array(z.object({ about: z.string(), belief: z.string(), confidence: z.number() })).optional(),
     /** Secrets learned by going through someone's things, or read in an exposé. Heavy to carry; heavier to use. */
@@ -182,6 +197,7 @@ export const Perception = z.object({
     asleep: z.boolean().optional(),
   })),
   place: z.object({ id: PlaceId, name: z.string(), kind: z.string(), for_sale: z.array(z.object({ item: z.string(), price: z.number() })), jobs_open: z.array(z.string()), exits: z.array(PlaceId),
+    community: CommunityProject.optional(),
     owner: z.string().nullable().optional(),
     /** For someone who works here: what is in the store room, and whether the place is broken. */
     stock: z.record(z.string(), z.number()).optional(), broken: z.boolean().optional(),
@@ -210,6 +226,7 @@ export type Perception = z.infer<typeof Perception>;
 /** Everything that happens is one of these. */
 export const EventKind = z.enum([
   "tick.day", "boat.dock", "boat.depart", "agent.arrive", "agent.leave",
+  "project.proposed", "project.contributed", "project.withdrawn", "garden.harvest", "knowledge.shared",
   "agent.move", "agent.say", "agent.give", "agent.take", "agent.trade",
   "agent.work", "agent.hired", "agent.quit", "agent.fired", "agent.sleep", "agent.wake",
   "agent.eat", "agent.rent", "agent.evicted", "agent.reflect", "agent.letter",
@@ -311,7 +328,7 @@ export type BuildingMoment = {
   deal?: number; coins?: number;
 };
 export type BuildingHistory = {
-  place: string; name: string; project: string; what: "house" | "shop";
+  place: string; name: string; project: string; what: "house" | "shop" | "garden";
   builder: { id: string; name: string }; needed: number; started: number;
   landCoins: number; materialCoins: number; planks: number;
   moments: BuildingMoment[];

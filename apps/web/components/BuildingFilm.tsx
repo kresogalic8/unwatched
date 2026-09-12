@@ -1,4 +1,6 @@
 "use client";
+import { CommunityProjects } from "./CommunityProjects";
+import { gardenArt } from "./world/garden-art";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { constructionStage, type BuildingReplay } from "@unwatched/protocol";
@@ -7,9 +9,10 @@ import { Wordmark } from "./ui";
 import { House as HarborHouse, P } from "./world/harbor-art";
 
 /** Architectural reconstruction from measured labor; no invented citizen movements or dialogue. */
-function House({ labor, needed, shop = false }: { labor: number; needed: number; shop?: boolean }) {
+function House({ labor, needed, shop = false, garden = false }: { labor: number; needed: number; shop?: boolean; garden?: boolean }) {
   const id=useId(),ratio=Math.max(0,Math.min(1,labor/Math.max(1,needed))),finished=ratio>=1;
   const [x,y]=P(130,95),height=ratio<.3?8:ratio<.8?28+(ratio-.3)*270:170+(ratio-.8)*450;
+  if (garden) return <image x="-165" y="-135" width="330" height="232.5" href={`data:image/svg+xml,${encodeURIComponent(gardenArt(ratio))}`} />;
   return <g>
     <path d="M-128 -4L-40 -46L108 2L18 45Z" fill="#ddd7bd" stroke="#b5b69d" strokeWidth="1"/>
     <defs><clipPath id={id}><rect x="-200" y={-height} width="400" height={height+5}/></clipPath></defs>
@@ -58,6 +61,7 @@ export function BuildingFilm({ place, demo = false }: { place?: string; demo?: b
   return <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-5">
     <header className="flex items-center justify-between gap-4"><Wordmark /><Link href="/town" className="text-sm font-semibold text-teal">Watch the island live ↗</Link></header>
     <div className="mt-10 mb-7 flex flex-wrap items-end justify-between gap-5"><div><p className="text-sm text-drift">{demo ? "Recorded mock demo · 30 days" : "The building record"} · {data?.town ?? "Unwatched"}</p><h1 className="display text-4xl sm:text-6xl leading-tight mt-2">They left a mark.</h1></div><p className="max-w-[32ch] text-ink2">An intention. Someone else's help. A place that wasn't here before.</p></div>
+    {!place && !demo && <><CommunityProjects /><Link href="/built/garden-demo" className="inline-block my-5 text-teal underline">Explore a recorded garden scenario →</Link></>}
     {error && <div role="alert" className="py-12 max-w-xl"><p>{error}</p><button className="mt-4 underline text-teal" onClick={()=>setAttempt(n=>n+1)}>Try again</button><Link className="ml-5 underline" href="/built">All buildings</Link><Link className="ml-5 underline" href="/built/demo">Try the recorded mock demo</Link></div>}
     {!data && !error && <div role="status" className="bg-glass rounded-3xl p-16 text-ink2">Opening the building record…</div>}
     {data && !frame && <section className="rounded-3xl bg-glass py-20 px-8 max-w-3xl"><h2 className="display text-3xl">The first foundation is still ahead.</h2><p className="mt-4 text-ink2">New buildings will leave their history here as citizens start them. Older buildings have no recorded construction replay.</p><Link href="/town" className="inline-block mt-6 text-teal underline">Spend a minute on the island →</Link><Link href="/built/demo" className="inline-block ml-5 mt-6 text-teal underline">Try the recorded mock demo →</Link></section>}
@@ -73,10 +77,10 @@ export function BuildingFilm({ place, demo = false }: { place?: string; demo?: b
               const at=b.history.moments.filter(x=>x.t<=m.t).at(-1);
               const x=100+b.x/data.size.w*660;const y=125+b.y/data.size.h*260;
               return <g key={b.history.place} transform={`translate(${x} ${y})`} opacity={at ? 1 : .22}>
-                {at ? <g transform="scale(.29)"><House labor={at.labor} needed={b.history.needed} shop={b.history.what==="shop"} /></g> : <path d="M-25 0H25M0 -10V10" stroke="#274c48" strokeDasharray="3 3" />}
+                {at ? <g transform="scale(.29)"><House labor={at.labor} needed={b.history.needed} shop={b.history.what==="shop"} garden={b.history.what==="garden"} /></g> : <path d="M-25 0H25M0 -10V10" stroke="#274c48" strokeDasharray="3 3" />}
                 <text x="0" y="28" textAnchor="middle" fontFamily="sans-serif" fontSize="11" fill="#274c48">{at ? b.history.name : "Unbuilt plot"}</text>
               </g>;
-            })}</g> : <g transform="translate(438 347) scale(1.18)"><House labor={m.labor} needed={h.needed} shop={h.what==="shop"} /></g>}
+            })}</g> : <g transform="translate(438 347) scale(1.18)"><House labor={m.labor} needed={h.needed} shop={h.what==="shop"} garden={h.what==="garden"} /></g>}
             <text x="36" y="495" fontFamily="Georgia,serif" fontSize="27" fill="#274c48">{h.name.length>48 ? h.name.slice(0,45)+"…" : h.name}</text>
             <text x="36" y="523" fontFamily="sans-serif" fontSize="13" fill="#274c48">{m.labor} / {h.needed} mornings worked · {m.people.map(p=>p.name).join(", ").slice(0,82)}</text>
             <text x="844" y="546" textAnchor="end" fontFamily="sans-serif" fontSize="10" fill="#46665d">RECONSTRUCTION FROM RECORDED ACTIONS · unwatched.world</text>

@@ -6,6 +6,7 @@ export type PlaceKind = "harbor" | "inn" | "market" | "shop" | "workplace" | "pu
 export interface Place {
   /** Public building milestones, retained with the place after the rolling event log expires. */
   history?: import("@unwatched/protocol").BuildingHistory;
+  community?: import("@unwatched/protocol").CommunityProject;
   id: PlaceId;
   name: string;
   kind: PlaceKind;
@@ -29,7 +30,7 @@ export interface Place {
   /** The day a broken place works again, if a storm took its roof. */
   brokenUntil?: number;
   /** An unfinished building on a plot. Work adds labor; at laborNeeded it becomes a place. */
-  site: { what: "house" | "shop"; name: string; by: AgentId; labor: number; laborNeeded: number; startedDay: number; look?: string; project?: string; workedDay?: Record<AgentId, number> } | null;
+  site: { what: "house" | "shop" | "garden"; name: string; by: AgentId; labor: number; laborNeeded: number; startedDay: number; look?: string; project?: string; workedDay?: Record<AgentId, number> } | null;
   /** How the builder wanted it to look, in their words. The island draws it from this; the hash of it names the sprite. */
   look?: string;
 }
@@ -102,6 +103,7 @@ export interface AgentState {
   asleep: boolean;
   arrivedAt: number;
   relationships: Map<AgentId, Relation>;
+  foodAdvice?: import("./learning.ts").FoodAdvice[];
   foodLessons?: import("./learning.ts").FoodLesson[];
   foodRoutineDecisions?: import("./learning.ts").FoodRoutineDecision[];
   memory: Memory[];
@@ -269,7 +271,8 @@ export interface AgentSnapshot {
   state: {
     needs: AgentState["needs"]; location: PlaceId; coins: number; inventory: string[]; job: string | null;
     home: AgentState["home"]; asleep: boolean; budget: Budget; intentions: string[]; rumors: string[];
-    foodLessons?: import("./learning.ts").FoodLesson[];
+    foodAdvice?: import("./learning.ts").FoodAdvice[];
+  foodLessons?: import("./learning.ts").FoodLesson[];
   foodRoutineDecisions?: import("./learning.ts").FoodRoutineDecision[];
     deals?: Deal[];
     letters?: OwnerLetter[]; lastConversation?: number; lastThought?: number; instructions?: string; brainKind?: AgentState["brainKind"]; thinkEvery?: number | null; plan?: ActivePlan | null; debts?: { to: AgentId; coins: number; due: number }[]; starving?: number; roofless?: number; convictions?: number; secretsKnown?: Record<AgentId, string>; watch?: string[]; selves?: AgentState["selves"]; lastSelfDay?: number; projects?: AgentState["projects"]; beliefs?: AgentState["beliefs"]; trustLog?: AgentState["trustLog"];

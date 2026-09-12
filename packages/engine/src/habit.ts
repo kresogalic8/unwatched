@@ -1,10 +1,11 @@
-import { foodExperience } from "./learning.ts";
+import { joinedProject, gardenReady } from "./community.ts";
+import { socialFoodConfidence } from "./learning.ts";
 import type { Action } from "@unwatched/protocol";
 import type { AgentState, Place, Job } from "./types.ts";
-import { FOOD_ITEMS } from "./world.ts";
+import { FOOD_ITEMS, GARDEN } from "./world.ts";
 
 export interface HabitView {
-  now?: number; learning?: boolean;
+  now?: number; day?: number; learning?: boolean;
   onFoodChoice?(baseline: string, preferred: string): void;
   places: Map<string, Place>;
   jobs: Map<string, Job>;
@@ -23,6 +24,7 @@ export interface HabitView {
  */
 export function habit(a: AgentState, v: HabitView): Action {
   const here = v.places.get(a.location)!;
+  const day = v.day ?? Math.floor((v.now ?? 0) / 1440) + 1;
   const wake = 6 + Math.round(a.persona.traits.caution * 1.5);
 
   if (a.asleep) {
@@ -70,7 +72,12 @@ export function habit(a: AgentState, v: HabitView): Action {
 
   // Carry out building work already chosen: an accepted promise first, then a site of your own.
   const promised = a.deals.find((d) => d.mine && d.state === "open" && d.construction && d.construction.done < d.construction.mornings && v.places.get(d.construction.site)?.site?.startedDay === d.construction.startedDay && v.places.get(d.construction.site)?.site?.by === d.with);
-  const site = (promised?.construction ? v.places.get(promised.construction.site) : undefined) ?? [...v.places.values()].find((p) => p.site?.by === a.id);
+  const site = (promised?.construction ? v.places.get(promised.construction.site) : undefined) ?? [...v.places.values()].find((p) => p.site?.by === a.id && !p.community && p.site.workedDay?.[a.id] !== day)
+    ?? [...v.places.values()].find(p => joinedProject(a,p) && (
+      (p.community?.phase === "building" && p.site?.workedDay?.[a.id] !== day) ||
+      (p.community?.phase === "funding" && p.community.coins >= p.community.target && (v.places.get("sawpit")?.stock.planks ?? 0) >= GARDEN.planks) ||
+      (gardenReady(p, day, v.hour, v.weather, v.season) && p.community?.tendedDay?.[a.id] !== day)
+    ));
   if (site && v.hour >= 8 && v.hour < 18 && !(a.job && (() => { const j = v.jobs.get(a.job!); return j && v.hour >= j.hours[0] && v.hour < j.hours[1]; })())) {
     if (a.location === site.id) return { kind: "work" };
     const next = v.path(a.location, site.id);
@@ -136,7 +143,7 @@ function nearestFoodPlace(a: AgentState, v: HabitView): string | null {
   const experience = (p: Place) => {
     if (v.learning === false) return .5;
     const food = cheapestFood(p,v);
-    return food ? foodExperience(a.foodLessons,p.id,food.item,v.now ?? 0).confidence : .5;
+    return food ? socialFoodConfidence(a.foodLessons,a.foodAdvice,a.relationships,p.id,food.item,v.now ?? 0) : .5;
   };
   const sellers = [...v.places.values()].filter((p) => p.sells.some((s) => FOOD_ITEMS.has(s.item))).sort((x, y) => far(x.id) - far(y.id) || experience(y) - experience(x) || rank(x.id) - rank(y.id));
   const affordable=sellers.filter(p=>{const c=cheapestFood(p,v);return c && a.coins>=c.price;});

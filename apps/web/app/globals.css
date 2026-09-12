@@ -72,3 +72,9 @@ h1, h2, h3, .display { font-family: var(--font-display); letter-spacing: -0.025e
   .evidence img { transform: scale(1.08); animation: evidence-drift linear both; animation-timeline: view(); animation-range: entry 0% exit 100%; will-change: transform; }
   @keyframes evidence-drift { from { transform: scale(1.08) translateY(-3.5%); } to { transform: scale(1.08) translateY(3.5%); } }
 } }
+
+/* A shared project's measured contributions, in the island's garden palette. */
+.project-progress { appearance: none; border: none; border-radius: 4px; overflow: hidden; background: var(--color-glass); }
+.project-progress::-webkit-progress-bar { background: var(--color-glass); }
+.project-progress::-webkit-progress-value { background: #799b85; }
+.project-progress::-moz-progress-bar { background: #799b85; }

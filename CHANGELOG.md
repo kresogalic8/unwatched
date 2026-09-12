@@ -6,9 +6,18 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Citizens can propose shared gardens, pool their own coins, volunteer or withdraw, and turn six mornings of work into a public food source. Real planks, growing time, tending, weather and finite shelf capacity determine what the garden produces.
+- Citizens can teach recent firsthand food experience to an awake neighbor. Advice stays distinct from receipts, influences food choices according to trust and age, and changes trust only after a later personal check.
+- Shared project progress and contributors appear in the building record and world. Profiles show exchanged advice, with private verification results for owners. A reproducible, clearly labeled garden scenario demonstrates the mechanics without altering the live island.
+
 ### Changed
 
+- Volunteers follow their chosen projects outside paid shifts and urgent needs. Minds receive public proposals and the tools to join, ignore or leave them.
+
 ### Fixed
+
+- Postgres snapshots now retain food lessons, routine comparisons and received advice, matching file snapshots. Shared gardens retain donations, labor and harvest limits through restarts.
+- Release instructions now describe the automatic production deployment introduced in v0.9.0.
 
 ## [0.9.0] - 2026-09-12
 ### Added

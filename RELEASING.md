@@ -33,7 +33,7 @@ After every merged round that changes what an owner reads tomorrow, and at least
    ```
 
 4. The `release` workflow runs typecheck and the tests once more, takes that version's section of `CHANGELOG.md` as the notes, appends the merged pull requests grouped by label (`.github/release.yml`), and publishes the GitHub release.
-5. Deploy the live island from `main` with `deploy/do.sh`. The tag does not deploy anything by itself; the island has its own clock and we choose the hour.
+5. The successful stable release automatically calls the production workflow. It builds both services from the tag, preserves the live DigitalOcean app configuration, deploys, and verifies the release version and commit on both public endpoints. Check the deploy job before announcing that the release is live. See [deployment](docs/deployment.md) for configuration and retries.
 6. Post the release in [Announcements](https://github.com/kresogalic8/unwatched/discussions/categories/announcements) with the two or three lines that matter to an owner.
 
 ## How people follow what is new

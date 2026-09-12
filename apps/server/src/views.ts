@@ -1,4 +1,4 @@
-import type { Town, AgentState } from "@unwatched/engine";
+import type { Town, AgentState, Place } from "@unwatched/engine";
 import type { TownEvent } from "@unwatched/protocol";
 
 /** What anyone may see about a person: what the town knows. */
@@ -8,6 +8,7 @@ export function setPerks(fn: (a: AgentState) => boolean): void { perksOf = fn; }
 export function publicAgent(town: Town, a: AgentState) {
   const job = a.job ? town.jobs.get(a.job)?.title ?? a.job : null;
   return {
+    sharedKnowledge: (a.foodAdvice ?? []).map(x => ({ from: x.from, name: town.agents.get(x.from)?.persona.name ?? x.from, place: town.places.get(x.place)?.name ?? x.place, item: x.item, confidence: x.confidence, sourceT: x.sourceT, sharedT: x.sharedT, eventId: x.eventId })),
     observedPurchases: (a.foodLessons ?? []).flatMap(l => {
       const receipts=l.evidence.filter(e=>e.success && e.eventId !== undefined);
       return receipts.length ? [{ place: town.places.get(l.place)?.name ?? l.place, item: l.item, receipts: receipts.map(e=>({t:e.t,eventId:e.eventId!,cost:e.cost})) }] : [];
@@ -26,6 +27,7 @@ export function publicAgent(town: Town, a: AgentState) {
 export function ownerAgent(town: Town, a: AgentState) {
   return {
     ...publicAgent(town, a),
+    foodAdvice: a.foodAdvice ?? [],
     foodLessons: a.foodLessons ?? [], foodRoutineDecisions: a.foodRoutineDecisions ?? [],
     persona: a.persona,
     needs: a.needs, coins: a.coins, inventory: a.inventory,
@@ -56,9 +58,16 @@ export function clockOf(town: Town) {
 export function poseOf(town: Town, a: AgentState): "sleep" | "work" | "sit" | "idle" {
   if (a.asleep) return "sleep";
   const here = town.places.get(a.location);
-  if (here?.site && town.hour >= 8 && town.hour < 18 && (here.site.by === a.id || town.dueStep(a)?.place === here.id)) return "work";
+  if (here?.site && town.hour >= 8 && town.hour < 18 && (here.site.by === a.id || here.community?.members.some(m => m.id === a.id && m.help) || town.dueStep(a)?.place === here.id)) return "work";
   const job = a.job ? town.jobs.get(a.job) : null;
   if (job && job.place === a.location && town.hour >= job.hours[0] && town.hour < job.hours[1]) return "work";
   if (here && (here.kind === "inn" || here.kind === "public") && town.hour >= 17) return "sit";
   return "idle";
+}
+
+/** Only voluntary public contributions and work; no private intentions or memories. */
+export function publicProject(town: Town, p: Place) {
+  if (!p.community) return undefined;
+  return { ...structuredClone(p.community), byName: town.agents.get(p.community.by)?.persona.name ?? p.community.by,
+    members: p.community.members.map(m => ({ ...m, name: town.agents.get(m.id)?.persona.name ?? m.id })) };
 }

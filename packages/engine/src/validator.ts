@@ -1,5 +1,7 @@
+import { teachable } from "./learning.ts";
+import { gardenReady } from "./community.ts";
 import type { Action } from "@unwatched/protocol";
-import { BUILDS, WORKS, buildKind, FOOD_ITEMS } from "./world.ts";
+import { BUILDS, GARDEN, WORKS, buildKind, FOOD_ITEMS } from "./world.ts";
 import type { AgentState, Place, Job } from "./types.ts";
 
 export type Verdict = { ok: true } | { ok: false; reason: string };
@@ -8,6 +10,7 @@ export interface ValidatorView {
   places: Map<string, Place>;
   jobs: Map<string, Job>;
   agents: Map<string, AgentState>;
+  now?: number; learning?: boolean; season?: string;
   hour: number; weekday?: number; day?: number; mayor?: string | null; works?: string[]; feast?: boolean; residentsOf?: (p: Place) => AgentState[]; bedPrice?: (p: Place) => number; knownItem?: (item: string) => boolean; curfew?: number | null;
   /** what a place pays for a thing brought to its counter, or null when it has no use for it; whether a thing can be eaten; the sky and the boat; the proposals open at the council */
   buyPrice?: (place: Place, item: string) => number | null; food?: (item: string) => boolean; weather?: string; boatHeld?: boolean;
@@ -25,6 +28,37 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
   if (!here) return { ok: false, reason: "nowhere" };
   if (a.asleep && action.kind !== "sleep" && action.kind !== "wait") return { ok: false, reason: "asleep" };
   switch (action.kind) {
+    case "teach": {
+      const b = v.agents.get(action.to);
+      if (v.learning === false) return { ok: false, reason: "learning is disabled" };
+      if (!b || b.id === a.id || b.location !== a.location || b.asleep) return { ok: false, reason: "no awake listener here" };
+      const lesson = teachable(a.foodLessons, action.place, action.item, v.now ?? 0);
+      if (!lesson) return { ok: false, reason: "no recent firsthand experience to share" };
+      if (b.foodAdvice?.some(x => x.from === a.id && x.place === action.place && x.item === action.item && x.sourceT >= lesson.sourceT)) return { ok: false, reason: "already shared that experience with them" };
+      if (b.foodAdvice?.some(x => x.from === a.id && x.place === action.place && x.item === action.item && Math.floor(x.sharedT / 1440) === Math.floor((v.now ?? 0) / 1440))) return { ok: false, reason: "one tip per person and food source each day" };
+      return { ok: true };
+    }
+    case "start_project": {
+      if (!v.places.has("sawpit") || !v.places.has("council")) return { ok: false, reason: "shared gardens require a sawpit and council" };
+      if (action.at !== a.location || here.kind !== "plot" || here.site || here.community || here.owner) return { ok: false, reason: "stand on an unclaimed plot to propose a shared garden" };
+      if ([...v.places.values()].some(p => p.community?.by === a.id && p.community.phase !== "complete")) return { ok: false, reason: "finish the shared project already proposed" };
+      return { ok: true };
+    }
+    case "contribute_project": {
+      const project = here.community;
+      if (action.at !== a.location || !project) return { ok: false, reason: "visit the project before contributing" };
+      if (action.coins > 0 && project.phase !== "funding") return { ok: false, reason: "materials are already paid for" };
+      if (action.coins > a.coins || action.coins > project.target - project.coins) return { ok: false, reason: "contribute only what you have and the project still needs" };
+      const member = project.members.find(m => m.id === a.id);
+      if (!action.coins && (!action.help || member?.help)) return { ok: false, reason: "no new contribution" };
+      if (!member && project.members.length >= 100) return { ok: false, reason: "enough volunteers for this garden" };
+      return { ok: true };
+    }
+    case "withdraw_project": {
+      if (action.at !== a.location || !here.community?.members.some(m => m.id === a.id)) return { ok: false, reason: "no contribution here to withdraw" };
+      const member = here.community.members.find(m => m.id === a.id)!;
+      return member.help || (here.community.phase === "funding" && member.coins > 0) ? { ok: true } : { ok: false, reason: "nothing left to withdraw" };
+    }
     case "move": {
       if (action.to === a.location) return { ok: false, reason: "already there" };
       if (!v.places.has(action.to)) return { ok: false, reason: `no such place as ${action.to}` };
@@ -67,6 +101,8 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
     }
     case "work": {
       if (a.starving >= 2) return { ok: false, reason: "too weak with hunger to work" };
+      if (here.community?.phase === "complete") return gardenReady(here, v.day ?? 1, v.hour, v.weather, v.season) && here.community.tendedDay?.[a.id] !== v.day ? { ok: true } : { ok: false, reason: "garden needs growing time, daylight, suitable weather and room for a harvest; one tending per person per day" };
+      if (here.community?.phase === "funding") return here.community.coins >= here.community.target && (v.places.get("sawpit")?.stock.planks ?? 0) >= GARDEN.planks && v.places.has("council") ? { ok: true } : { ok: false, reason: "the garden still needs funding or planks" };
       if (v.weekday === 0 && !here.site) return { ok: false, reason: "it is Sunday; no shifts today" };
       if (v.feast && v.hour >= 12 && !here.site) return { ok: false, reason: "a feast day; no shifts this afternoon" };
       if (here.brokenUntil && here.brokenUntil > (v.day ?? 0)) return { ok: false, reason: `${here.name} is broken; nothing to do here for now` };
@@ -146,8 +182,10 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       return { ok: true };
     }
     case "build": {
+      if (/garden/i.test(action.what)) return { ok: false, reason: "use start_project to propose a shared garden" };
       if (action.at !== a.location) return { ok: false, reason: "must be standing on the plot" };
       if (here.kind !== "plot") return { ok: false, reason: "no land to build on here" };
+      if (here.community) return { ok: false, reason: "this plot is reserved for a shared garden" };
       if (here.site) return { ok: false, reason: here.site.by === a.id ? "already begun; work on it" : "someone else is building here" };
       const kind = buildKind(action.what);
       if (!kind) return { ok: false, reason: "can build a house or a shop" };

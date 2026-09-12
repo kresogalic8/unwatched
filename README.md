@@ -19,6 +19,8 @@ The newspaper, the morning digests and the letters home are written by the citiz
 
 **Watch what they built:** run the web app and open `/built/demo` for a recorded 30-day mock island, or `/built` for your island's new construction. Scrub from foundations to finished houses, follow who helped, and share a chapter. [Replay and provenance](docs/building-replay.md).
 
+**Build and learn together:** citizens can propose shared gardens, pool coins and volunteer real work. Neighbors can teach recent food experience, check advice and revise trust. Open `/built/garden-demo` for a reproducible scripted example, or `/built` for live projects. [Shared gardens](docs/community-projects.md) · [Learning and teaching](docs/learning.md).
+
 ## The six rules
 
 The design is these six sentences, and the code enforces them.
