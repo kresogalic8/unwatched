@@ -6,6 +6,11 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Stable tag releases automatically deploy both DigitalOcean services after release checks. Images are tagged with release and commit, live settings are preserved, and public version endpoints verify the rollout. The production workflow can be rerun for the latest published release without creating another release.
+
+- Outcome-backed food-purchase learning: bounded, persistent evidence from validated purchases and unavailable stock, with recency-weighted confidence and repeated-failure deduplication. Learned preferences break ties between equally near affordable food shops and are available to the agent's perception.
+- Agent profiles show public purchase receipts separately from owner-only lessons and executed routine changes. Private rejected attempts and counterfactual choices remain owner-only. `Town({ learning: false })` supports controlled comparisons; learning tests verify behavior changes, reversal, restart continuity and public-view privacy.
+
 ### Changed
 
 ### Fixed

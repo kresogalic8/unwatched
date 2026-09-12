@@ -8,6 +8,10 @@ export function setPerks(fn: (a: AgentState) => boolean): void { perksOf = fn; }
 export function publicAgent(town: Town, a: AgentState) {
   const job = a.job ? town.jobs.get(a.job)?.title ?? a.job : null;
   return {
+    observedPurchases: (a.foodLessons ?? []).flatMap(l => {
+      const receipts=l.evidence.filter(e=>e.success && e.eventId !== undefined);
+      return receipts.length ? [{ place: town.places.get(l.place)?.name ?? l.place, item: l.item, receipts: receipts.map(e=>({t:e.t,eventId:e.eventId!,cost:e.cost})) }] : [];
+    }),
     id: a.id, name: a.persona.name, age: a.persona.age, origin: a.persona.origin, summary: a.persona.summary,
     location: a.location, place: town.places.get(a.location)?.name ?? a.location, asleep: a.asleep,
     job, home: a.home?.place ?? null, arrivedDay: Math.floor(a.arrivedAt / 1440) + 1, funded: a.funded,
@@ -22,6 +26,7 @@ export function publicAgent(town: Town, a: AgentState) {
 export function ownerAgent(town: Town, a: AgentState) {
   return {
     ...publicAgent(town, a),
+    foodLessons: a.foodLessons ?? [], foodRoutineDecisions: a.foodRoutineDecisions ?? [],
     persona: a.persona,
     needs: a.needs, coins: a.coins, inventory: a.inventory,
     nightsPaid: a.home?.nightsPaid ?? 0,

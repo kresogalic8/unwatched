@@ -10,9 +10,12 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @unwatched/web...
-RUN pnpm --filter @unwatched/web build
+RUN pnpm --filter @unwatched/web exec next build --webpack
 
 FROM base AS run
+ARG RELEASE_VERSION=dev
+ARG COMMIT_SHA=local
+ENV RELEASE_VERSION=$RELEASE_VERSION COMMIT_SHA=$COMMIT_SHA
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static

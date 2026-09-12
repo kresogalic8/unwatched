@@ -1,8 +1,11 @@
+import { foodExperience } from "./learning.ts";
 import type { Action } from "@unwatched/protocol";
 import type { AgentState, Place, Job } from "./types.ts";
 import { FOOD_ITEMS } from "./world.ts";
 
 export interface HabitView {
+  now?: number; learning?: boolean;
+  onFoodChoice?(baseline: string, preferred: string): void;
   places: Map<string, Place>;
   jobs: Map<string, Job>;
   hour: number;
@@ -130,8 +133,19 @@ function cheapestFood(here: Place, v: HabitView): { item: string; price: number 
 function nearestFoodPlace(a: AgentState, v: HabitView): string | null {
   const order = ["market", "inn", "bakery", "fields"]; const rank = (id: string) => { const i = order.indexOf(id); return i < 0 ? order.length : i; };
   const far = (id: string) => v.hops ? (v.hops(a.location, id) ?? 99) : 0;
-  const sellers = [...v.places.values()].filter((p) => p.sells.some((s) => FOOD_ITEMS.has(s.item))).sort((x, y) => far(x.id) - far(y.id) || rank(x.id) - rank(y.id));
-  for (const p of sellers) { const c = cheapestFood(p, v); if (c && a.coins >= c.price) return p.id; }
+  const experience = (p: Place) => {
+    if (v.learning === false) return .5;
+    const food = cheapestFood(p,v);
+    return food ? foodExperience(a.foodLessons,p.id,food.item,v.now ?? 0).confidence : .5;
+  };
+  const sellers = [...v.places.values()].filter((p) => p.sells.some((s) => FOOD_ITEMS.has(s.item))).sort((x, y) => far(x.id) - far(y.id) || experience(y) - experience(x) || rank(x.id) - rank(y.id));
+  const affordable=sellers.filter(p=>{const c=cheapestFood(p,v);return c && a.coins>=c.price;});
+  if(affordable.length){
+    const preferred=affordable[0]!;
+    const baseline=[...affordable].sort((x,y)=>far(x.id)-far(y.id)||rank(x.id)-rank(y.id))[0]!;
+    if(preferred.id!==baseline.id)v.onFoodChoice?.(baseline.id,preferred.id);
+    return preferred.id;
+  }
   // nothing they can afford: the nearest shelf that at least has food on it, before the nearest that merely sells it
   return sellers.find((p) => cheapestFood(p, v) !== null)?.id ?? sellers[0]?.id ?? null;
 }

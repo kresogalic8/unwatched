@@ -592,7 +592,7 @@ app.get("/api/me/agents", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json([]);
   return c.json([...town.agents.values()].filter((a) => a.owner === owner).map((a) => ownerAgent(town, a)));
 });
-app.get("/api/health", (c) => c.json({ ok: true, clock: clockOf(town), brain: brain.name }));
+app.get("/api/health", (c) => c.json({ ok: true, version: process.env.RELEASE_VERSION ?? "dev", commit: process.env.COMMIT_SHA ?? "local", clock: clockOf(town), brain: brain.name }));
 
 // ---- WebSocket stream ----
 const server = serve({ fetch: app.fetch, port: PORT, createServer }, () => log(`listening on http://localhost:${PORT}`));

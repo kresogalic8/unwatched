@@ -16,6 +16,9 @@ COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter @unwatched/server... --prod=false
 
 FROM base AS run
+ARG RELEASE_VERSION=dev
+ARG COMMIT_SHA=local
+ENV RELEASE_VERSION=$RELEASE_VERSION COMMIT_SHA=$COMMIT_SHA
 ENV NODE_ENV=production
 COPY --from=deps /app /app
 COPY packages ./packages

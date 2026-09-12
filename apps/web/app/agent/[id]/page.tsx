@@ -25,6 +25,15 @@ export default function Profile() {
         </Card>
         <Card className="min-h-0 overflow-hidden"><div className="flex justify-between items-center"><h1 className="text-[26px] font-semibold">{own ? "Life" : "What the town knows"}</h1><span className="text-[13px] text-drift">{evs.length} things on the record</span></div><div className="overflow-auto"><Strip items={evs.slice(0, 60).map((e) => ({ t: `Day ${dayOf(e.t)} ${hhmm(e.t)}`, changed: e.importance >= 0.45, text: e.text.length > 220 ? e.text.slice(0, 218) + "…" : e.text }))} /></div></Card>
         <div className="flex flex-col gap-4">
+          <Card><Label>Observed routines</Label><p className="text-sm text-ink2">Purchases recorded by the town, not inferred thoughts.</p>
+            {(a.observedPurchases ?? []).slice(-4).map(r=><div key={`${r.place}:${r.item}`} className="border-t border-ink/10 pt-3 text-sm"><b>{r.item} · {r.place}</b><p>{r.receipts.length} recent successful {r.receipts.length===1?"purchase":"purchases"}.</p><details><summary className="cursor-pointer text-teal">Show evidence</summary>{r.receipts.slice(-5).map(e=><p key={e.eventId}>Day {dayOf(e.t)}, {hhmm(e.t)} · {e.cost} coins · record #{e.eventId}</p>)}</details></div>)}
+            {!a.observedPurchases?.length && <p className="text-sm text-drift">No purchase evidence recorded yet.</p>}
+          </Card>
+          {own && <Card><Label>Learning from experience</Label><p className="text-sm text-ink2">When food shops are equally near, recent purchase outcomes help choose between them. Availability and affordability still come first. Old experiences lose influence.</p>
+            {((a as OwnerAgent).foodRoutineDecisions ?? []).slice(-3).map((d,i)=><p key={`${d.t}:${i}`} className="text-sm border-l-2 border-teal pl-3">Day {dayOf(d.t)} · From {d.from}, took the road to {d.next} toward {d.preferred}. Without learning, the food routine would have chosen {d.baseline}.</p>)}
+            {((a as OwnerAgent).foodLessons ?? []).slice(-4).map(l=><div key={`${l.place}:${l.item}`} className="text-sm"><b>{l.item} · {l.place}</b><p>{l.evidence.filter(e=>e.success).length} successful, {l.evidence.filter(e=>!e.success).length} unavailable observations in retained evidence.</p></div>)}
+          </Card>}
+
           {own ? <>
             <Card><Label>Money</Label><div className="display text-[26px] font-semibold tabular">{(a as OwnerAgent).coins} <span className="text-sm text-drift font-normal">coins</span></div><div className="text-sm text-ink2">{a.job ? `Works as ${a.job}.` : "No work."} {a.home ? `Sleeps at the ${a.home}, ${(a as OwnerAgent).nightsPaid} nights paid.` : "No roof."}</div></Card>
             <Card><Label>People</Label>{(a as OwnerAgent).people.slice(0, 6).map((p) => <Tide key={p.id} name={p.name} trust={p.trust} word={p.tide} />)}</Card>

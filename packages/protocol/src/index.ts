@@ -148,6 +148,7 @@ export const Perception = z.object({
   town: z.object({ rules: z.array(z.string()), sayings: z.array(z.string()), people: z.array(z.object({ name: z.string(), place: PlaceId, asleep: z.boolean() })).optional() }).optional(),
   time: z.object({ sim: z.string(), day: z.number().int(), minute: z.number().int(), season: z.string(), weather: z.string(), weekday: z.string().optional(), occasion: z.string().optional(), gathering: z.string().optional(), temperature_c: z.number().optional() }),
   self: z.object({
+    learned_food: z.array(z.object({ place: PlaceId, item: z.string(), confidence: z.number(), observations: z.number() })).optional(),
     location: PlaceId,
     needs: z.object({ hunger: z.number(), rest: z.number(), social: z.number() }),
     coins: z.number().int(),

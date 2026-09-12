@@ -200,7 +200,9 @@ Everything is read from the environment, and `.env.example` documents every line
 
 ## Deploy
 
-`deploy/do.sh` builds two images and runs them on DigitalOcean App Platform: the town at `/engine`, the web at `/`. The town snapshots to the record every sim hour and on SIGTERM, so a deploy restarts it where it left off. `deploy/do.sh secrets` pushes the keys from `.env` once.
+A published version from the tag-based release workflow automatically calls `.github/workflows/deploy.yml`. It builds both services from that exact release commit, updates the existing DigitalOcean app without replacing its live secrets or routes, and verifies the version and commit at `/engine/api/health` and `/api/version`. A green release **including its deploy job** confirms production; a GitHub release page alone does not. See [deployment setup](docs/deployment.md).
+
+For manual setup, `deploy/do.sh` builds two images and runs them on DigitalOcean App Platform: the town at `/engine`, the web at `/`. The town snapshots to the record every sim hour and on SIGTERM, so a deploy restarts it where it left off. `deploy/do.sh secrets` pushes the keys from `.env` once.
 
 ## Status
 

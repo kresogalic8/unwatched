@@ -102,6 +102,8 @@ export interface AgentState {
   asleep: boolean;
   arrivedAt: number;
   relationships: Map<AgentId, Relation>;
+  foodLessons?: import("./learning.ts").FoodLesson[];
+  foodRoutineDecisions?: import("./learning.ts").FoodRoutineDecision[];
   memory: Memory[];
   budget: Budget;
   funded: boolean;
@@ -267,6 +269,8 @@ export interface AgentSnapshot {
   state: {
     needs: AgentState["needs"]; location: PlaceId; coins: number; inventory: string[]; job: string | null;
     home: AgentState["home"]; asleep: boolean; budget: Budget; intentions: string[]; rumors: string[];
+    foodLessons?: import("./learning.ts").FoodLesson[];
+  foodRoutineDecisions?: import("./learning.ts").FoodRoutineDecision[];
     deals?: Deal[];
     letters?: OwnerLetter[]; lastConversation?: number; lastThought?: number; instructions?: string; brainKind?: AgentState["brainKind"]; thinkEvery?: number | null; plan?: ActivePlan | null; debts?: { to: AgentId; coins: number; due: number }[]; starving?: number; roofless?: number; convictions?: number; secretsKnown?: Record<AgentId, string>; watch?: string[]; selves?: AgentState["selves"]; lastSelfDay?: number; projects?: AgentState["projects"]; beliefs?: AgentState["beliefs"]; trustLog?: AgentState["trustLog"];
     /** kept so a restart does not ask the same question twice, or forget a letter it promised to answer */

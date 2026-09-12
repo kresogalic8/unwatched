@@ -1,3 +1,4 @@
+import { recordPurchase, foodExperience } from "./learning.ts";
 import { recordBuildingMoment } from "./building-history.ts";
 import type { Action, ActionProposal, AgentId, PlaceId, Perception, TownEvent, EventKind, Persona, Paper, Reflection, DayPlan, Child, Passenger } from "@unwatched/protocol";
 import { OPTIONS_DEFAULT } from "@unwatched/protocol";
@@ -12,6 +13,7 @@ import { salience, wantsConversation, dueThought } from "./salience.ts";
 
 export interface TownOptions {
   seed: number;
+  learning?: boolean;
   brain: Brain;
   /** Letters that go into every new citizen's id, so two islands sharing one record can never mint the same person. */
   idPrefix?: string;
@@ -104,7 +106,9 @@ export class Town {
   private readonly creditBank: ((agent: AgentState, tier: Tier) => boolean) | undefined;
   private readonly conversationPairsThisTick = new Set<string>();
 
+  readonly learning: boolean;
   constructor(opts: TownOptions) {
+    this.learning = opts.learning ?? true;
     this.idPrefix = (opts.idPrefix ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
     this.pack = opts.pack ?? ISLAND; this.places = makePlaces(this.pack); this.jobs = makeJobs(this.pack);
     this.ageOfMajority = opts.ageOfMajority ?? 20;
@@ -175,7 +179,7 @@ export class Town {
       needs: { hunger: 0.3, rest: 0.2, social: 0.4 },
       location: "harbor", coins: o.coins ?? 40, inventory: ["suitcase"], job: null,
       home: { place: "inn", nightsPaid: 3 }, asleep: false, arrivedAt: this.t,
-      relationships: new Map(), memory: [],
+      relationships: new Map(), memory: [], foodLessons: [], foodRoutineDecisions: [],
       budget: { tier1Max: 50, tier2Max: 5, tier1Left: 50, tier2Left: 5, ...o.budget },
       plan: null, lastPlan: null, debts: [], deals: [], hint: null, crossroads: null, ownerLetterDay: 0, heading: null, starving: 0, roofless: 0, convictions: 0, secretsKnown: {}, seek: null, watch: [], selves: [], lastSelfDay: 0, doToday: 0, projects: [], beliefs: [],
       funded: o.funded ?? true, owner: o.owner ?? null, letters: [], intentions: [],
@@ -211,6 +215,7 @@ export class Town {
         coins: sa.state.coins, inventory: [...sa.state.inventory], job: sa.state.job && this.jobs.has(sa.state.job) ? sa.state.job : null,
         home: sa.state.home, asleep: sa.state.asleep, arrivedAt: sa.arrivedAt,
         relationships: new Map(sa.relationships.map((r) => [r.other, { trust: r.trust, affection: r.affection, lastSeen: r.lastSeen, opinion: r.opinion, lastPlace: (r as { lastPlace?: string | null }).lastPlace ?? null }])),
+        foodLessons: structuredClone(sa.state.foodLessons ?? []), foodRoutineDecisions: structuredClone(sa.state.foodRoutineDecisions ?? []),
         memory: [...sa.memory].sort((x, y) => x.t - y.t),
         budget: { ...sa.state.budget }, funded: sa.funded, owner: sa.owner, letters: sa.state.letters ?? [], intentions: [...sa.state.intentions],
         deals: [...(sa.state.deals ?? [])], lastConversation: sa.state.lastConversation ?? -999, lastThought: sa.state.lastThought ?? -999, heard: [], workedToday: false, rumors: [...sa.state.rumors], appearance: sa.appearance, instructions: sa.state.instructions ?? "", brainKind: sa.state.brainKind ?? "hosted", thinkEvery: sa.state.thinkEvery ?? null, plan: sa.state.plan ?? null, lastPlan: sa.state.lastPlan ?? null, debts: sa.state.debts ?? [], hint: null, crossroads: null, ownerLetterDay: 0, heading: null, starving: sa.state.starving ?? 0, roofless: sa.state.roofless ?? 0, convictions: sa.state.convictions ?? 0, secretsKnown: { ...(sa.state.secretsKnown ?? {}) }, seek: null, watch: [...(sa.state.watch ?? [])], selves: [...(sa.state.selves ?? [])], lastSelfDay: sa.state.lastSelfDay ?? 0, doToday: 0, projects: [...(sa.state.projects ?? [])], beliefs: [...(sa.state.beliefs ?? [])],
@@ -237,7 +242,7 @@ export class Town {
       jobs: [...this.jobs.values()].filter((j) => this.places.get(j.place)?.owner).map(({ holders: _h, ...j }) => j),
       agents: [...this.agents.values()].map((a): AgentSnapshot => ({
         id: a.id, persona: a.persona, owner: a.owner, funded: a.funded, appearance: a.appearance, arrivedAt: a.arrivedAt,
-        state: { deals: a.deals.filter((d) => d.state === "offered" || d.state === "open"), needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, brainKind: a.brainKind, thinkEvery: a.thinkEvery, plan: a.plan, lastPlan: a.lastPlan, replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId, debts: a.debts, starving: a.starving, roofless: a.roofless, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60) },
+        state: { foodRoutineDecisions: structuredClone(a.foodRoutineDecisions ?? []), foodLessons: structuredClone(a.foodLessons ?? []), deals: a.deals.filter((d) => d.state === "offered" || d.state === "open"), needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, brainKind: a.brainKind, thinkEvery: a.thinkEvery, plan: a.plan, lastPlan: a.lastPlan, replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId, debts: a.debts, starving: a.starving, roofless: a.roofless, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60) },
         relationships: [...a.relationships.entries()].map(([other, r]) => ({ other, ...r })),
         memory: a.memory,
       })),
@@ -309,7 +314,8 @@ export class Town {
       const s = this.brain.name === "none" || this.paused ? null : salience(a, { hour: this.hour, t: this.t, day: this.day, nearby, jobsOpenHere: this.openJobsAt(here.id).length, plotHere: here.kind === "plot" && !here.site, watched: this.watched(a, here, nearby), debtDue: a.debtThoughtDay !== this.day && this.debtDueToday(a), gathering });
       if (s && this.spend(a, s.tier)) { thinkers.push({ a, tier: s.tier, why: s.why }); this.noteThought(a, s.why, gathering); }
       else {
-        let act = habit(a, this.habitView());
+        const choices: {baseline:string;preferred:string}[]=[];
+        let act = habit(a, {...this.habitView(), onFoodChoice:(baseline,preferred)=>choices.push({baseline,preferred})});
         // whoever has come to a gathering waits for it to begin, instead of wandering off
         if (act.kind !== "sleep" && act.kind !== "use" && this.pendingGatheringAt(a.location)) act = { kind: "wait" };
         if (a.heading && a.heading !== a.location && act.kind !== "sleep" && act.kind !== "use" && this.places.has(a.heading) && !this.pendingGatheringAt(a.location)) { const nx = this.path(a.location, a.heading); if (nx) act = { kind: "move", to: nx }; else a.heading = null; } // a gathering about to begin here outranks wherever they were going
@@ -319,7 +325,12 @@ export class Town {
         const onShift = a.job && (() => { const j = this.jobs.get(a.job!); return !!j && this.hour >= j.hours[0] && this.hour < j.hours[1]; })();
         const pulled = step?.place && step.place !== a.location && this.places.has(step.place) && this.hour < step.hour + 3 && this.hour < 21 && a.needs.hunger < 0.6 && !onShift;
         if ((act.kind === "wait" || pulled) && step?.place && step.place !== a.location && this.places.has(step.place)) { const next = this.path(a.location, step.place); if (next) act = { kind: "move", to: next }; }
-        this.apply(a, act, "habit");
+        const choice=choices[0], from=a.location;
+        const learnedStep=choice && act.kind === "move" && act.to === this.path(from,choice.preferred) && act.to !== this.path(from,choice.baseline);
+        if(this.apply(a, act, "habit") && learnedStep && choice && act.kind === "move") {
+          (a.foodRoutineDecisions ??= []).push({t:this.t,from,next:act.to,...choice});
+          a.foodRoutineDecisions=a.foodRoutineDecisions.slice(-20);
+        }
       }
       this.progressPlan(a);
     }
@@ -377,6 +388,7 @@ export class Town {
         ...(this.mayor === a.id ? { mayor: true } : {}), ...(a.convictions ? { convictions: a.convictions } : {}),
         ...(a.watch.length ? { watching: [...a.watch] } : {}),
         ...(a.projects.some((x) => !x.done) ? { projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, progress: x.progress, since_day: x.since, ...(x.construction ? { construction: { ...x.construction } } : {}) })) } : {}),
+        ...(this.learning && a.foodLessons?.length ? { learned_food: a.foodLessons.map(l => ({ place: l.place, item: l.item, ...foodExperience(a.foodLessons, l.place, l.item, this.t) })) } : {}),
         ...(a.beliefs.length ? { believes: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })) } : {}),
         ...(Object.keys(a.secretsKnown).length ? { knows: Object.entries(a.secretsKnown).map(([id, secret]) => ({ who: this.agents.get(id)?.persona.name ?? id, secret })) } : {}), },
       nearby,
@@ -447,6 +459,8 @@ export class Town {
     const here = this.places.get(a.location)!;
     const verdict = validate(a, action, { places: this.places, jobs: this.jobs, agents: this.agents, hour: this.hour, weekday: this.weekday, day: this.day, mayor: this.mayor, works: this.works, feast: !!this.feastToday(), residentsOf: (p: Place) => this.residentsOf(p), bedPrice: (p: Place) => this.bedPrice(p), knownItem: (item: string) => this.knownItem(item), curfew: this.rules.find((r): r is Extract<Rule, { kind: "curfew" }> => r.kind === "curfew")?.hour ?? null, buyPrice: (p, i) => this.buyPrice(p, i), food: (i) => this.isFood(i), weather: this.weather, boatHeld: this.boatHeld, laws: this.laws, price: (p, i) => this.price(p, i), path: (f, t) => this.path(f, t) });
     if (!verdict.ok) {
+      if (this.learning && action.kind === "trade" && action.buy && this.isFood(action.buy) && (!action.with || action.with === here.id) && verdict.reason === "not for sale here")
+        recordPurchase(a.foodLessons ??= [], here.id, action.buy, { t: this.t, success: false, cost: 0 });
       if (source !== "habit") this.emit("action.rejected", [a.id], here.id, `${a.persona.name} tried to ${action.kind} but ${verdict.reason}.`, 0.05, { action, source });
       return false;
     }
@@ -559,7 +573,7 @@ export class Town {
           if (action.sell) { a.inventory.splice(a.inventory.indexOf(action.sell), 1); b.inventory.push(action.sell); }
           this.emit("agent.trade", [a.id, b.id], here.id, `${name} traded with ${b.persona.name}.`, 0.3);
         } else {
-          if (action.buy) { const o = here.owner ? this.agents.get(here.owner) : null; const own = !!o && o.id === a.id; const p = own ? 0 : this.price(here, action.buy)!; a.coins -= p; a.inventory.push(action.buy); if (here.stock[action.buy] !== undefined) here.stock[action.buy]! -= 1; if (o && !own) o.coins += p; else if (!o) here.treasury += p; this.emit("agent.trade", [a.id], here.id, `${name} bought ${action.buy} for ${p}${o && o.id !== a.id ? ` at ${here.name}` : ""}.`, 0.02); }
+          if (action.buy) { const o = here.owner ? this.agents.get(here.owner) : null; const own = !!o && o.id === a.id; const p = own ? 0 : this.price(here, action.buy)!; a.coins -= p; a.inventory.push(action.buy); if (here.stock[action.buy] !== undefined) here.stock[action.buy]! -= 1; if (o && !own) o.coins += p; else if (!o) here.treasury += p; const receipt = this.emit("agent.trade", [a.id], here.id, `${name} bought ${action.buy} for ${p}${o && o.id !== a.id ? ` at ${here.name}` : ""}.`, 0.02); if (this.learning && this.isFood(action.buy)) recordPurchase(a.foodLessons ??= [], here.id, action.buy, { t: this.t, success: true, cost: p, eventId: receipt.id }); }
           if (action.sell) {
             // the counter buys at half the shelf, out of its own till, and the thing goes on the shelf
             const bp = this.buyPrice(here, action.sell) ?? 1; const o = here.owner ? this.agents.get(here.owner) : null;
@@ -1624,7 +1638,7 @@ export class Town {
     let cur = to; while (prev.get(cur) !== from) cur = prev.get(cur)!;
     return cur;
   }
-  private habitView() { return { places: this.places, jobs: this.jobs, hour: this.hour, weather: this.weather, season: this.season, weekday: this.weekday, crowd: (p: string) => this.crowd(p), price: (pl: Place, i: string) => this.price(pl, i), path: (f: string, t: string) => this.path(f, t), hops: (f: string, t: string) => this.hops(f, t) }; }
+  private habitView() { return { now: this.t, learning: this.learning, places: this.places, jobs: this.jobs, hour: this.hour, weather: this.weather, season: this.season, weekday: this.weekday, crowd: (p: string) => this.crowd(p), price: (pl: Place, i: string) => this.price(pl, i), path: (f: string, t: string) => this.path(f, t), hops: (f: string, t: string) => this.hops(f, t) }; }
   rel(a: AgentState, other: AgentId) {
     let r = a.relationships.get(other);
     if (!r) { r = { trust: 0.3, affection: 0.3, lastSeen: this.t, opinion: "", lastPlace: null }; a.relationships.set(other, r); }
