@@ -29,10 +29,10 @@ export default function Gate() {
     } else { await signInDev(email || "visitor"); r.push(nextPath() === "/digest" ? "/board" : nextPath()); }
   }
   return (
-    <main className="min-h-screen grid p-6 gap-6" style={{ gridTemplateColumns: "minmax(0,1fr) 560px" }}>
-      <div className="rounded-[28px] overflow-hidden relative bg-glass"><img src="/world-street.jpg" alt="" className="w-full h-full object-cover" /><div className="absolute left-7 top-7 bg-shell rounded-full py-2 pl-2.5 pr-4"><Wordmark size={20} /></div></div>
-      <div className="bg-shell rounded-[28px] px-16 py-14 flex flex-col justify-center gap-6">
-        <div className="flex flex-col gap-2"><Label>Harbor office</Label><h1 className="text-[38px] font-bold">Sign in, or buy a ticket.</h1><p className="text-ink2">{hasSupabase ? "No passwords on the island. We send a letter to your inbox with a link that opens the gate." : "The gate is open while the town runs on this machine. Give a name and it is yours on this device."}</p></div>
+    <main className="min-h-screen grid p-3 sm:p-6 gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_560px]">
+      <div className="rounded-[28px] overflow-hidden relative bg-glass min-h-[180px] lg:min-h-0"><img src="/world-street.jpg" alt="" className="w-full h-full object-cover" /><div className="absolute left-4 top-4 sm:left-7 sm:top-7 bg-shell rounded-full py-2 pl-2.5 pr-4"><Wordmark size={20} /></div></div>
+      <div className="bg-shell rounded-[28px] px-6 py-8 sm:px-16 sm:py-14 flex flex-col justify-center gap-6">
+        <div className="flex flex-col gap-2"><Label>Harbor office</Label><h1 className="text-[30px] sm:text-[38px] font-bold">Sign in, or buy a ticket.</h1><p className="text-ink2">{hasSupabase ? "No passwords on the island. We send a letter to your inbox with a link that opens the gate." : "The gate is open while the town runs on this machine. Give a name and it is yours on this device."}</p></div>
         {closed && <div className="bg-glass rounded-card p-5"><div className="font-bold">The harbor office is closed for the moment.</div><div className="text-ink2 text-[15px]">This copy of the site was built without its sign-in keys, so the island cannot take passengers until it is rebuilt. If you run it: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY and deploy again.</div></div>}
         {!closed && (sent ? <div className="bg-glass rounded-card p-5"><div className="font-bold">The letter is on its way.</div><div className="text-ink2 text-[15px]">Open it within fifteen minutes and the gate opens on its own.</div></div> : (
           <form onSubmit={go} className="flex flex-col gap-4">

@@ -53,7 +53,7 @@ export function Wordmark({ size = 21, dark = false }: { size?: number; dark?: bo
   return <Link href="/" className="flex items-center gap-2.5"><Logo size={size * 1.4} dark={dark} /><span className="display" style={{ fontSize: size * 1.05, fontWeight: 600, letterSpacing: "-0.03em", whiteSpace: "nowrap", color: dark ? "#F7F6F3" : "var(--color-kelp)" }}>unwatched</span></Link>;
 }
 
-const TABS: [string, string, IconName][] = [["Digest", "/digest", "digest"], ["Letters", "/letters", "letter"], ["Town", "/town", "town"], ["Gazette", "/gazette", "gazette"], ["Library", "/library", "book"]];
+const TABS: [string, string, IconName][] = [["Digest", "/digest", "digest"], ["Letters", "/letters", "letter"], ["People", "/people", "people"], ["Town", "/town", "town"], ["Gazette", "/gazette", "gazette"], ["Library", "/library", "book"]];
 export function TopBar() {
   const path = usePathname();
   const [c, setC] = useState<Clock | null>(null);
@@ -88,6 +88,7 @@ export function TopBar() {
 export function Page({ children }: { children: React.ReactNode }) {
   return <><main className="max-w-[1440px] mx-auto px-4 sm:px-8 pt-3 sm:pt-5 pb-24 lg:pb-6 flex flex-col gap-4 sm:gap-5 min-h-screen"><TopBar />{children}</main><MobileTabs /></>;
 }
-export function Strip({ items }: { items: { t: string; changed: boolean; text: React.ReactNode }[] }) {
-  return <div className="flex flex-col">{items.map((it, i) => <div key={i} className="grid items-center gap-x-3 py-2.5 rise" style={{ gridTemplateColumns: "90px 16px minmax(0,1fr)", "--i": i } as React.CSSProperties}><div className="text-[13px] text-drift tabular">{it.t}</div><div className="justify-self-center"><Dot changed={it.changed} /></div><div className={`text-[15px] ${it.changed ? "font-semibold" : ""}`}>{it.text}</div></div>)}</div>;
+/** A timeline. A row with `share` carries a quiet link to that moment's own page, for passing on. */
+export function Strip({ items }: { items: { t: string; changed: boolean; text: React.ReactNode; share?: string; key?: string | number }[] }) {
+  return <div className="flex flex-col">{items.map((it, i) => <div key={it.key ?? i} className="grid items-center gap-x-3 py-2.5 rise" style={{ gridTemplateColumns: "90px 16px minmax(0,1fr) auto", "--i": i } as React.CSSProperties}><div className="text-[13px] text-drift tabular">{it.t}</div><div className="justify-self-center"><Dot changed={it.changed} /></div><div className={`text-[15px] ${it.changed ? "font-semibold" : ""}`}>{it.text}</div><div>{it.share ? <Link href={it.share} className="text-drift hover:text-teal inline-flex items-center gap-1 text-[12px] font-bold" title="This moment, on its own page"><Icon name="share" size={16} /><span className="hidden sm:inline">Share</span></Link> : null}</div></div>)}</div>;
 }

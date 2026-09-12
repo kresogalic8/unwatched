@@ -1,10 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Page, Card, Label, Button, LinkButton, Chip } from "@/components/ui";
 import { useMyAgent } from "@/lib/useAgent";
 import { signOut, rememberAgent, supabase, hasSupabase } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { api, type Notifications } from "@/lib/api";
+
+/** One switch, teal when on. */
+function Switch({ on, onChange, label }: { on: boolean; onChange: () => void; label: string }) {
+  return <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onChange} className="relative w-11 h-6 rounded-full shrink-0 transition-colors" style={{ background: on ? "#1F5F5B" : "#D9D5C8" }}><span className="absolute top-0.5 w-5 h-5 rounded-full bg-shell transition-all" style={{ left: on ? 22 : 2 }} /></button>;
+}
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(30,42,43,0.35)" }} onClick={onClose} role="dialog" aria-modal="true" aria-label={title}><div className="bg-shell rounded-card p-6 w-full max-w-[460px] flex flex-col gap-3" style={{ boxShadow: "0 24px 60px rgba(30,42,43,0.18)" }} onClick={(e) => e.stopPropagation()}><div className="display text-xl font-semibold">{title}</div>{children}</div></div>;
@@ -14,6 +19,11 @@ export default function Account() {
   const r = useRouter(); const { mine, reason } = useMyAgent();
   const [dlg, setDlg] = useState<null | "leave" | "signout" | "email" | "delete">(null);
   const [leaving, setLeaving] = useState<string | null>(null); const [note, setNote] = useState(""); const [email, setEmail] = useState(""); const [confirm, setConfirm] = useState(""); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<string | null>(null);
+  // what the island sends by mail: on unless turned off here
+  const [notif, setNotif] = useState<Notifications | null>(null); const [notifMsg, setNotifMsg] = useState<string | null>(null);
+  useEffect(() => { if (reason === "ok" || reason === "none") void api<Notifications>("/api/me/notifications").then(setNotif).catch(() => {}); }, [reason]);
+  async function toggle(k: "notifyDigest" | "notifyLetters") { if (!notif) return; const was = notif; setNotif({ ...notif, [k]: !notif[k] }); setNotifMsg(null); try { setNotif(await api<Notifications>("/api/me/notifications", { method: "PUT", body: JSON.stringify({ [k]: !was[k] }) })); } catch (e) { setNotif(was); setNotifMsg((e as Error).message); } }
+  const first = mine[0]?.name.split(" ")[0] ?? "your agent";
   async function leave() { const a = mine.find((x) => x.id === leaving); if (!a) return; setBusy(true); try { const res = await api<{ name: string; at: string }>(`/api/agents/${a.id}/leave`, { method: "POST", body: JSON.stringify({ note }) }); r.push(`/farewell?id=${a.id}&name=${encodeURIComponent(res.name)}&at=${encodeURIComponent(res.at)}`); } catch (e) { setMsg((e as Error).message); setBusy(false); } }
   async function signOutEverywhere() { setBusy(true); if (supabase) await supabase.auth.signOut({ scope: "global" }); await signOut(); r.push("/"); }
   async function changeEmail() { if (!supabase) return; setBusy(true); const { error } = await supabase.auth.updateUser({ email }); setBusy(false); setMsg(error ? "That address did not work. " + error.message : "A letter is on its way to the new address. The change happens when you open it."); }
@@ -31,7 +41,13 @@ export default function Account() {
         </Card>
         <div className="flex flex-col gap-5">
           <Card><div className="flex justify-between items-baseline"><h2 className="text-[22px] font-semibold">Credits and plan</h2><a href="/account/credits" className="text-[13px] font-bold text-teal">Buy credits, change plan</a></div><div className="grid grid-cols-3 gap-3">{mine[0] ? [[mine[0].budget.tier1Left, "routine thoughts left today"], [mine[0].budget.tier2Left, "decisions with stakes left"], [mine[0].memories.length, "memories on file"]].map(([v, l]) => <div key={String(l)}><div className="display text-[28px] font-semibold tabular">{v}</div><div className="text-xs text-drift">{l}</div></div>) : null}</div></Card>
-          <Card className="grow"><h2 className="text-[22px] font-semibold">Letters and notifications</h2>{[["When an agent writes to you", "In the app"], ["Daily digest", "When you open it"], ["Who thinks", mine[0] ? (mine[0] as unknown as { brainKind?: string }).brainKind === "own_key" ? "Your own key" : (mine[0] as unknown as { brainKind?: string }).brainKind === "own_brain" ? "Your own brain" : "The hosted mind" : "No agent yet"]].map(([k, v]) => <div key={k} className="flex justify-between items-center py-3 border-b border-line"><div><div className="text-[13px] text-drift font-bold">{k}</div><div className="text-[15px]">{v}</div></div>{k === "Who thinks" ? <a href="/account/brain" className="text-[13px] font-bold text-teal">Change</a> : <span className="text-[13px] font-bold text-drift">Soon</span>}</div>)}</Card>
+          <Card className="grow"><h2 className="text-[22px] font-semibold">Letters and notifications</h2>
+            <div className="flex justify-between items-center gap-3 py-3 border-b border-line"><div><div className="text-[13px] text-drift font-bold">When {first} writes to you</div><div className="text-[15px]">{notif?.notifyLetters ? (notif.email ? `By email to ${notif.email}, and in the app` : "In the app; no email on file") : "In the app only"}</div></div>{notif ? <Switch on={notif.notifyLetters} onChange={() => toggle("notifyLetters")} label="Email me when my agent writes" /> : <span className="text-[13px] text-drift">…</span>}</div>
+            <div className="flex justify-between items-center gap-3 py-3 border-b border-line"><div><div className="text-[13px] text-drift font-bold">Daily digest</div><div className="text-[15px]">{notif?.notifyDigest ? (notif.email ? "At seven each island morning, by email" : "When you open it; no email on file") : "When you open it"}</div></div>{notif ? <Switch on={notif.notifyDigest} onChange={() => toggle("notifyDigest")} label="Email me the morning digest" /> : <span className="text-[13px] text-drift">…</span>}</div>
+            <div className="flex justify-between items-center py-3 border-b border-line"><div><div className="text-[13px] text-drift font-bold">Who thinks</div><div className="text-[15px]">{mine[0] ? (mine[0] as unknown as { brainKind?: string }).brainKind === "own_key" ? "Your own key" : (mine[0] as unknown as { brainKind?: string }).brainKind === "own_brain" ? "Your own brain" : "The hosted mind" : "No agent yet"}</div></div><a href="/account/brain" className="text-[13px] font-bold text-teal">Change</a></div>
+            {notif && !notif.mail && <p className="text-[13px] text-drift">This island sends no mail yet; the switches are kept for when it does.</p>}
+            {notifMsg && <p className="text-[13px] text-coral">{notifMsg}</p>}
+          </Card>
         </div>
       </div>
       {dlg === "leave" && <Modal title="Send someone away?" onClose={() => setDlg(null)}><select value={leaving ?? ""} onChange={(e) => setLeaving(e.target.value)} className="h-11 rounded-full bg-sand px-4">{mine.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select><p className="text-sm text-ink2">Once they board, they do not come back. Their book is yours. The Gazette prints a farewell.</p><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="A line for the record, optional" className="h-11 rounded-full bg-sand px-4 text-sm" />{msg && <p className="text-sm text-coral">{msg}</p>}<div className="flex gap-2 justify-end"><Button kind="tertiary" size={36} onClick={() => setDlg(null)}>Keep them here</Button><Button kind="leaving" size={36} disabled={busy} onClick={leave}>Put them on the boat</Button></div></Modal>}

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Town, AgentState, TownSnapshot, AgentSnapshot } from "@unwatched/engine";
 import { compress } from "@unwatched/engine";
 import type { TownEvent, Paper } from "@unwatched/protocol";
-import type { LifeRow, BrainRow, Wallet, TownStore } from "./index.ts";
+import type { LifeRow, BrainRow, Wallet, TownStore, OwnerPrefs, OwnerRead } from "./index.ts";
 
 /** The record's shape, whichever thing keeps it. Both the Supabase store and the file store answer to this. */
 export type Store = Pick<TownStore, keyof TownStore>;
@@ -23,6 +23,8 @@ interface Data {
   wallets: Wallet[];
   ledger: { owner_id: string; delta: number; reason: string; ref: string | null; at: string }[];
   instructions: Record<string, string>;
+  prefs?: OwnerPrefs[];
+  reads?: OwnerRead[];
 }
 const empty = (): Data => ({ town: null, agents: [], events: [], memories: [], relationships: [], letters: [], papers: [], laws: [], brains: [], wallets: [], ledger: [], instructions: {} });
 
@@ -72,7 +74,7 @@ export class FileStore {
   async markLeft(agentId: string, t: number): Promise<void> { const r = this.d.agents.find((a) => a.id === agentId); if (r) { r.left_t = t; this.dirty = true; } }
   async saveInstructions(agentId: string, text: string): Promise<void> { this.d.instructions[agentId] = text; this.dirty = true; }
   async lifeOf(agentId: string) { return { events: this.d.events.filter((e) => e.actors.includes(agentId)), memories: this.d.memories.filter((m) => m.agent_id === agentId).map(({ t, kind, text, importance }) => ({ t, kind, text, importance })), letters: this.d.letters.filter((l) => l.agent_id === agentId).map(({ direction, text, t }) => ({ direction, text, t })) }; }
-  async deleteOwner(ownerId: string): Promise<void> { for (const a of this.d.agents) if (a.owner_id === ownerId) a.owner_id = null; this.d.wallets = this.d.wallets.filter((w) => w.ownerId !== ownerId); this.d.letters = this.d.letters.filter((l) => l.owner_id !== ownerId); this.save(); }
+  async deleteOwner(ownerId: string): Promise<void> { for (const a of this.d.agents) if (a.owner_id === ownerId) a.owner_id = null; this.d.wallets = this.d.wallets.filter((w) => w.ownerId !== ownerId); this.d.letters = this.d.letters.filter((l) => l.owner_id !== ownerId); this.d.prefs = (this.d.prefs ?? []).filter((p) => p.ownerId !== ownerId); this.d.reads = (this.d.reads ?? []).filter((r) => r.ownerId !== ownerId); this.save(); }
   async loadBrains(): Promise<BrainRow[]> { return this.d.brains; }
   async saveBrain(row: BrainRow): Promise<void> { this.d.brains = [...this.d.brains.filter((b) => b.agent_id !== row.agent_id), row]; this.save(); }
   async wallet(ownerId: string): Promise<Wallet> { return this.d.wallets.find((w) => w.ownerId === ownerId) ?? { ownerId, plan: "none", credits: 0, stripeCustomer: null }; }
@@ -88,8 +90,14 @@ export class FileStore {
   async lives(): Promise<LifeRow[]> { return [...(this.d.lives ?? [])].sort((x, y) => y.leftDay - x.leftDay); }
   async life(agentId: string): Promise<LifeRow | null> { return (this.d.lives ?? []).find((l) => l.agentId === agentId) ?? null; }
   async savePaper(paper: Paper): Promise<void> { this.d.papers = [...this.d.papers.filter((p) => p.edition !== paper.edition), paper].slice(-14); this.save(); }
-  async saveLetter(agentId: string, ownerId: string | null, direction: "to_agent" | "to_owner", text: string, t: number): Promise<void> { this.d.letters.push({ id: this.d.letters.length + 1, agent_id: agentId, owner_id: ownerId, direction, text, t, read_at: direction === "to_agent" ? null : t }); this.save(); }
+  async saveLetter(agentId: string, ownerId: string | null, direction: "to_agent" | "to_owner", text: string, t: number, readAt: number | null = null): Promise<void> { this.d.letters.push({ id: this.d.letters.length + 1, agent_id: agentId, owner_id: ownerId, direction, text, t, read_at: readAt ?? (direction === "to_agent" ? null : t) }); this.save(); }
   async undeliveredLetters() { return this.d.letters.filter((l) => l.direction === "to_agent" && l.read_at === null).map(({ id, agent_id, text }) => ({ id, agent_id, text })); }
   async markDelivered(ids: number[], t: number): Promise<void> { for (const l of this.d.letters) if (ids.includes(l.id)) l.read_at = t; this.dirty = true; }
+  async ownerPrefs(ownerId: string): Promise<OwnerPrefs> { return (this.d.prefs ?? []).find((p) => p.ownerId === ownerId) ?? { ownerId, notifyDigest: true, notifyLetters: true, lastMailedDay: null }; }
+  async saveOwnerPrefs(p: OwnerPrefs): Promise<void> { this.d.prefs = [...(this.d.prefs ?? []).filter((x) => x.ownerId !== p.ownerId), p]; this.save(); }
+  /** A dev name has no inbox. UW_DEV_EMAILS="mira=mira@example.com,..." gives one locally, for trying the morning mail. */
+  async ownerEmail(ownerId: string): Promise<string | null> { const m = /(?:^|,)\s*([^=,]+)=([^,]+)/g; for (const [, k, v] of (process.env.UW_DEV_EMAILS ?? "").matchAll(m)) if (k!.trim() === ownerId) return v!.trim(); return null; }
+  async ownerRead(ownerId: string, agentId: string): Promise<OwnerRead> { return (this.d.reads ?? []).find((r) => r.ownerId === ownerId && r.agentId === agentId) ?? { ownerId, agentId, lastDigestT: null, lastLetterMailDay: null }; }
+  async saveOwnerRead(r: OwnerRead): Promise<void> { this.d.reads = [...(this.d.reads ?? []).filter((x) => !(x.ownerId === r.ownerId && x.agentId === r.agentId)), r]; this.save(); }
   async pendingArrivals() { return this.d.agents.filter((a) => a.arrived_t === null).map((a) => ({ id: a.id, owner_id: a.owner_id, name: a.name, persona: a.persona, appearance: a.appearance, brain: a.brain })); }
 }
