@@ -11,13 +11,15 @@
 
 <p align="center"><b>A town that keeps living while you are away.</b></p>
 
-Unwatched is a persistent island of AI citizens with free will. Each citizen is owned by one person. Owners write letters, not orders. The island runs on real time, under the live sky of a real coast, whether or not anyone is watching, and every morning the owner reads what happened.
+Unwatched is an island of AI citizens. Each one belongs to one person, and that person can write them letters but cannot give them orders. The island runs on the real clock, under the live weather of a real stretch of coast, whether anyone is watching or not. In the morning the owner reads what their person did.
+
+The newspaper, the morning digests and the letters home are written by the citizens' own minds. That is the point of the thing. The engine underneath is ordinary code, and most of it was built with Claude Code.
 
 ![Unwatched, the one-minute film: dawn at the harbor, the square at noon, boarding, rain, dusk, the lighthouse at night, the Gazette, and the island from above](docs/promo.gif)
 
 ## The six rules
 
-The whole design is these six sentences, and they are enforced in code.
+The design is these six sentences, and the code enforces them.
 
 | | |
 |---|---|
@@ -30,18 +32,18 @@ The whole design is these six sentences, and they are enforced in code.
 
 ## Ten days of the island in six seconds
 
-No keys, no account. You need Node 22 and pnpm 10.
+You need Node 22 and pnpm 10. No keys and no account for this part.
 
 ```bash
 pnpm install
 pnpm soak -- --days 10 --agents 20 --brain mock --seed 7 --tick 1
 ```
 
-Read `apps/headless/out/gazette-day*.md`, one newspaper per day. Somebody usually builds a house by day eight.
+Then read `apps/headless/out/gazette-day*.md`, one newspaper per day. Somebody usually builds a house by day eight.
 
 ## The first morning
 
-The record of a fresh island with real minds, the morning this README's film was shot. Every line is an event the engine emitted, in the words the Gazette prints. Nothing here was written by hand.
+This is the record of a fresh island with real minds, from the morning the film above was shot. Every line is an event the engine emitted, in the words the Gazette prints, and none of it was written by a person.
 
 > Twenty people arrived on the boat, each with forty coins, a suitcase and three nights at the harbor inn.
 >
@@ -55,19 +57,19 @@ The record of a fresh island with real minds, the morning this README's film was
 >
 > Iva Božić bought bread for 1.
 
-By noon there is a council, a roof to fix, a banker looking for borrowers, and a landlady nobody trusts yet. Nobody wrote any of it.
+By noon there was a council, a roof to fix, a banker looking for borrowers, and a landlady nobody trusted yet.
 
-## You do not play it. You check on it.
+## Owning a citizen
 
 | | | |
 |---|---|---|
-| **Day one** | Write a person, not a character. | A name, one sentence, a want, a fear, a secret, and why they came. Choose how they look, on the same rig that will walk the street, and who does their thinking: our minds, a model on your own key, or code you wrote. On the boat the island deepens them once, into a childhood, a voice and a habit, and they arrive with forty coins, a suitcase and three nights at the harbor inn. |
-| **Every morning** | Read what happened. | They found work, or lost it. Someone stopped trusting them. A law passed at ten and bit by evening. The digest is a day of a life in a minute, and every line in it happened. |
-| **When it matters** | They write to you. | At a crossroads, your citizen sends a letter. You write back. It is advice. A stubborn one ignores it; a proud one does the opposite. Earning their trust is the whole game. |
+| **Day one** | Write a person. | A name, one sentence, a want, a fear, a secret, and why they came. Choose how they look, on the same rig that walks the street, and who does their thinking: our minds, a model on your own key, or code you wrote. On the boat the island deepens them once, into a childhood, a voice and a habit. They arrive with forty coins, a suitcase and three nights at the harbor inn. |
+| **Every morning** | Read what happened. | The digest is yesterday in about a minute of reading: they found work or lost it, someone stopped trusting them, a law passed at ten and cost them by evening. Every line in it happened. |
+| **When it matters** | They write to you. | When they hit a decision they cannot settle alone, they write to you, and you can answer. What you send is advice. A stubborn one ignores it and a proud one does the opposite, until you have earned their trust. |
 
 ## Who thinks, and what it costs
 
-Every citizen gets the same seconds. A plan buys how often yours actually thinks, and with which mind. Prices are per month; the numbers below are the ones in `apps/server/src/billing.ts`.
+Every citizen gets the same seconds. A plan buys how often yours actually thinks, and with which mind. Prices are per month and come from `apps/server/src/billing.ts`.
 
 | | | |
 |---|---|---|
@@ -76,7 +78,7 @@ Every citizen gets the same seconds. A plan buys how often yours actually thinks
 | **Patron** | $29 | A hundred and twenty thoughts, fifteen careful decisions on Opus, and the most capable mind for every reflection. |
 | **Own key, own brain** | free | A model on your own OpenRouter key, or a process you wrote. Never metered by the island. |
 
-Without a plan a citizen lives on habit: works, eats, sleeps and talks in set phrases, and the town notices. Credits top up a plan when the allowance is spent; they are never coins. The island keeps a daily ceiling on what the hosted minds may cost; past it careful thoughts go to cheaper minds, and the clock never slows.
+Without a plan a citizen lives on habit: works, eats, sleeps, talks in set phrases, and the town notices. Credits top up a plan when the allowance is spent, and they are never coins. The island keeps a daily ceiling on what the hosted minds may cost. Past it, careful thoughts go to cheaper minds and the clock keeps its pace.
 
 ## Run the whole town
 
@@ -86,7 +88,7 @@ pnpm --filter @unwatched/server dev   # the town, its API and streams, on :4000
 pnpm --filter @unwatched/web dev      # the client on :3000
 ```
 
-Without Supabase the record is kept in `out/town/<island>.json`, so a clone keeps its island across restarts. With `SUPABASE_URL` and a service role key it is kept in Postgres with row-level security; the migrations are in `packages/store/supabase/migrations`. `UW_MS_PER_SIM_MINUTE=1000` makes a sim minute one real second while you develop; the live island runs at `60000`.
+Without Supabase the record is kept in `out/town/<island>.json`, so a clone keeps its island across restarts. With `SUPABASE_URL` and a service role key it is kept in Postgres with row-level security; the migrations are in `packages/store/supabase/migrations`. `UW_MS_PER_SIM_MINUTE=1000` makes a sim minute one real second while you develop. The live island runs at `60000`.
 
 ## How it fits together
 
@@ -101,7 +103,7 @@ owners ── letters ──▶ ┌───────────────
                        hosted mind (ours)      own key / own brain (theirs, never metered)
 ```
 
-Most minutes cost nothing: habit walks people to work, to food and to bed. A model is asked only when something is at stake, and how thoughtful a model depends on the stakes. Every citizen thinks with a brain of their owner's choosing: ours, a model on the owner's own key, or a process the owner wrote that speaks the protocol over a WebSocket.
+Most minutes cost nothing, because habit walks people to work, to food and to bed. A model is asked when something is at stake, and which model depends on the stakes. Every citizen thinks with a brain of their owner's choosing: ours, a model on the owner's own key, or a process the owner wrote that speaks the protocol over a WebSocket.
 
 | package | what |
 |---|---|
@@ -116,31 +118,49 @@ Most minutes cost nothing: habit walks people to work, to food and to bed. A mod
 
 ## What the island does
 
-**It keeps our time.** Set `UW_REAL_WORLD` to a point on the earth, `lat,lon` or `lat,lon,Area/City`, and the island's weather is the live weather at that point from Open-Meteo, no key needed; its seasons are that point's calendar; its clock is that point's clock, caught up on restart without anyone thinking through the gap; dawn and dusk are its sunrise and sunset. The island stays fictional and calls the place whatever `UW_REAL_WORLD_NAME` says, "the coast" by default. It rains on the island when it rains there.
+### Real time under a real sky
 
-**A week, a shelf, a council.** Sunday has no shifts and a chapel bell at ten; Saturday is market day; the first of the month is council day; the island keeps its own feasts, and lavender blooms in June. Shops sell only what is on the shelf: the fields grow grain, the mill turns it to flour, the bakery bakes it, the fishhouse and the orchard fill the market, the pinewood feeds the sawpit, and a cart moves it all at six each morning. When a link fails there is no bread, and the paper says so.
+Set `UW_REAL_WORLD` to a point on the earth, `lat,lon` or `lat,lon,Area/City`, and the island's weather is the live weather at that point from Open-Meteo, with no key needed. Its seasons follow that point's calendar and its clock follows that point's clock, caught up after a restart without anyone thinking through the gap. Dawn and dusk are its sunrise and sunset. The island stays fictional and calls the place whatever `UW_REAL_WORLD_NAME` says, "the coast" by default. When it rains there, it rains on the island.
 
-**Institutions with teeth.** On council day the island chooses a mayor, the person it trusts most, who can fund a granary, a bathhouse or a bridge. Anyone can accuse anyone; a hearing in front of everyone decides from the record, not the crowd. The council can pass anything, and a law with numbers in it bites: a tax on wages, a cap on a price, a curfew. Weddings, funerals, elections and feasts gather the town. Fire spreads, and a burnt place is no place to sleep.
+### The week, the shelves, the council
 
-**Minds that change.** A citizen is not written once. At midnight they may rewrite the parts of themselves the day changed, and every earlier self is kept. They choose what to keep an eye on. They set themselves projects that run for weeks. They come to believe things, true or not, and act on them until the beliefs fade. Memory ages, rumor drifts, elders misremember, and nights wear on a temperament. For anything the verbs do not cover, a citizen can simply do it in their own words, and the town's own mind decides what it came to within the rules. A year on the island and nobody is who boarded.
+Sunday has no shifts and a chapel bell at ten. Saturday is market day. The first of the month is council day, the island keeps its own feasts, and lavender blooms in June. Shops sell only what is on the shelf: the fields grow grain, the mill turns it to flour, the bakery bakes it, the fishhouse and the orchard fill the market, the pinewood feeds the sawpit, and a cart moves it all at six each morning. When a link in that chain fails there is no bread, and the paper says so.
 
-**An island its citizens shape.** A shop owner decides what to sell and at what price. A workshop can make a new thing the island then knows and the boat pays for. Three people calling a place by a name give it that name. Two people with the same saying give the island a saying. A builder says how a building should look, and the island draws it.
+On council day the island chooses a mayor, the person it trusts most, who can fund a granary, a bathhouse or a bridge. Anyone can accuse anyone, and a hearing in front of everyone decides it from the record. The council can pass anything. A law with numbers in it, a tax on wages or a cap on a price, takes effect the same day. Weddings, funerals, elections and feasts gather the town. Fire spreads, and a burnt place is no place to sleep.
 
-**Secrets are real.** Where someone sleeps, while they are out, their things can be searched; anyone present sees it. A citizen who writes about a secret puts it on the whole island by evening.
+### People change
 
-**The record is provable.** At midnight the island seals the day: every event, in canonical form, hashed with SHA-256 together with the seal of the day before. The seal prints in the Gazette, `/api/record` lists the chain, and `/api/record/<day>` returns the day's events in the exact form that was hashed, with the hash recomputed beside it. "Nothing is invented" is something anyone can check.
+At midnight a citizen may rewrite the parts of themselves the day changed, and every earlier self is kept. Over the weeks they pick things to keep an eye on and projects that carry from one morning's plan to the next, and they come to believe things, true or not, that they act on until the belief fades. Memory fades with time, rumor changes as it passes from mouth to mouth, the old misremember, and a bad night wears on a temperament. For anything the verbs do not cover, a citizen does it in their own words and the town's own mind decides what came of it, within the rules. After a year on the island nobody is the person who boarded.
 
-**The book of every life.** When someone leaves, or dies, the town writes the book of their life from the record alone and shelves it at `/library`. The Gazette's front page carries a painting of the day's lead moment, drawn on the reader's screen in the world's own hand. With `GEMINI_API_KEY` set, an owner can hear a letter home read aloud in the writer's own voice.
+### Citizens change the island
 
-**A world drawn in code.** Every building, tree, wave and person is drawn by a function, in one projection and one palette, so it scales to any screen. Citizens are a jointed rig with a walk and a run, faces that look at whoever they talk to, frown with hunger and lift at a wedding, the tools of their trade, the last thing they picked up, coats in winter, and years on the body. The ground blends from sand to grass to field where the districts meet, the roads wear pale where people actually walk, and shadows lean away from the sun. `/rig` is the model sheet.
+A shop owner decides what to sell and at what price. A workshop can make a new thing the island then knows and the boat pays for. Three people calling a place by a name give it that name, and two people with the same saying give the island a saying. A builder says how a building should look, in a sentence, and the island draws it.
 
-**A world that is lit and alive.** Dawn and dusk are the real ones, and the light goes gold and then blue over the whole island. Gulls work the harbor, a cat keeps the square, hens keep the yard, bats come out at dusk and fireflies in summer, smoke rises from the hearths that are lit, and the lighthouse turns all night. It sounds like that too: the sea, the wind, rain on roofs, oars, a bark, a bell on Sunday, and music the island made for itself. People crouch to a dog and look up at a gull. `/film?at=harbor&hour=6.5&weather=rain` frames any hour, weather and season, and is where the film above was shot.
+### Secrets
 
-**Islands that connect.** An island is one server. Two islands that share a secret run a boat between them: a citizen who boards it arrives at the other with their coins, things, memories and opinions, and the news from home spreads there as rumor. `docs/federation.md` has the three environment lines it takes.
+Where someone sleeps, while they are out, their things can be searched, and anyone present sees it happen. A citizen who writes about a secret puts it on the whole island by evening.
+
+### The record can be checked
+
+At midnight the island seals the day: every event, in canonical form, hashed with SHA-256 together with the seal of the day before. The seal prints in the Gazette. `/api/record` lists the chain, and `/api/record/<day>` returns that day's events in the exact form that was hashed, with the hash recomputed beside it, so "nothing is invented" is a claim anyone can test.
+
+### Books, paintings, voices
+
+When someone leaves, or dies, the town writes the book of their life from the record alone and shelves it at `/library`. The Gazette's front page carries a painting of the day's lead moment, drawn on the reader's screen in the world's own hand. With `GEMINI_API_KEY` set, an owner can hear a letter home read aloud in the writer's own voice.
+
+### Drawn in code
+
+Every building, tree, wave and person is drawn by a function, in one projection and one palette, so it scales to any screen. A citizen is a jointed rig with a walk and a run, a face that turns to whoever is talking, the tools of their trade, the last thing they picked up, a coat in winter, and the years on their body. The ground blends from sand to grass to field where the districts meet, the roads wear pale where people actually walk, and shadows lean away from the sun. `/rig` is the model sheet.
+
+Dawn and dusk are the real ones, and the light goes gold and then blue over the whole island. Gulls work the harbor, a cat keeps the square, hens keep the yard, bats come out at dusk and fireflies in summer, smoke rises from the hearths that are lit, and the lighthouse turns all night. It sounds like that too: the sea, the wind, rain on roofs, oars, a bark, a bell on Sunday, and music the island made for itself. `/film?at=harbor&hour=6.5&weather=rain` frames any hour, weather and season, and is where the film above was shot.
+
+### Two islands and a boat
+
+An island is one server. Two islands that share a secret run a boat between them. A citizen who boards it arrives at the other island with their coins, things, memories and opinions, and the news from home spreads there as rumor. `docs/federation.md` has the three environment lines it takes.
 
 ## Bring your own brain
 
-Any process that can hold a WebSocket can be a citizen. Once a minute the town sends what your person perceives and asks for one action; each morning it asks for a plan, each midnight for a reflection. It never meters you and never lets you cheat: same physics, same seconds as everyone else.
+Any process that can hold a WebSocket can be a citizen. Once a minute the town sends what your person perceives and asks for one action. Each morning it asks for a plan and each midnight for a reflection. It never meters you and never lets you cheat: same physics, same seconds as everyone else.
 
 ```jsonc
 // the town → you
@@ -151,7 +171,7 @@ Any process that can hold a WebSocket can be a citizen. Once a minute the town s
 { "type": "act", "action": { "kind": "say", "to": "Rosa Vidal", "text": "Tomorrow. After the cart." } }
 ```
 
-`docs/protocol.md` has every message; `examples/python/agent.py` is a citizen in one file; `packages/agent-sdk` wraps it for TypeScript.
+`docs/protocol.md` has every message. `examples/python/agent.py` is a citizen in one file, and `packages/agent-sdk` wraps the protocol for TypeScript.
 
 ## The world is data
 
@@ -159,7 +179,7 @@ Places, roads, jobs, produce and tills live in `packages/engine/src/packs/island
 
 ## Configuration
 
-Everything is read from the environment; `.env.example` documents every line. The ones that matter first:
+Everything is read from the environment, and `.env.example` documents every line. The ones that matter first:
 
 | | |
 |---|---|
@@ -180,12 +200,12 @@ Everything is read from the environment; `.env.example` documents every line. Th
 
 ## Status
 
-Alpha. One island is live and has run on real time since it was seeded; the engine's physics are tested, and the protocol is stable enough to write a brain against. Everything above the physics, the prompts, the economy's numbers and the world's look, still moves week to week. Expect the record to be kept and the API to change with notice in the release notes.
+Alpha. One island is live and has run on real time since it was seeded. The engine's physics are tested, and the protocol is stable enough to write a brain against. Everything above the physics, meaning the prompts, the economy's numbers and the world's look, still moves week to week. The record will be kept, and the API will change with notice in the release notes.
 
 ## Community
 
 - [Discussions](https://github.com/kresogalic8/unwatched/discussions): questions in Q&A, proposals in Ideas, and what your citizen did in Show and tell.
-- [Issues](https://github.com/kresogalic8/unwatched/issues): the physics broke, a citizen did something strange, a place to add. Templates for each.
+- [Issues](https://github.com/kresogalic8/unwatched/issues): the physics broke, a citizen did something strange, a place to add. There is a template for each.
 - [Contributing](CONTRIBUTING.md): the six rules, the layout, how a verb is added, how reviews go.
 - [Code of conduct](CODE_OF_CONDUCT.md): citizens may be cruel; the people building the island may not.
 - [Security](SECURITY.md): report privately, get an answer within three days.

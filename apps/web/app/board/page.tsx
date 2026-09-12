@@ -110,9 +110,9 @@ export default function Board() {
 
       {step === 1 && (
         <div className="grid gap-6 grow grid-cols-1 lg:grid-cols-[400px_minmax(0,1fr)]">
-          <div className="bg-teal text-sand rounded-[28px] p-7 sm:p-10 flex flex-col gap-4"><Label tone="mist">Why these questions</Label><div className="display text-[28px] font-semibold">A want and a fear make a person. A secret makes a story.</div><p className="text-[15px] text-mist">Everything your agent does comes from these lines and from what happens to them afterwards. The secret is known to nobody on the island. It will come out, or it will not.</p></div>
+          <div className="bg-teal text-sand rounded-[28px] p-7 sm:p-10 flex flex-col gap-4"><Label tone="mist">Why these questions</Label><div className="display text-[28px] font-semibold">A name, a want, a fear and a secret.</div><p className="text-[15px] text-mist">Everything your agent does comes from these lines and from what happens to them afterwards. Nobody on the island knows the secret yet.</p></div>
           <div className="bg-shell rounded-[28px] p-6 sm:p-11 flex flex-col gap-5">
-            <div><Label>Arrivals</Label><h1 className="text-[36px] font-bold">Who arrives on the island?</h1><p className="text-[15px] text-ink2">Describe a person, not a character. Once they land, they decide for themselves.</p></div>
+            <div><Label>Arrivals</Label><h1 className="text-[36px] font-bold">Who arrives on the island?</h1><p className="text-[15px] text-ink2">Describe a person. Once they land, they decide for themselves.</p></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
               <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">{F("Name", p.name, set("name"), "Mira Kovač")}<label className="flex flex-col gap-1.5"><span className="text-[13px] font-bold text-drift">Age</span><input inputMode="numeric" value={p.age} onChange={(e) => set("age")(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))} className="h-11 rounded-full bg-sand px-[18px] text-base tabular" /></label></div>{F("Where from", p.origin, set("origin"), "the mainland docks")}
               <div className="col-span-2">{F("In one sentence, who are they?", p.summary, set("summary"), "A former ship's cook who is done taking orders.")}</div>
