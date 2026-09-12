@@ -83,6 +83,8 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if (!job) return { ok: false, reason: action.job ? "no such job" : "nothing open here to ask for" };
       if (job.place !== a.location) return { ok: false, reason: "must apply in person" };
       if (job.holders.length >= job.slots) return { ok: false, reason: "no openings" };
+      { const place = v.places.get(job.place); // a place with nothing in the till cannot take anyone on, or it takes them on and lets them go again every morning
+        if (place && !place.owner && place.treasury < job.wage) return { ok: false, reason: "the till is empty; they cannot pay anyone" }; }
       if (a.job) return { ok: false, reason: "already employed" };
       return { ok: true };
     }

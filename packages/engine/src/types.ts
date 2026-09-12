@@ -47,6 +47,8 @@ export interface Relation {
   affection: number;
   lastSeen: number;
   opinion: string;
+  /** Where this person was the last time they were actually seen. Nothing is known unless it was perceived, so this is all anyone can say about where another person is. */
+  lastPlace: PlaceId | null;
 }
 
 export interface Memory {

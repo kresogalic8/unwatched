@@ -16,7 +16,7 @@ describe("the town gathers", () => {
     for (let i = 0; i < 8; i++) town.addAgent({ persona: persona(`P${i}`, rng) });
     const [a, b] = [...town.agents.values()]; const house = [...town.places.values()].find((p) => p.beds && p.kind !== "inn")!;
     house.kind = "home"; house.owner = a!.id; a!.home = { place: house.id, nightsPaid: 36500 }; b!.home = { place: house.id, nightsPaid: 36500 };
-    a!.relationships.set(b!.id, { trust: 0.8, affection: 0.8, lastSeen: 0, opinion: "" }); b!.relationships.set(a!.id, { trust: 0.8, affection: 0.8, lastSeen: 0, opinion: "" });
+    a!.relationships.set(b!.id, { trust: 0.8, affection: 0.8, lastSeen: 0, opinion: "", lastPlace: null }); b!.relationships.set(a!.id, { trust: 0.8, affection: 0.8, lastSeen: 0, opinion: "", lastPlace: null });
     for (const x of town.agents.values()) x.coins = 30;
     await town.run(2); // the first night schedules the wedding
     const wedding = town.gatherings.find((g) => g.kind === "wedding"); expect(wedding).toBeDefined(); expect(wedding!.hour).toBe(11);

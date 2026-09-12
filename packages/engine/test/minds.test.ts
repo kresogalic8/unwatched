@@ -23,10 +23,12 @@ describe("the mind sees the town, the plan, and itself", () => {
     const town = new Town({ seed: 14, brain: mind }); const rng = new Rng(14);
     const a = town.addAgent({ persona: persona("Mira", rng), owner: "o" }), b = town.addAgent({ persona: persona("Vesna", rng) });
     a.budget.tier2Max = 5; a.job = "bakery.cook"; town.jobs.get("bakery.cook")!.holders.push(a.id);
-    b.location = "market"; b.asleep = true; a.relationships.set(b.id, { trust: 0.6, affection: 0.4, lastSeen: 0, opinion: "" });
+    b.location = "market"; b.asleep = true; a.relationships.set(b.id, { trust: 0.6, affection: 0.4, lastSeen: 0, opinion: "", lastPlace: null });
     a.needs = { hunger: 0.75, rest: 0.9, social: 0.1 }; a.location = "lane-1";
     const p = town.perceive(a);
-    expect(p.town?.people).toEqual([{ name: "Vesna", place: "market", asleep: true }]);
+    expect(p.town?.people).toBeUndefined(); // Vesna has never been seen, so there is nothing to say about where she is and no sheet to send
+    a.relationships.get(b.id)!.lastPlace = "market"; // now she has been seen there once
+    expect(town.perceive(a).town?.people).toEqual([{ name: "Vesna", place: "market", asleep: false }]); // where she was last seen; whether she is asleep cannot be told from the lane
     expect(p.self.feels).toEqual({ hunger: "very hungry", rest: "exhausted", social: "content" });
     expect(p.self.shift).toEqual({ place: "bakery", wage: 3, hours: [6, 12] });
     expect(p.place.plot?.planks).toBe(24);

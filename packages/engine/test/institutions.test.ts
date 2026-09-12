@@ -18,7 +18,7 @@ describe("institutions with teeth", () => {
     for (let i = 0; i < 6; i++) town.addAgent({ persona: persona(`P${i}`, rng) });
     const people = [...town.agents.values()]; const a = people[0]!, b = people[1]!, c = people[2]!;
     // everyone trusts P1
-    for (const x of town.agents.values()) if (x.id !== b.id) x.relationships.set(b.id, { trust: 0.9, affection: 0.5, lastSeen: 0, opinion: "" });
+    for (const x of town.agents.values()) if (x.id !== b.id) x.relationships.set(b.id, { trust: 0.9, affection: 0.5, lastSeen: 0, opinion: "", lastPlace: null });
     await town.run(2); // day 2 at ten the council sits for the first time
     while (town.hour < 11) await town.tick();
     expect(town.mayor).toBe(b.id);
