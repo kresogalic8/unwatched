@@ -10,6 +10,8 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Fixed
 
+- Run the server's development command with the free mock brain, no shared store and no paid voice/image providers, even when the repository `.env` contains production credentials. Live model testing must be started explicitly.
+
 ## [0.10.2] - 2026-09-12
 ### Added
 
