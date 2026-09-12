@@ -6,10 +6,15 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.4.0] - 2026-09-12
+### Added
+
 - Rent, arrears and eviction. A bed is paid for the night it is slept in, out of what is left after a person has kept enough to eat. A landlord lets it run and the shortfall stands against the tenant; three nights behind and they are put out, with what they owe following them as a debt. The harbor inn gives no credit: the three nights an arrival is given end when they are paid out, and after that it is a bed like any other.
 - What is overdue grows: a tenth a day, a coin at the least, and never past twice what was lent. A council that finds against a debtor now pays the creditor out of the fine before the town takes the rest.
-
-### Changed
 
 ### Fixed
 
@@ -157,7 +162,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kresogalic8/unwatched/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kresogalic8/unwatched/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/kresogalic8/unwatched/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kresogalic8/unwatched/compare/v0.1.0...v0.2.0
