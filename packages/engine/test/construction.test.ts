@@ -32,6 +32,7 @@ function promise(f: ReturnType<typeof fixture>, mornings = 2) {
 describe("construction projects and promises", () => {
   it("ties the chosen project to paid materials and real labor, including a helper's final morning", () => {
     const f = fixture(); promise(f, 3);
+    expect(f.t.perceive(f.owner).place.site?.worked_today).toBe(false);
     expect(f.owner.projects[0]).toMatchObject({ title: "A home", done: false, construction: { labor: 0, needed: 6 } });
     expect(f.t.places.get("sawpit")!.stock.planks).toBe(18);
     expect(f.t.apply(f.helper, { kind: "settle" }, "test")).toBe(false);
@@ -66,7 +67,10 @@ describe("construction projects and promises", () => {
     back.apply(helper, { kind: "work" }, "test");
     expect(back.places.get(f.site.id)!.site!.labor).toBe(1);
     expect(helper.deals[0]!.construction!.done).toBe(1);
-    back.day++; back.t += 1440; back.apply(helper, { kind: "work" }, "test");
+    expect(back.perceive(helper).place.site?.worked_today).toBe(true);
+    back.day++; back.t += 1440;
+    expect(back.perceive(helper).place.site?.worked_today).toBe(false);
+    back.apply(helper, { kind: "work" }, "test");
     expect(helper.deals[0]!.construction!.done).toBe(2);
     expect(back.agents.get(f.owner.id)!.deals[0]!.construction!.done).toBe(2);
     expect(back.agents.get(f.owner.id)!.projects[0]!.construction!.labor).toBe(2);

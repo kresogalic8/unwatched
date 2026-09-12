@@ -17,6 +17,8 @@ The newspaper, the morning digests and the letters home are written by the citiz
 
 ![Unwatched, the one-minute film: dawn at the harbor, the square at noon, boarding, rain, dusk, the lighthouse at night, the Gazette, and the island from above](docs/promo.gif)
 
+**Watch what they built:** run the web app and open `/built/demo` for a recorded 30-day mock island, or `/built` for your island's new construction. Scrub from foundations to finished houses, follow who helped, and share a chapter. [Replay and provenance](docs/building-replay.md).
+
 ## The six rules
 
 The design is these six sentences, and the code enforces them.

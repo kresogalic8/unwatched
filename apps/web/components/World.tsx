@@ -1,4 +1,5 @@
 "use client";
+import { constructionStage } from "@unwatched/protocol";
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef, useState } from "react";
 import { Application, Container, Graphics, Rectangle, Text, TextStyle } from "pixi.js";
@@ -22,7 +23,7 @@ import { Portrait } from "./Portrait";
  */
 const C = { ...GROUND, shell: CREAM, sage: SAGE, teal: TEAL, kelp: KELP, coral: CORAL, drift: DRIFT };
 
-type PlaceView = { id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
+type PlaceView = { hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
 type TownView = Clock & { size: { w: number; h: number }; places: PlaceView[] };
 
 
@@ -85,7 +86,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
   const ambienceRef = useRef<Ambience | null>(null);
   const [sound, setSound] = useState(false);
   const [cleanUi, setCleanUi] = useState(false);
-  const [placeInfo, setPlaceInfo] = useState<{ id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
+  const [placeInfo, setPlaceInfo] = useState<{ hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
   const [mini, setMini] = useState<{ w: number; h: number; places: { id: string; x: number; y: number; kind: string; crowd: number }[]; view: { x: number; y: number; w: number; h: number }; people: { x: number; y: number; mine: boolean }[] } | null>(null);
 
   useEffect(() => {
@@ -218,7 +219,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
         const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(0, p.site ? 22 : 6); t.zIndex = 100000; g.addChild(t);
         g.position.set(p.x, p.y);
         g.eventMode = "static"; g.cursor = "pointer"; g.hitArea = { contains: (x: number, y: number) => x > -90 && x < 90 && y > -170 && y < 30 } as never;
-        g.on("pointertap", () => { const here = [...agents.current.values()].filter((a) => a.location === p.id); setPlaceInfo({ id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
+        g.on("pointertap", () => { const here = [...agents.current.values()].filter((a) => a.location === p.id); setPlaceInfo({ hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
       };
       for (const p of places.values()) drawPlace(p);
       const decor = keepOffRoads(decorFor([...places.values()]), segs);
@@ -654,8 +655,9 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
       {placeInfo && <div className="absolute right-3 top-14 sm:right-6 sm:top-16 w-[min(320px,calc(100%-24px))] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
         <div className="flex justify-between items-baseline gap-2"><div><div className="label">{placeInfo.district}</div><div className="display text-[20px] font-semibold">{placeInfo.name}</div></div><button onClick={() => setPlaceInfo(null)} className="text-sm text-drift">Close</button></div>
         {placeInfo.kind !== "plot" && placeInfo.kind !== "wild" && <Interior kind={placeInfo.kind} sprite={placeInfo.sprite} hour={clock?.hour ?? 12} people={placeInfo.people} />}
+        {placeInfo.hasHistory && <a href={`/built/${encodeURIComponent(placeInfo.id)}`} className="text-sm font-semibold text-teal underline underline-offset-4">Explore the building record →</a>}
         {placeInfo.owner && <div className="text-sm text-ink2">Owned by {placeInfo.owner}.</div>}
-        {placeInfo.site && <div className="text-sm text-ink2">{placeInfo.site.by} is building {placeInfo.site.name}: {placeInfo.site.done} of {placeInfo.site.of} mornings done.</div>}
+        {placeInfo.site && <div className="text-sm text-ink2">{constructionStage(placeInfo.site.done, placeInfo.site.of)} · {placeInfo.site.by} is building {placeInfo.site.name}: {placeInfo.site.done} of {placeInfo.site.of} mornings done.</div>}
         {placeInfo.kind === "plot" && !placeInfo.site && <div className="text-sm text-ink2">Empty land. A house costs 15 coins and six mornings; a shop 30 and ten.</div>}
         <div className="text-sm">{placeInfo.people.length === 0 ? <span className="text-drift">Nobody here right now.</span> : placeInfo.people.map((pp) => <div key={pp.name} className="flex items-center gap-2 py-0.5"><Portrait name={pp.name} appearance={pp.appearance} age={pp.age ?? 30} size={26} /><span>{pp.name}{pp.asleep ? ", asleep" : pp.job ? `, ${pp.job}` : ""}</span></div>)}</div>
       </div>}

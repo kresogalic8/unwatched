@@ -6,9 +6,16 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Watch what they built: a public building replay with foundations, rising walls and roofs, a plot overview, time controls, shareable chapters and downloadable SVG pictures. A labeled 30-day mock recording works without an account or API server.
+- Every new building keeps its public construction history in the place snapshot: who started it, who worked, what materials cost and whether promised help was paid. Names and chapters survive restarts and the rolling event log; final mornings and off-site payments count. Private thoughts, letters and raw event payloads are excluded.
+- A bounded synthetic opportunity probe reports real model decisions separately from provider fallbacks. The soak runner exports construction recordings.
+
 ### Changed
 
+- Citizens at a building site see whether they have already worked today. Their decision prompt distinguishes talking about help from making a formal offer, while leaving the choice to them.
+
 ### Fixed
+
 
 ## [0.5.0] - 2026-09-12
 ### Added

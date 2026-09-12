@@ -1,3 +1,4 @@
+import { recordBuildingMoment } from "./building-history.ts";
 import type { Action, ActionProposal, AgentId, PlaceId, Perception, TownEvent, EventKind, Persona, Paper, Reflection, DayPlan, Child, Passenger } from "@unwatched/protocol";
 import { OPTIONS_DEFAULT } from "@unwatched/protocol";
 import { Rng } from "./rng.ts";
@@ -197,7 +198,7 @@ export class Town {
     // what people built, over the map the code lays out: the code owns positions and roads, the record owns everything else
     for (const sp of snap.places ?? []) {
       const p = this.places.get(sp.id);
-      if (p) { p.name = sp.name; p.kind = sp.kind; p.sells = sp.sells; p.owner = sp.owner ?? null; p.site = sp.site ?? null; p.treasury = sp.treasury ?? p.treasury; if (sp.stock) p.stock = { ...sp.stock }; if (sp.look) p.look = sp.look; else delete p.look; if (sp.brokenUntil) p.brokenUntil = sp.brokenUntil; if (sp.beds) p.beds = sp.beds; else delete p.beds; if (sp.sprite) p.sprite = sp.sprite; }
+      if (p) { if (sp.history) p.history = structuredClone(sp.history); else delete p.history; p.name = sp.name; p.kind = sp.kind; p.sells = sp.sells; p.owner = sp.owner ?? null; p.site = sp.site ?? null; p.treasury = sp.treasury ?? p.treasury; if (sp.stock) p.stock = { ...sp.stock }; if (sp.look) p.look = sp.look; else delete p.look; if (sp.brokenUntil) p.brokenUntil = sp.brokenUntil; if (sp.beds) p.beds = sp.beds; else delete p.beds; if (sp.sprite) p.sprite = sp.sprite; }
     }
     for (const p of this.places.values()) stockShelf(this.pack, p); // a record from before shelves were counted gets its counts now
     for (const sj of snap.jobs ?? []) if (!this.jobs.has(sj.id) && this.places.has(sj.place)) this.jobs.set(sj.id, { ...sj, holders: [] });
@@ -386,7 +387,7 @@ export class Town {
         ...(here.nickname ? { known_as: here.nickname } : {}), ...(here.recipes?.length ? { recipes: here.recipes.map((r) => ({ item: r.item, from: r.from })) } : {}),
         ...(here.kind === "civic" ? { council: { mayor: this.mayor ? (this.agents.get(this.mayor)?.persona.name ?? null) : null, treasury: here.treasury, works: [...this.works], can_fund: this.mayor === a.id ? Object.entries(WORKS).filter(([w]) => !this.works.includes(w)).map(([what, w]) => ({ what, coins: w.coins })) : [], open_laws: this.laws.filter((l) => l.open).map((l) => l.text) } } : {}),
         ...(here.kind === "plot" && !here.site ? { plot: { free: true, house: { coins: BUILDS.house.coins, mornings: BUILDS.house.labor }, shop: { coins: BUILDS.shop.coins, mornings: BUILDS.shop.labor }, planks: this.places.get("sawpit")?.stock.planks ?? 0 } } : {}),
-        ...(here.site ? { site: { what: here.site.what, name: here.site.name, by: this.agents.get(here.site.by)?.persona.name ?? here.site.by, done: here.site.labor, of: here.site.laborNeeded } } : {}),
+        ...(here.site ? { site: { what: here.site.what, name: here.site.name, by: this.agents.get(here.site.by)?.persona.name ?? here.site.by, done: here.site.labor, of: here.site.laborNeeded, worked_today: here.site.workedDay?.[a.id] === this.day } } : {}),
         ...(here.kind === "harbor" && this.harbors.length ? { boats_to: this.harbors.map((h) => ({ id: h.id, name: h.name })) } : {}) },
       heard: a.heard.map((h) => ({ from: h.from, name: h.name, text: h.text })),
       recent: retrieve(a.memory, q, this.t, 8).map((m) => this.recall(a, m)),
@@ -531,6 +532,7 @@ export class Town {
         project.construction = { site: here.id, labor: 0, needed: spec.labor };
         project.progress = `${here.id}: 0 of ${spec.labor} mornings worked; materials paid for`;
         here.site.project = project.title;
+        here.history = { place: here.id, name: here.site.name, project: project.title, what: kind, builder: { id: a.id, name }, needed: spec.labor, started: this.t, landCoins: spec.coins - forPlanks, materialCoins: forPlanks, planks: spec.planks, moments: [] };
         this.emit("agent.build", [a.id], here.id, `${name} paid ${spec.coins} coins for ${here.name} and marked out ${kind === "house" ? "a house" : "a shop"}: ${here.site.name}.`, 0.7, { what: kind, site: here.id });
         this.remember(a, `I bought ${here.name} and started building ${here.site.name}. It needs ${spec.labor} mornings of work.`, 0.8);
         for (const w of this.nearby(a)) this.remember(w, `${name} is building ${here.site.name} on ${here.name}.`, 0.5, "rumor");
@@ -1639,6 +1641,7 @@ export class Town {
   emit(kind: EventKind, actors: AgentId[], place: string | undefined, text: string, importance: number, payload?: Record<string, unknown>): TownEvent {
     const withWhy = this.because && kind !== "action.rejected" ? { ...(payload ?? {}), because: this.because } : payload;
     const e: TownEvent = { id: this.nextEventId++, t: this.t, day: this.day, kind, actors, text, importance: clamp(importance), ...(place ? { place } : {}), ...(withWhy ? { payload: withWhy } : {}) };
+    recordBuildingMoment(e, this.places, this.agents);
     this.events.push(e); this.onEvent?.(e);
     // a moment worth a letter home: something that mattered, to someone whose plan carries careful thoughts, at most once a day between reflections
     if (e.importance >= 0.5 && kind !== "agent.letter" && kind !== "agent.reflect" && kind !== "action.rejected" && kind !== "town.book") for (const id of actors) { const a = this.agents.get(id); if (a && a.owner && a.budget.tier2Max > 0 && !a.crossroads && a.ownerLetterDay !== this.day && !a.asleep) a.crossroads = text; }

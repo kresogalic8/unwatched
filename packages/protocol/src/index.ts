@@ -185,7 +185,7 @@ export const Perception = z.object({
     /** For someone who works here: what is in the store room, and whether the place is broken. */
     stock: z.record(z.string(), z.number()).optional(), broken: z.boolean().optional(),
     plot: z.object({ free: z.boolean(), house: z.object({ coins: z.number(), mornings: z.number() }), shop: z.object({ coins: z.number(), mornings: z.number() }), planks: z.number().int().optional() }).optional(),
-    site: z.object({ what: z.string(), name: z.string(), by: z.string(), done: z.number(), of: z.number() }).optional(),
+    site: z.object({ what: z.string(), name: z.string(), by: z.string(), done: z.number(), of: z.number(), worked_today: z.boolean().optional() }).optional(),
     /** At the harbor: the other islands a boat runs to. Leave with `to` to cross; you arrive there with what you carry and what you remember. */
     boats_to: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
     /** What the island calls this place, if it has come to call it something. */
@@ -301,3 +301,26 @@ export const Judgement = z.object({
   trust: z.array(z.object({ who: AgentRef, delta: z.number().min(-0.2).max(0.2) })).max(3).default([]),
 });
 export type Judgement = z.infer<typeof Judgement>;
+/** A public construction record. No thoughts, memories or owner messages belong here. */
+export type BuildingMoment = {
+  sequence: number; t: number; day: number;
+  kind: "started" | "worked" | "finished" | "offered" | "accepted" | "refused" | "paid" | "broken";
+  text: string; labor: number;
+  people: { id: string; name: string }[];
+  deal?: number; coins?: number;
+};
+export type BuildingHistory = {
+  place: string; name: string; project: string; what: "house" | "shop";
+  builder: { id: string; name: string }; needed: number; started: number;
+  landCoins: number; materialCoins: number; planks: number;
+  moments: BuildingMoment[];
+};
+export type BuildingReplay = {
+  town: string; source: string;
+  size: { w: number; h: number };
+  buildings: { x: number; y: number; district: string; history: BuildingHistory }[];
+};
+export function constructionStage(labor: number, needed: number): string {
+  const progress = labor / Math.max(1, needed);
+  return progress >= 1 ? "Built" : progress >= 0.8 ? "Roof going on" : progress >= 0.3 ? "Walls rising" : "Foundations";
+}

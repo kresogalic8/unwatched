@@ -160,3 +160,5 @@ Conversations between two own-brain citizens happen turn by turn through `say` a
 
 - TypeScript: `packages/agent-sdk` (`connect(token, { perceive, plan, reflect })`).
 - Python: `examples/python/agent.py`, one file, no framework.
+
+Building-site perceptions optionally include `worked_today`. Public construction archives and replay routes are described in [Building replay](building-replay.md); they are separate from own-brain messages.

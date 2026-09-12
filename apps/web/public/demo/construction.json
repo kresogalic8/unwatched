@@ -1,0 +1,590 @@
+{
+  "town": "Island · seed 3",
+  "source": "mock simulation · 30 days · seed 3",
+  "size": {
+    "w": 3000,
+    "h": 1800
+  },
+  "buildings": [
+    {
+      "x": 1300,
+      "y": 1560,
+      "district": "old town",
+      "history": {
+        "place": "lane-1",
+        "name": "Nikola's house",
+        "project": "Nikola's house",
+        "what": "house",
+        "builder": {
+          "id": "ag_c",
+          "name": "Nikola Radić"
+        },
+        "needed": 6,
+        "started": 4863,
+        "landCoins": 9,
+        "materialCoins": 6,
+        "planks": 6,
+        "moments": [
+          {
+            "sequence": 1,
+            "t": 4863,
+            "day": 4,
+            "kind": "started",
+            "text": "Nikola Radić paid 15 coins for an empty lot on Rope Lane and marked out a house: Nikola's house.",
+            "labor": 0,
+            "people": [
+              {
+                "id": "ag_c",
+                "name": "Nikola Radić"
+              }
+            ]
+          },
+          {
+            "sequence": 2,
+            "t": 6243,
+            "day": 5,
+            "kind": "worked",
+            "text": "Nikola Radić worked on Nikola's house: 1 of 6 mornings done.",
+            "labor": 1,
+            "people": [
+              {
+                "id": "ag_c",
+                "name": "Nikola Radić"
+              }
+            ]
+          },
+          {
+            "sequence": 3,
+            "t": 7684,
+            "day": 6,
+            "kind": "worked",
+            "text": "Nikola Radić worked on Nikola's house: 2 of 6 mornings done.",
+            "labor": 2,
+            "people": [
+              {
+                "id": "ag_c",
+                "name": "Nikola Radić"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "x": 1620,
+      "y": 1520,
+      "district": "old town",
+      "history": {
+        "place": "lane-2",
+        "name": "Stjepan's house",
+        "project": "Stjepan's house",
+        "what": "house",
+        "builder": {
+          "id": "ag_g",
+          "name": "Stjepan Vuković"
+        },
+        "needed": 6,
+        "started": 6480,
+        "landCoins": 9,
+        "materialCoins": 6,
+        "planks": 6,
+        "moments": [
+          {
+            "sequence": 1,
+            "t": 6480,
+            "day": 5,
+            "kind": "started",
+            "text": "Stjepan Vuković paid 15 coins for the corner lot on Rope Lane and marked out a house: Stjepan's house.",
+            "labor": 0,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          },
+          {
+            "sequence": 2,
+            "t": 6481,
+            "day": 5,
+            "kind": "worked",
+            "text": "Stjepan Vuković worked on Stjepan's house: 1 of 6 mornings done.",
+            "labor": 1,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          },
+          {
+            "sequence": 3,
+            "t": 7870,
+            "day": 6,
+            "kind": "worked",
+            "text": "Stjepan Vuković worked on Stjepan's house: 2 of 6 mornings done.",
+            "labor": 2,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          },
+          {
+            "sequence": 4,
+            "t": 9304,
+            "day": 7,
+            "kind": "worked",
+            "text": "Stjepan Vuković worked on Stjepan's house: 3 of 6 mornings done.",
+            "labor": 3,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          },
+          {
+            "sequence": 5,
+            "t": 10745,
+            "day": 8,
+            "kind": "worked",
+            "text": "Stjepan Vuković worked on Stjepan's house: 4 of 6 mornings done.",
+            "labor": 4,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          },
+          {
+            "sequence": 6,
+            "t": 12187,
+            "day": 9,
+            "kind": "worked",
+            "text": "Stjepan Vuković worked on Stjepan's house: 5 of 6 mornings done.",
+            "labor": 5,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          },
+          {
+            "sequence": 7,
+            "t": 13624,
+            "day": 10,
+            "kind": "finished",
+            "text": "Stjepan Vuković finished Stjepan's house, a new house on the old town. It took 6 mornings.",
+            "labor": 6,
+            "people": [
+              {
+                "id": "ag_g",
+                "name": "Stjepan Vuković"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "x": 760,
+      "y": 300,
+      "district": "north shore",
+      "history": {
+        "place": "shore-1",
+        "name": "Nikola's house",
+        "project": "Nikola's house",
+        "what": "house",
+        "builder": {
+          "id": "ag_c",
+          "name": "Nikola Radić"
+        },
+        "needed": 6,
+        "started": 7746,
+        "landCoins": 9,
+        "materialCoins": 6,
+        "planks": 6,
+        "moments": [
+          {
+            "sequence": 1,
+            "t": 7746,
+            "day": 6,
+            "kind": "started",
+            "text": "Nikola Radić paid 15 coins for a plot above the cove and marked out a house: Nikola's house.",
+            "labor": 0,
+            "people": [
+              {
+                "id": "ag_c",
+                "name": "Nikola Radić"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "x": 1060,
+      "y": 220,
+      "district": "north shore",
+      "history": {
+        "place": "shore-2",
+        "name": "Ivana's house",
+        "project": "Ivana's house",
+        "what": "house",
+        "builder": {
+          "id": "ag_3",
+          "name": "Ivana Horvat"
+        },
+        "needed": 6,
+        "started": 9304,
+        "landCoins": 9,
+        "materialCoins": 6,
+        "planks": 6,
+        "moments": [
+          {
+            "sequence": 1,
+            "t": 9304,
+            "day": 7,
+            "kind": "started",
+            "text": "Ivana Horvat paid 15 coins for a plot on the north shore and marked out a house: Ivana's house.",
+            "labor": 0,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          },
+          {
+            "sequence": 2,
+            "t": 9305,
+            "day": 7,
+            "kind": "worked",
+            "text": "Ivana Horvat worked on Ivana's house: 1 of 6 mornings done.",
+            "labor": 1,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          },
+          {
+            "sequence": 3,
+            "t": 10744,
+            "day": 8,
+            "kind": "worked",
+            "text": "Ivana Horvat worked on Ivana's house: 2 of 6 mornings done.",
+            "labor": 2,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          },
+          {
+            "sequence": 4,
+            "t": 12191,
+            "day": 9,
+            "kind": "worked",
+            "text": "Ivana Horvat worked on Ivana's house: 3 of 6 mornings done.",
+            "labor": 3,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          },
+          {
+            "sequence": 5,
+            "t": 13628,
+            "day": 10,
+            "kind": "worked",
+            "text": "Ivana Horvat worked on Ivana's house: 4 of 6 mornings done.",
+            "labor": 4,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          },
+          {
+            "sequence": 6,
+            "t": 15068,
+            "day": 11,
+            "kind": "worked",
+            "text": "Ivana Horvat worked on Ivana's house: 5 of 6 mornings done.",
+            "labor": 5,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          },
+          {
+            "sequence": 7,
+            "t": 16508,
+            "day": 12,
+            "kind": "finished",
+            "text": "Ivana Horvat finished Ivana's house, a new house on the north shore. It took 6 mornings.",
+            "labor": 6,
+            "people": [
+              {
+                "id": "ag_3",
+                "name": "Ivana Horvat"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "x": 1380,
+      "y": 300,
+      "district": "north shore",
+      "history": {
+        "place": "shore-3",
+        "name": "Luka's house",
+        "project": "Luka's house",
+        "what": "house",
+        "builder": {
+          "id": "ag_4",
+          "name": "Luka Babić"
+        },
+        "needed": 6,
+        "started": 10624,
+        "landCoins": 9,
+        "materialCoins": 6,
+        "planks": 6,
+        "moments": [
+          {
+            "sequence": 1,
+            "t": 10624,
+            "day": 8,
+            "kind": "started",
+            "text": "Luka Babić paid 15 coins for the last plot before the pines and marked out a house: Luka's house.",
+            "labor": 0,
+            "people": [
+              {
+                "id": "ag_4",
+                "name": "Luka Babić"
+              }
+            ]
+          },
+          {
+            "sequence": 2,
+            "t": 10661,
+            "day": 8,
+            "kind": "worked",
+            "text": "Rosa Vidal worked on Luka's house: 1 of 6 mornings done.",
+            "labor": 1,
+            "people": [
+              {
+                "id": "ag_1",
+                "name": "Rosa Vidal"
+              }
+            ]
+          },
+          {
+            "sequence": 3,
+            "t": 10924,
+            "day": 8,
+            "kind": "worked",
+            "text": "Luka Babić worked on Luka's house: 2 of 6 mornings done.",
+            "labor": 2,
+            "people": [
+              {
+                "id": "ag_4",
+                "name": "Luka Babić"
+              }
+            ]
+          },
+          {
+            "sequence": 4,
+            "t": 12371,
+            "day": 9,
+            "kind": "worked",
+            "text": "Luka Babić worked on Luka's house: 3 of 6 mornings done.",
+            "labor": 3,
+            "people": [
+              {
+                "id": "ag_4",
+                "name": "Luka Babić"
+              }
+            ]
+          },
+          {
+            "sequence": 5,
+            "t": 13808,
+            "day": 10,
+            "kind": "worked",
+            "text": "Luka Babić worked on Luka's house: 4 of 6 mornings done.",
+            "labor": 4,
+            "people": [
+              {
+                "id": "ag_4",
+                "name": "Luka Babić"
+              }
+            ]
+          },
+          {
+            "sequence": 6,
+            "t": 15249,
+            "day": 11,
+            "kind": "worked",
+            "text": "Luka Babić worked on Luka's house: 5 of 6 mornings done.",
+            "labor": 5,
+            "people": [
+              {
+                "id": "ag_4",
+                "name": "Luka Babić"
+              }
+            ]
+          },
+          {
+            "sequence": 7,
+            "t": 18248,
+            "day": 13,
+            "kind": "finished",
+            "text": "Luka Babić finished Luka's house, a new house on the north shore. It took 6 mornings.",
+            "labor": 6,
+            "people": [
+              {
+                "id": "ag_4",
+                "name": "Luka Babić"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "x": 1620,
+      "y": 260,
+      "district": "pinewood",
+      "history": {
+        "place": "wood-1",
+        "name": "Katarina's house",
+        "project": "Katarina's house",
+        "what": "house",
+        "builder": {
+          "id": "ag_b",
+          "name": "Katarina Jurić"
+        },
+        "needed": 6,
+        "started": 16505,
+        "landCoins": 9,
+        "materialCoins": 6,
+        "planks": 6,
+        "moments": [
+          {
+            "sequence": 1,
+            "t": 16505,
+            "day": 12,
+            "kind": "started",
+            "text": "Katarina Jurić paid 15 coins for a clearing in the pines and marked out a house: Katarina's house.",
+            "labor": 0,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          },
+          {
+            "sequence": 2,
+            "t": 16506,
+            "day": 12,
+            "kind": "worked",
+            "text": "Katarina Jurić worked on Katarina's house: 1 of 6 mornings done.",
+            "labor": 1,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          },
+          {
+            "sequence": 3,
+            "t": 17945,
+            "day": 13,
+            "kind": "worked",
+            "text": "Katarina Jurić worked on Katarina's house: 2 of 6 mornings done.",
+            "labor": 2,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          },
+          {
+            "sequence": 4,
+            "t": 19385,
+            "day": 14,
+            "kind": "worked",
+            "text": "Katarina Jurić worked on Katarina's house: 3 of 6 mornings done.",
+            "labor": 3,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          },
+          {
+            "sequence": 5,
+            "t": 22268,
+            "day": 16,
+            "kind": "worked",
+            "text": "Katarina Jurić worked on Katarina's house: 4 of 6 mornings done.",
+            "labor": 4,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          },
+          {
+            "sequence": 6,
+            "t": 23705,
+            "day": 17,
+            "kind": "worked",
+            "text": "Katarina Jurić worked on Katarina's house: 5 of 6 mornings done.",
+            "labor": 5,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          },
+          {
+            "sequence": 7,
+            "t": 25145,
+            "day": 18,
+            "kind": "finished",
+            "text": "Katarina Jurić finished Katarina's house, a new house on the pinewood. It took 6 mornings.",
+            "labor": 6,
+            "people": [
+              {
+                "id": "ag_b",
+                "name": "Katarina Jurić"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

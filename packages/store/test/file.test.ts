@@ -34,6 +34,7 @@ describe("the file record", () => {
     back.apply(h, { kind: "work" }, "test");
     expect(back.places.get("shore-1")!.site!.labor).toBe(1);
     expect(h.deals[0]!.construction!.done).toBe(1);
+    expect(back.places.get("shore-1")!.history!.moments.map(m => m.kind)).toEqual(["started", "offered", "accepted", "worked"]);
     expect(back.agents.get(owner.id)!.projects[0]!.construction!.labor).toBe(1);
 
     // Capture the actual PostgREST writes. No external database or network is used.
@@ -49,7 +50,7 @@ describe("the file record", () => {
       expect(agents.find((a) => a.id === helper.id)!.state.deals[0]).toMatchObject({ construction: { done: 1, mornings: 2 } });
       expect(agents.find((a) => a.id === owner.id)!.state.deals[0]).toMatchObject({ construction: { done: 1 } });
       expect(agents.find((a) => a.id === owner.id)!.state.projects[0]).toMatchObject({ construction: { labor: 1 } });
-      expect(writes.find((w) => w.url.includes("/towns"))!.body).toMatchObject({ civic: { nextDealId: 2 }, places: expect.arrayContaining([expect.objectContaining({ id: "shore-1", site: expect.objectContaining({ workedDay: { [helper.id]: 1 } }) })]) });
+      expect(writes.find((w) => w.url.includes("/towns"))!.body).toMatchObject({ civic: { nextDealId: 2 }, places: expect.arrayContaining([expect.objectContaining({ id: "shore-1", history: expect.objectContaining({ project: "A home", moments: expect.arrayContaining([expect.objectContaining({kind:"worked",labor:1})]) }), site: expect.objectContaining({ workedDay: { [helper.id]: 1 } }) })]) });
     } finally { vi.unstubAllGlobals(); }
   });
   it("delivers a letter once: one posted through the API is already read, one written straight in waits for the hour", async () => {

@@ -1,3 +1,4 @@
+import { constructionRoutes } from "./construction.ts";
 import type { AgentState } from "@unwatched/engine";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -235,7 +236,7 @@ async function ownerOf(req: Request): Promise<string | null> {
 }
 const owns = (a: { owner: string | null }, owner: string | null) => !!owner && a.owner === owner;
 
-const placeView = (p: import("@unwatched/engine").Place) => ({ id: p.id, name: p.nickname ? `${p.name} (${p.nickname})` : p.name, kind: p.kind, exits: p.exits, crowd: town.crowd(p.id), x: p.x, y: p.y, district: p.district, sprite: p.sprite, ...(p.look ? { look: p.look } : {}), ...(Object.keys(p.stock).length ? { stock: p.stock } : {}), owner: p.owner ? (town.agents.get(p.owner)?.persona.name ?? null) : null, site: p.site ? { what: p.site.what, name: p.site.name, by: town.agents.get(p.site.by)?.persona.name ?? p.site.by, done: p.site.labor, of: p.site.laborNeeded } : null, beds: p.beds ? { price: p.beds.price, free: p.freeBeds ?? 0 } : null });
+const placeView = (p: import("@unwatched/engine").Place) => ({ id: p.id, hasHistory: !!p.history, name: p.nickname ? `${p.name} (${p.nickname})` : p.name, kind: p.kind, exits: p.exits, crowd: town.crowd(p.id), x: p.x, y: p.y, district: p.district, sprite: p.sprite, ...(p.look ? { look: p.look } : {}), ...(Object.keys(p.stock).length ? { stock: p.stock } : {}), owner: p.owner ? (town.agents.get(p.owner)?.persona.name ?? null) : null, site: p.site ? { what: p.site.what, name: p.site.name, by: town.agents.get(p.site.by)?.persona.name ?? p.site.by, done: p.site.labor, of: p.site.laborNeeded } : null, beds: p.beds ? { price: p.beds.price, free: p.freeBeds ?? 0 } : null });
 const childView = (ch: import("@unwatched/protocol").Child) => ({ id: ch.id, name: ch.name, days: town.day - ch.bornDay, ofAgeIn: Math.max(0, town.ageOfMajority - (town.day - ch.bornDay)), parents: ch.parentNames, home: town.places.get(ch.home)?.name ?? ch.home, orphan: ch.orphan, adopted: !!ch.adoptedBy });
 /** The far end of the boat. Another island puts a passenger here; they step off at our harbor with what they carry and what they remember. */
 // cargo: another island asks what we are short of, and sends what it has spare; the shelves pay
@@ -273,6 +274,7 @@ app.post("/api/boat/arrive", async (c) => {
 });
 // the boat office tells the web which sign-in it expects, so a build without the public keys can say so instead of failing at the last step
 app.get("/api/office", (c) => c.json({ signIn: sb && process.env.UW_DEV_OWNER !== "1" ? "supabase" : "dev" }));
+app.route("/api/construction", constructionRoutes(town, TOWN_NAME));
 app.get("/api/town", (c) => c.json({ ...clockOf(town), name: TOWN_NAME, id: TOWN_ID, size: town.pack.size, places: [...town.places.values()].map(placeView), laws: town.laws, children: town.children.map(childView) }));
 /** Children of the island who could be adopted: unowned, growing up or already grown. Adopting means writing to them; nothing more. */
 app.get("/api/children", (c) => c.json({

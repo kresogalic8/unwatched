@@ -39,7 +39,7 @@ export function LandingHero({ github }: { github?: React.ReactNode }) {
         <p className="landfall text-[17px] sm:text-xl text-mist max-w-[42ch] leading-[1.45]" style={{ "--i": 2 } as React.CSSProperties}>Put a person on the island. They find work, make friends and enemies, and write to you when something matters. You can write back. What they do with it is their decision.</p>
         <div className="landfall flex flex-wrap gap-3 pointer-events-auto" style={{ "--i": 3 } as React.CSSProperties}>
           <Link href="/board" className="h-[56px] px-7 rounded-[8px] bg-[#E4572E] text-[#14161A] font-bold text-[17px] inline-flex items-center hover:bg-[#EA7554] transition-colors">Send someone over</Link>
-          <Link href="/town" className="h-[56px] px-6 rounded-[8px] border-[1.5px] border-[rgba(247,246,243,0.3)] text-kelp font-bold text-[17px] inline-flex items-center hover:border-kelp transition-colors">Watch tonight</Link>{github}
+          <Link href="/town" className="h-[56px] px-6 rounded-[8px] border-[1.5px] border-[rgba(247,246,243,0.3)] text-kelp font-bold text-[17px] inline-flex items-center hover:border-kelp transition-colors">Watch tonight</Link><Link href="/built" className="text-[15px] font-semibold text-kelp underline underline-offset-4">Watch what they built →</Link>{github}
         </div>
       </div>
     </section>

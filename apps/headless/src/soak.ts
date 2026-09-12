@@ -77,6 +77,7 @@ const summary = {
   citizens: [...town.agents.values()].map((a) => ({ name: a.persona.name, coins: a.coins, job: a.job, home: a.home, memories: a.memory.length, relationships: a.relationships.size })),
 };
 writeFileSync(`${outDir}/summary.json`, JSON.stringify(summary, null, 2));
+writeFileSync(`${outDir}/construction.json`, JSON.stringify({ town: `Island · seed ${seed}`, source: `${brain.name} simulation · ${days} days · seed ${seed}`, size: town.pack.size, buildings: [...town.places.values()].filter(p => p.history).map(p => ({x:p.x,y:p.y,district:p.district,history:p.history})) }, null, 2));
 eventsFile.end();
 
 console.log(`\nWhile you were away · ${mira.persona.name} · last 3 days`);
