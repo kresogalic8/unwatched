@@ -9,7 +9,7 @@ const sh = (cmd) => execSync(cmd, { stdio: ["ignore", "pipe", "inherit"] }).toSt
 const arg = process.argv[2];
 if (!arg) { console.error("usage: pnpm release <major|minor|patch|x.y.z>"); process.exit(2); }
 if (sh("git branch --show-current") !== "main") { console.error("release from main"); process.exit(1); }
-if (sh("git status --porcelain")) { console.error("the tree is not clean; commit or stash first"); process.exit(1); }
+if (sh("git status --porcelain --untracked-files=no")) { console.error("there are uncommitted changes; commit or stash first"); process.exit(1); } // a file nobody has added yet is not part of the release
 
 const root = JSON.parse(readFileSync("package.json", "utf8"));
 const [maj, min, pat] = String(root.version ?? "0.0.0").split(".").map(Number);
