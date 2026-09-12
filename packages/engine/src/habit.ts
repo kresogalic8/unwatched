@@ -131,5 +131,6 @@ function nearestFoodPlace(a: AgentState, v: HabitView): string | null {
   const far = (id: string) => v.hops ? (v.hops(a.location, id) ?? 99) : 0;
   const sellers = [...v.places.values()].filter((p) => p.sells.some((s) => FOOD_ITEMS.has(s.item))).sort((x, y) => far(x.id) - far(y.id) || rank(x.id) - rank(y.id));
   for (const p of sellers) { const c = cheapestFood(p, v); if (c && a.coins >= c.price) return p.id; }
-  return sellers[0]?.id ?? null;
+  // nothing they can afford: the nearest shelf that at least has food on it, before the nearest that merely sells it
+  return sellers.find((p) => cheapestFood(p, v) !== null)?.id ?? sellers[0]?.id ?? null;
 }

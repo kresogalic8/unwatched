@@ -131,7 +131,8 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if (here.kind !== "workplace" && here.kind !== "shop") return { ok: false, reason: "things are made at a workplace or a shop" };
       const job = a.job ? v.jobs.get(a.job) : undefined; if (here.owner !== a.id && job?.place !== here.id) return { ok: false, reason: "you neither own nor work here" };
       if (here.brokenUntil && here.brokenUntil > (v.day ?? 0)) return { ok: false, reason: `${here.name} is not standing` };
-      for (const f of action.from) { const k = f.toLowerCase().trim(); if ((here.stock[k] ?? 0) < 1) return { ok: false, reason: `no ${k} on hand here` }; }
+      const want = new Map<string, number>(); for (const f of action.from) { const k = f.toLowerCase().trim(); want.set(k, (want.get(k) ?? 0) + 1); } // two of a thing named twice needs two on hand
+      for (const [k, n] of want) if ((here.stock[k] ?? 0) < n) return { ok: false, reason: n > 1 ? `only ${here.stock[k] ?? 0} ${k} on hand here, and that takes ${n}` : `no ${k} on hand here` };
       const item = action.item.toLowerCase().trim(); if (action.from.some((f) => f.toLowerCase().trim() === item)) return { ok: false, reason: "a thing cannot be made from itself" }; if (/coin|money|gold/.test(item)) return { ok: false, reason: "coins are not made" };
       return { ok: true };
     }

@@ -101,6 +101,8 @@ export interface AgentState {
   thinkEvery: number | null;
   /** Today's plan, made on waking. Null before the first morning, or for a person who cannot afford to plan. */
   plan: ActivePlan | null;
+  /** The plan of the last day they planned, as it stood when that day ended: what the morning digest reports against. */
+  lastPlan: ActivePlan | null;
   /** A word from the world for the next thought only: someone is here and something is at stake. Never persisted. */
   hint: string | null;
   /** something just happened that whoever sent them would want to hear; cleared by the next thought */
@@ -243,6 +245,8 @@ export interface AgentSnapshot {
     needs: AgentState["needs"]; location: PlaceId; coins: number; inventory: string[]; job: string | null;
     home: AgentState["home"]; asleep: boolean; budget: Budget; intentions: string[]; rumors: string[];
     letters?: OwnerLetter[]; lastConversation?: number; lastThought?: number; instructions?: string; brainKind?: AgentState["brainKind"]; thinkEvery?: number | null; plan?: ActivePlan | null; debts?: { to: AgentId; coins: number; due: number }[]; starving?: number; roofless?: number; convictions?: number; secretsKnown?: Record<AgentId, string>; watch?: string[]; selves?: AgentState["selves"]; lastSelfDay?: number; projects?: AgentState["projects"]; beliefs?: AgentState["beliefs"]; trustLog?: AgentState["trustLog"];
+    /** kept so a restart does not ask the same question twice, or forget a letter it promised to answer */
+    lastPlan?: ActivePlan | null; replyTo?: number | null; lastHungerThought?: number; starvingThoughtDay?: number; debtThoughtDay?: number; gatheringThoughtId?: number | null;
   };
   relationships: { other: AgentId; trust: number; affection: number; lastSeen: number; opinion: string }[];
   memory: Memory[];
