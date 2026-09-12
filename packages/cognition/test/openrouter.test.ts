@@ -148,3 +148,32 @@ describe("voices on every brain", () => {
     expect(canEnrich(new MockBrain(1))).toBe(false);
   });
 });
+
+describe("an answer that arrives broken", () => {
+  const judgeCtx = { what: "whistle", withName: null, place: "square", placeKind: "square", hour: 9, weather: "fair", nearby: [], inventory: [], coins: 0, stock: [] };
+  it("a body that never finishes falls back and ops hear of it, instead of escaping the brain", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => { const e = new Error("The operation was aborted due to timeout"); e.name = "TimeoutError"; throw e; }, text: async () => "" } as unknown as Response)));
+    const lines: string[] = []; const falls: string[] = [];
+    const b = new OpenRouterBrain({ apiKey: "k", ...models, timeoutMs: 30, reflectTimeoutMs: 30, log: (l) => lines.push(l) }); b.onFallback = (f) => falls.push(f.reason);
+    const out = await b.judge({ agent: citizen("ada"), ...judgeCtx } as JudgeContext);
+    expect(isFromFallback(out)).toBe(true);
+    expect(falls).toEqual(["no answer in 0s"]);
+    expect(lines[0]).toBe("openrouter no answer in 0s; retrying");
+  });
+  it("an answer with nothing in it is simply asked again, with no empty turn a provider would refuse", async () => {
+    const bodies: { messages: { role: string; content: unknown }[] }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: { body: string }) => { bodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ choices: [{ message: { content: bodies.length === 1 ? "" : JSON.stringify({ happened: "a whistle", plausible: true, coins_spent: 0, item_gained: null, item_lost: null, eases: null, trust: [] }) } }] }), { status: 200 }); }));
+    const b = new OpenRouterBrain({ apiKey: "k", ...models });
+    const out = await b.judge({ agent: citizen("ada"), ...judgeCtx } as JudgeContext);
+    expect(isFromFallback(out)).toBe(false); expect(out.happened).toBe("a whistle");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]!.messages).toHaveLength(bodies[0]!.messages.length); // the second ask is a fresh one, not a repair on an empty answer
+  });
+  it("does not sleep after it has already decided to fall back", async () => {
+    fakeFetch([{ status: 503 }, { status: 503 }]);
+    const b = new OpenRouterBrain({ apiKey: "k", ...models });
+    const started = Date.now();
+    await b.judge({ agent: citizen("ada"), ...judgeCtx } as JudgeContext);
+    expect(Date.now() - started).toBeLessThan(2500); // one backoff, not two
+  }, 10_000);
+});

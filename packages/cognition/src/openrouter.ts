@@ -127,23 +127,23 @@ export class OpenRouterBrain implements Brain {
   private async post(body: unknown, model: string, name: CallKind, slot: Slot): Promise<{ text: string } | null> {
     const ms = slot === "reflect" ? this.reflectTimeoutMs : this.timeoutMs;
     for (let attempt = 0; attempt < 2; attempt++) {
-      let res: Response;
+      // the whole attempt is inside the try: the deadline aborts the body as well as the headers, so an answer that arrives half-read must fall back like any other
       try {
-        res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json", "HTTP-Referer": "https://unwatched.town", "X-Title": "Unwatched" },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(ms),
         });
+        if (res.status === 429 || res.status >= 500) { this.log(`openrouter ${res.status}; ${attempt === 0 ? "retrying" : "falling back"}`); if (attempt === 1) { this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; } await new Promise((r) => setTimeout(r, 1500)); continue; }
+        if (!res.ok) { const msg = (await res.text()).slice(0, 600); this.log(`openrouter ${res.status}: ${msg}`); this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; }
+        const data = await res.json() as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
+        this.spent.calls++; this.spent.prompt += data.usage?.prompt_tokens ?? 0; this.spent.completion += data.usage?.completion_tokens ?? 0; this.cached += data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+        return { text: data.choices?.[0]?.message?.content ?? "" };
       } catch (err) {
-        const why = (err as Error).name === "TimeoutError" || (err as Error).name === "AbortError" ? `no answer in ${Math.round(ms / 1000)}s` : `fetch failed: ${(err as Error).message}`;
+        const why = (err as Error).name === "TimeoutError" || (err as Error).name === "AbortError" ? `no answer in ${Math.round(ms / 1000)}s` : `no usable answer: ${(err as Error).message}`;
         this.log(`openrouter ${why}; ${attempt === 0 ? "retrying" : "falling back"}`); if (attempt === 1) this.onFallback?.({ what: name, model, reason: why }); continue;
       }
-      if (res.status === 429 || res.status >= 500) { this.log(`openrouter ${res.status}; ${attempt === 0 ? "retrying" : "falling back"}`); if (attempt === 1) this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); await new Promise((r) => setTimeout(r, 1500)); continue; }
-      if (!res.ok) { const msg = (await res.text()).slice(0, 600); this.log(`openrouter ${res.status}: ${msg}`); this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; }
-      const data = await res.json() as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
-      this.spent.calls++; this.spent.prompt += data.usage?.prompt_tokens ?? 0; this.spent.completion += data.usage?.completion_tokens ?? 0; this.cached += data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
-      return { text: data.choices?.[0]?.message?.content ?? "" };
     }
     return null;
   }
@@ -165,7 +165,7 @@ export class OpenRouterBrain implements Brain {
       const text = got.text;
       let raw: unknown;
       try { raw = JSON.parse(text.trim().replace(/^```json\s*|```$/g, "")); }
-      catch { this.log(`not json from ${model}: ${text.slice(0, 80)}`); if (attempt === 1) { this.onFallback?.({ what: name, model, reason: "not json" }); return null; } messages.push({ role: "assistant", content: text }, { role: "user", content: "That was not a single JSON object. Return the same answer as JSON only, matching the schema." }); continue; }
+      catch { this.log(`not json from ${model}: ${text.slice(0, 80)}`); if (attempt === 1) { this.onFallback?.({ what: name, model, reason: text.trim() ? "not json" : "no answer" }); return null; } if (text.trim()) messages.push({ role: "assistant", content: text }, { role: "user", content: "That was not a single JSON object. Return the same answer as JSON only, matching the schema." }); continue; } // an empty turn is refused by the providers, so an answer with nothing in it is simply asked again
       const parsed = schema.safeParse(truncateProse(name, wantsStrict(model) ? stripNulls(raw) : raw));
       if (parsed.success) return parsed.data;
       const issue = parsed.error.issues[0];
