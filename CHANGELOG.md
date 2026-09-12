@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.6.0] - 2026-09-12
+### Added
+
 - Watch what they built: a public building replay with foundations, rising walls and roofs, a plot overview, time controls, shareable chapters and downloadable SVG pictures. A labeled 30-day mock recording works without an account or API server.
 - Every new building keeps its public construction history in the place snapshot: who started it, who worked, what materials cost and whether promised help was paid. Names and chapters survive restarts and the rolling event log; final mornings and off-site payments count. Private thoughts, letters and raw event payloads are excluded.
 - A bounded synthetic opportunity probe reports real model decisions separately from provider fallbacks. The soak runner exports construction recordings.
@@ -13,8 +20,6 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 ### Changed
 
 - Citizens at a building site see whether they have already worked today. Their decision prompt distinguishes talking about help from making a formal offer, while leaving the choice to them.
-
-### Fixed
 
 
 ## [0.5.0] - 2026-09-12
@@ -184,7 +189,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/kresogalic8/unwatched/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kresogalic8/unwatched/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kresogalic8/unwatched/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kresogalic8/unwatched/compare/v0.2.1...v0.3.0
