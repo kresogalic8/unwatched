@@ -32,6 +32,10 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Fixed
 
+- The town sheet told a citizen where everyone they know was standing, whether or not they had ever met. It now says where they were last seen, and whether someone is asleep only when you are in the room with them.
+- Another person's letter home, their private opinion of you and their rewritten self could reach your digest and your morning mail.
+- An owner buying at their own counter destroyed the coins, and an owner holding a post at their own place was paid a wage out of nothing.
+- A workplace with an empty till hired people it could not pay, fired them the same evening and hired them again the next morning until they starved. Thirty days of the island on one seed: four died of hunger before, none now.
 - An owner's letter was delivered and remembered twice, once by the API and once by the hourly replay.
 - The digest window silently capped at three days and its kicker always said three days.
 - A plan step was marked done the moment a thought was spent; steps are now ticked by being at the place at the hour, or marked missed.
