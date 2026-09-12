@@ -1,6 +1,12 @@
 import type { Memory } from "./types.ts";
 import { embed, cosine } from "./embed.ts";
 
+/** Preserve the source when a memory is retrieved; remembering a claim does not verify it. */
+export function memoryForMind(m: Memory): string {
+  const source = { obs: "recorded observation; quoted claims remain claims", reflect: "personal interpretation, not verified experience", rumor: "reported speech, not verified experience", letter: "letter, not verified experience", plan: "intention, not completed work" }[m.kind] ?? "unknown source, not verified experience";
+  return `[minute ${m.t}; ${source}] ${m.text}`;
+}
+
 const STOP = new Set(["the", "a", "an", "and", "to", "of", "at", "in", "on", "for", "with", "is", "was", "it", "she", "he", "they", "i", "me", "my", "her", "his"]);
 function keywords(s: string): Set<string> {
   return new Set(s.toLowerCase().replace(/[^a-zà-ž0-9 ]/gi, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));

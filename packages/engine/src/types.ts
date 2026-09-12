@@ -176,12 +176,16 @@ export interface ConverseContext {
   a: AgentState; b: AgentState; place: Place; time: string; weather: string;
   aMemories: string[]; bMemories: string[];
   rumorsA: string[];
+  /** Public condition of the place both speakers currently occupy. */
+  observedPlace?: string;
   /** whether they have dealt with each other before, and what each wants from today */
   known?: boolean; aToday?: string | null; bToday?: string | null;
 }
 
 export interface ReflectContext {
   agent: AgentState; day: number; dayMemories: string[]; keyMemories: string[];
+  /** Bounded personal action records; speech is evidence of speaking, not of its claims. */
+  actionEvidence?: string[];
   relationships: { id: AgentId; name: string; trust: number; opinion: string }[];
   unreadLetters: string[];
   /** What they meant to do this morning and what came of each step; what they carry across weeks; what they believe; what they chose to watch. Shown so a night's answer keeps what it means to keep. */

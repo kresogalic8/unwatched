@@ -5,7 +5,7 @@ import { OPTIONS_DEFAULT } from "@unwatched/protocol";
 import { Rng } from "./rng.ts";
 import type { AgentState, Deal, Brain, Budget, EventSink, Job, Place, Tier, Memory, TownSnapshot, AgentSnapshot, DigestContext, LifeContext, Gathering, Seal, JudgeContext, Rule } from "./types.ts";
 import { makeJobs, makePlaces, FOOD_ITEMS, PERISHABLE, MINUTES_PER_DAY, SEASONS, BUILDS, GARDEN, WORKS, buildKind, lookHash, siteName, stockShelf, ISLAND, type WorldPack } from "./world.ts";
-import { retrieve, compress, age, drift } from "./memory.ts";
+import { retrieve, compress, age, drift, memoryForMind } from "./memory.ts";
 import { sha256, canonicalEvent } from "./hash.ts";
 import { validate } from "./validator.ts";
 import { habit } from "./habit.ts";
@@ -272,7 +272,7 @@ export class Town {
     if (this.brain.name === "none") return;
     const arrivedDay = Math.floor(a.arrivedAt / MINUTES_PER_DAY) + 1;
     const events = this.events.filter((e) => e.actors.includes(a.id) && e.importance >= 0.35 && e.kind !== "agent.reflect" && e.kind !== "agent.move").sort((x, y) => y.importance - x.importance).slice(0, 40).sort((x, y) => x.t - y.t).map((e) => `day ${e.day}: ${e.text}`);
-    const memories = [...a.memory].filter((m) => m.kind === "reflect" || m.importance >= 0.7).sort((x, y) => y.importance - x.importance).slice(0, 16).sort((x, y) => x.t - y.t).map((m) => m.text);
+    const memories = [...a.memory].filter((m) => m.kind === "reflect" || m.importance >= 0.7).sort((x, y) => y.importance - x.importance).slice(0, 16).sort((x, y) => x.t - y.t).map(memoryForMind);
     const people = [...a.relationships.entries()].map(([id, r]) => ({ name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion ?? "" })).sort((x, y) => Math.abs(y.trust - 0.3) - Math.abs(x.trust - 0.3)).slice(0, 8);
     const lettersHome = this.events.filter((e) => e.kind === "agent.letter" && e.actors[0] === a.id).map((e) => String(e.payload?.text ?? "")).filter(Boolean).slice(-4);
     const lastThought = [...a.memory].reverse().find((m) => m.kind === "reflect")?.text ?? null;
@@ -335,7 +335,7 @@ export class Town {
       this.progressPlan(a);
     }
     // 3. thoughts. Everyone perceives the same minute, thinks at the same time, and acts in seeded order; the validator settles any clash.
-    const perceived = thinkers.map((th) => ({ th, p: this.perceive(th.a) }));
+    const perceived = thinkers.map((th) => { this.rememberPlace(th.a); return { th, p: this.perceive(th.a) }; });
     const proposals: ActionProposal[] = new Array(perceived.length);
     const CONCURRENCY = 8;
     for (let i = 0; i < perceived.length; i += CONCURRENCY) {
@@ -349,7 +349,7 @@ export class Town {
       const wasAsked = th.a.crossroads !== null && th.a.replyTo !== null; // this thought is the one the letter raised
       th.a.lastThought = this.t; th.a.hint = null; th.a.crossroads = null;
       for (const l of th.a.letters) if (!l.read) { l.read = true; this.remember(th.a, `A letter from whoever sent me: "${l.text}"`, 0.6, "letter"); if (asksSomething(l.text) && !l.answered && !th.a.replyTo) { th.a.replyTo = l.id; th.a.crossroads = `A letter from whoever sent you asks something of you: "${l.text}"`; } } // a letter that asks gets its answer: the next thought is a crossroads
-      for (const r of proposal.remember) this.remember(th.a, r, 0.4);
+      for (const r of proposal.remember) this.remember(th.a, r, 0.4, "reflect");
       th.a.heard = [];
       this.because = proposal.intent ?? null;
       // a mind that has nothing better to do than wait keeps walking to where it was going
@@ -397,7 +397,7 @@ export class Town {
         ...(here.community ? { community: structuredClone(here.community) } : {}),
         owner: here.owner ? (this.agents.get(here.owner)?.persona.name ?? here.owner) : null,
         ...(a.job && this.jobs.get(a.job)?.place === here.id && Object.keys(here.stock).length ? { stock: { ...here.stock } } : {}),
-        ...(here.brokenUntil && here.brokenUntil > this.day ? { broken: true } : {}),
+        broken: !!(here.brokenUntil && here.brokenUntil > this.day),
         ...(here.nickname ? { known_as: here.nickname } : {}), ...(here.recipes?.length ? { recipes: here.recipes.map((r) => ({ item: r.item, from: r.from })) } : {}),
         ...(here.kind === "civic" ? { council: { mayor: this.mayor ? (this.agents.get(this.mayor)?.persona.name ?? null) : null, treasury: here.treasury, works: [...this.works], can_fund: this.mayor === a.id ? Object.entries(WORKS).filter(([w]) => !this.works.includes(w)).map(([what, w]) => ({ what, coins: w.coins })) : [], open_laws: this.laws.filter((l) => l.open).map((l) => l.text) } } : {}),
         ...(here.kind === "plot" && !here.site && !here.community ? { plot: { free: true, house: { coins: BUILDS.house.coins, mornings: BUILDS.house.labor }, shop: { coins: BUILDS.shop.coins, mornings: BUILDS.shop.labor }, planks: this.places.get("sawpit")?.stock.planks ?? 0 } } : {}),
@@ -855,12 +855,13 @@ export class Town {
         }
         if (!(this.spend(a, 1) || this.spend(b, 1))) continue;
         const place = this.places.get(placeId)!;
+        this.rememberPlace(b);
         let d;
         try {
           d = await this.brain.converse({
-            a, b, place, time: this.clock(), weather: this.weather,
-            aMemories: retrieve(a.memory, b.persona.name, this.t, 5).map((m) => m.text),
-            bMemories: retrieve(b.memory, a.persona.name, this.t, 5).map((m) => m.text),
+            a, b, place, time: this.clock(), weather: this.weather, observedPlace: this.rememberPlace(a),
+            aMemories: retrieve(a.memory, b.persona.name, this.t, 5).map(memoryForMind),
+            bMemories: retrieve(b.memory, a.persona.name, this.t, 5).map(memoryForMind),
             rumorsA: a.rumors.slice(-2),
             known: !!(a.relationships.get(b.id) || b.relationships.get(a.id)), aToday: a.plan?.day === this.day && a.plan.goals.length ? a.plan.goals.join("; ") : null, bToday: b.plan?.day === this.day && b.plan.goals.length ? b.plan.goals.join("; ") : null,
           });
@@ -872,8 +873,10 @@ export class Town {
         const transcript = d.lines.map((l) => `${this.agents.get(l.speaker)?.persona.name ?? l.speaker}: “${l.text}”`).join(" ");
         const importance = Math.min(1, 0.12 + Math.abs(d.outcome.a_trust_delta) * 3 + Math.abs(d.outcome.b_trust_delta) * 3 + (d.outcome.rumor ? 0.1 : 0));
         this.emit("conversation", [a.id, b.id], placeId, `${a.persona.name} and ${b.persona.name} talked at ${place.name}. ${transcript}`, importance, { lines: d.lines });
-        this.remember(a, d.outcome.a_remember, 0.3 + Math.abs(d.outcome.a_trust_delta) * 2);
-        this.remember(b, d.outcome.b_remember, 0.3 + Math.abs(d.outcome.b_trust_delta) * 2);
+        this.remember(a, `My interpretation of the conversation with ${b.persona.name}: ${d.outcome.a_remember}`, 0.3 + Math.abs(d.outcome.a_trust_delta) * 2, "reflect");
+        this.remember(a, `Conversation at ${place.name}: ${transcript}`, importance, "rumor");
+        this.remember(b, `My interpretation of the conversation with ${a.persona.name}: ${d.outcome.b_remember}`, 0.3 + Math.abs(d.outcome.b_trust_delta) * 2, "reflect");
+        this.remember(b, `Conversation at ${place.name}: ${transcript}`, importance, "rumor");
         this.nudge(a, b.id, d.outcome.a_trust_delta, d.outcome.a_trust_delta / 2);
         this.nudge(b, a.id, d.outcome.b_trust_delta, d.outcome.b_trust_delta / 2);
         if (d.outcome.rumor) { const told = drift(d.outcome.rumor, () => this.rng.next()); b.rumors.push(told); if (b.rumors.length > 12) b.rumors.shift(); this.remember(b, `${a.persona.name} told me: ${told}`, 0.5, "rumor"); }
@@ -935,11 +938,11 @@ export class Town {
     for (const a of this.agents.values()) {
       if (!a.funded || this.brain.name === "none" || this.paused) continue;
       if (a.brainKind === "hosted" && a.budget.tier2Max === 0 && !(this.creditBank?.(a, 3) ?? false)) continue; // a Visitor with no credits keeps the day, not the reflection
-      const dayMemories = a.memory.filter((m) => m.t >= dayStart && m.kind !== "reflect").sort((x, y) => y.importance - x.importance).slice(0, 12).map((m) => m.text);
-      const keyMemories = retrieve(a.memory, a.persona.want, this.t, 6).map((m) => m.text);
+      const dayMemories = a.memory.filter((m) => m.t >= dayStart && m.kind !== "reflect").sort((x, y) => y.importance - x.importance).slice(0, 12).map(memoryForMind);
+      const keyMemories = retrieve(a.memory, a.persona.want, this.t, 6).map(memoryForMind);
       const rels = [...a.relationships.entries()].map(([id, r]) => ({ id, name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion }));
       let ref: Reflection;
-      try { ref = await this.brain.reflect({ agent: a, day: this.day, dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
+      try { ref = await this.brain.reflect({ agent: a, day: this.day, actionEvidence: todays.filter(e => e.actors.includes(a.id) && ["agent.trade", "agent.work", "agent.hired", "agent.quit", "agent.build", "town.built", "agent.give", "agent.take", "action.rejected"].includes(e.kind)).slice(-24).map(e => `[event ${e.id}, minute ${e.t}, ${e.kind}] ${e.text}`), dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
       catch (err) { this.log(`reflect failed for ${a.persona.name}: ${(err as Error).message}`); continue; }
       this.remember(a, ref.summary, 0.75, "reflect");
       for (const i of ref.insights) this.remember(a, i, 0.6, "reflect");
@@ -951,7 +954,7 @@ export class Town {
       // projects across weeks: a title repeated is the same project, updated; done is done, and the record hears of it
       for (const pr of ref.projects ?? []) {
         const title = pr.title.trim(); if (!title) continue; const have = a.projects.find((x) => x.title.toLowerCase() === title.toLowerCase() && !x.done);
-        if (have) { if (pr.why) have.why = pr.why.trim(); if (have.construction) continue; if (pr.progress) have.progress = pr.progress.trim(); if (pr.done) { have.done = true; have.doneDay = this.day; this.emit("town.notice", [a.id], a.location, `${a.persona.name} has finished what they set out to do: ${have.title}.`, 0.5, { project: have.title }); this.remember(a, `Done: ${have.title}. ${have.progress}`, 0.9, "reflect"); } }
+        if (have) { if (pr.why) have.why = pr.why.trim(); if (have.construction) continue; if (pr.progress) have.progress = pr.progress.trim(); if (pr.done) { have.done = true; have.doneDay = this.day; this.emit("town.notice", [a.id], a.location, `${a.persona.name} considers their personal goal finished: ${have.title}.`, 0.5, { project: have.title, reported: true }); this.remember(a, `I consider this done: ${have.title}. ${have.progress}`, 0.9, "reflect"); } }
         else if (!pr.done && a.projects.filter((x) => !x.done).length < 3) { a.projects.push({ title, why: (pr.why ?? "").trim(), progress: (pr.progress ?? "just begun").trim(), since: this.day, done: false }); this.remember(a, `I have set myself something: ${title}. ${pr.why ?? ""}`.trim(), 0.7, "reflect"); }
       }
       if (a.projects.length > 12) a.projects = [...a.projects.filter((x) => !x.done), ...a.projects.filter((x) => x.done).slice(-6)];
@@ -1312,7 +1315,7 @@ export class Town {
     return null;
   }
   /** An old memory in an old head comes back a little wrong, now and then. The record keeps the truth; the person does not. */
-  private recall(a: AgentState, m: Memory): string { const days = (this.t - m.t) / MINUTES_PER_DAY; return a.persona.age >= 60 && days > 60 && m.kind !== "letter" && this.rng.chance(0.15) ? drift(m.text, () => this.rng.next()) : m.text; }
+  private recall(a: AgentState, m: Memory): string { const days = (this.t - m.t) / MINUTES_PER_DAY; return a.persona.age >= 60 && days > 60 && m.kind !== "letter" && this.rng.chance(0.15) ? memoryForMind({ ...m, kind: "reflect", text: drift(m.text, () => this.rng.next()) }) : memoryForMind(m); }
   /** The other adult who sleeps under the same owned roof, if any. */
   partnerOf(a: AgentState): AgentState | null {
     if (!a.home) return null; const p = this.places.get(a.home.place); if (!p || p.kind !== "home" || !p.owner) return null;
@@ -1352,7 +1355,7 @@ export class Town {
       if (ra.affection < 0.6 || rb.affection < 0.6 || ra.trust < 0.5 || rb.trust < 0.5 || a.coins + b.coins < 20 || this.day - youngest < 30 || a.starving || b.starving) continue;
       if (!this.rng.chance(0.06)) continue;
       const home = this.places.get(a.home!.place)!;
-      const ctx = { parents: [a, b].map((x) => ({ persona: x.persona, keyMemories: retrieve(x.memory, x.persona.want, this.t, 4).map((m) => m.text), coins: x.coins, job: x.job ? (this.jobs.get(x.job)?.title ?? x.job) : null })), home: home.name, day: this.day, siblings: this.children.filter((c) => c.parents.includes(a.id)).map((c) => c.name) };
+      const ctx = { parents: [a, b].map((x) => ({ persona: x.persona, keyMemories: retrieve(x.memory, x.persona.want, this.t, 4).map(memoryForMind), coins: x.coins, job: x.job ? (this.jobs.get(x.job)?.title ?? x.job) : null })), home: home.name, day: this.day, siblings: this.children.filter((c) => c.parents.includes(a.id)).map((c) => c.name) };
       let persona: Persona;
       try { persona = await this.brain.child(ctx); } catch (err) { this.log(`child failed: ${(err as Error).message}`); continue; }
       const child: Child = { id: `ch_${this.idPrefix}${(this.children.length + 1).toString(36)}${this.day}`, name: persona.name, bornDay: this.day, parents: [a.id, b.id], parentNames: [a.persona.name, b.persona.name], home: home.id, persona, adoptedBy: null, orphan: false };
@@ -1419,10 +1422,11 @@ export class Town {
     if (a.plan?.day === this.day || !a.funded || this.brain.name === "none" || this.paused || this.hour < 5) return;
     const tier: Tier = this.spend(a, 2) ? 2 : this.spend(a, 1) ? 1 : 0 as unknown as Tier;
     if (!tier) { a.plan = { day: this.day, mood: "", goals: [], steps: [] }; return; } // cannot afford to plan today; habit carries them
-    const yesterday = [...a.memory].reverse().find((m) => m.kind === "reflect")?.text ?? null;
+    const lastReflection = [...a.memory].reverse().find((m) => m.kind === "reflect");
+    const yesterday = lastReflection ? memoryForMind(lastReflection) : null;
     const ctx = {
       agent: a, day: this.day, weather: this.weather, hour: this.hour, yesterday, intentions: [...a.intentions, ...a.deals.filter((d) => d.state === "open" || d.state === "offered").map((d) => `${d.mine ? "I promised" : "Promised to me"}: ${d.what}${d.construction ? ` at ${d.construction.site}, ${d.construction.done}/${d.construction.mornings} mornings worked` : ""}; ${d.coins} coins; ${d.state}`)],
-      keyMemories: retrieve(a.memory, a.persona.want, this.t, 6).map((m) => m.text),
+      keyMemories: retrieve(a.memory, a.persona.want, this.t, 6).map(memoryForMind),
       relationships: [...a.relationships.entries()].map(([id, r]) => ({ id, name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion })),
       places: [...this.places.values()].map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
       jobsOpen: [...this.jobs.values()].filter((j) => j.holders.length < j.slots).map((j) => `${j.title} at ${this.places.get(j.place)?.name ?? j.place}, ${j.wage} coins`),
@@ -1737,6 +1741,14 @@ export class Town {
   }
   private nudge(a: AgentState, other: AgentId, trust: number, affection: number): void {
     const r = this.rel(a, other); r.trust = clamp(r.trust + trust); r.affection = clamp(r.affection + affection); r.lastSeen = this.t;
+  }
+  /** Remember only the public condition of the place actually occupied, not remote world state. */
+  private rememberPlace(a: AgentState): string {
+    const p = this.places.get(a.location)!;
+    const text = `Observed local state at ${p.name} (${p.id}): ${p.brokenUntil && p.brokenUntil > this.day ? "active damage" : "no active damage recorded"}; ${p.site ? `construction ${p.site.labor}/${p.site.laborNeeded} mornings` : "no construction site"}. This does not reveal unmodeled structural details.`;
+    const dayStart = (this.day - 1) * MINUTES_PER_DAY;
+    if (!a.memory.some(m => m.t >= dayStart && m.kind === "obs" && m.text === text)) this.remember(a, text, 0.65);
+    return text;
   }
   remember(a: AgentState, text: string, importance: number, kind: Memory["kind"] = "obs"): void {
     a.memory.push({ t: this.t, text, importance: clamp(importance), kind });

@@ -2,6 +2,16 @@
 
 The first implemented learning domain is food purchasing. This is persistent experiential learning, not model-weight training or self-modifying code.
 
+## Narrative memory and evidence
+
+Model-authored decision memories and conversation interpretations are stored as `reflect`, not `obs`. Dialogue transcripts retain attribution and are stored as `rumor`: evidence that something was said does not establish its truth. Retrieval for decisions, conversations, planning, reflection and life summaries includes the existing memory kind and simulation minute. These kinds already survive file/Postgres persistence and island travel; no database migration is required.
+
+When a citizen thinks or converses, the engine remembers the public damage/construction condition of their current place, at most once per identical condition per simulation day. It does not inspect remote locations or expose workplace stock. Perception explicitly distinguishes active damage from no active damage. Neither condition supplies unmodeled details about beams or roofs.
+
+Nightly reflection receives up to 24 recent personal action records with event IDs, including rejected actions. Plans are explicitly described as intentions: the current scheduler's `done` flag means the step was reached or considered, not that its work was executed. A model's personal-goal completion remains self-reported; its public notice says so and includes `reported: true`. Real construction retains its separate engine-controlled completion.
+
+This prevents new decision claims and dialogue summaries from being stored as observations by those paths; it is not a semantic truth verifier. Models can still generate incorrect interpretations. Existing legacy `obs` entries are retained and may contain old unsupported claims, so prompts explicitly warn that repetition is not corroboration. No old memories are silently rewritten or upgraded into verified evidence. The food-learning receipt rules below remain unchanged.
+
 The engine records a successful purchase only after validation, inventory transfer and payment. Each receipt keeps simulation time, paid cost and the public event ID. An attempted local food purchase that fails because the item is not for sale records a private availability observation. Lack of money, remote-shop mistakes and person-to-person trades do not teach a shop-availability lesson. Repeated unavailable attempts within an hour count once.
 
 Each citizen retains up to 24 place/item lessons and 16 observations per lesson. Confidence uses a neutral Beta(1,1) prior with evidence weights halving every seven simulation days. Contrary evidence can reverse a preference. Confidence estimates purchase availability, not skill, intelligence or the probability of overall task success.

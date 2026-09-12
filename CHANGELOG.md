@@ -6,9 +6,14 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Bounded, unscripted headless autonomy audit with real-model decision records, action/opportunity counts, preserved output and explicit incomplete status on model fallback. Document the first partial live observation and its limits in `docs/autonomy-audit.md`.
+
 ### Changed
 
 ### Fixed
+
+- Keep model-authored memories and conversation interpretations separate from observations, including on retrieval after restart. Record the public condition of the currently occupied place and provide personal action event references to nightly reflection.
+- Clarify that reaching a planned stop does not verify its proposed work. Report model-completed personal goals as the citizen's claim, rather than verified world construction, and prioritize current state over conflicting persona backstory.
 
 ## [0.10.1] - 2026-09-12
 ### Added
