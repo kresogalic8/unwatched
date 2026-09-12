@@ -1,7 +1,7 @@
 import type { Action, ActionProposal, AgentId, PlaceId, Perception, TownEvent, EventKind, Persona, Paper, Reflection, DayPlan, Child, Passenger } from "@unwatched/protocol";
 import { OPTIONS_DEFAULT } from "@unwatched/protocol";
 import { Rng } from "./rng.ts";
-import type { AgentState, Brain, Budget, EventSink, Job, Place, Tier, Memory, TownSnapshot, AgentSnapshot, DigestContext, LifeContext, Gathering, Seal, JudgeContext, Rule } from "./types.ts";
+import type { AgentState, Deal, Brain, Budget, EventSink, Job, Place, Tier, Memory, TownSnapshot, AgentSnapshot, DigestContext, LifeContext, Gathering, Seal, JudgeContext, Rule } from "./types.ts";
 import { makeJobs, makePlaces, FOOD_ITEMS, PERISHABLE, MINUTES_PER_DAY, SEASONS, BUILDS, WORKS, buildKind, lookHash, siteName, stockShelf, ISLAND, type WorldPack } from "./world.ts";
 import { retrieve, compress, age, drift } from "./memory.ts";
 import { sha256, canonicalEvent } from "./hash.ts";
@@ -94,6 +94,7 @@ export class Town {
   private idPrefix = "";
   private nextEventId = 1;
   private nextLetterId = 1;
+  private nextDealId = 1;
   private arrivalsToday = 0;
   private departuresToday = 0;
   private readonly minutesPerTick: number;
@@ -175,7 +176,7 @@ export class Town {
       home: { place: "inn", nightsPaid: 3 }, asleep: false, arrivedAt: this.t,
       relationships: new Map(), memory: [],
       budget: { tier1Max: 50, tier2Max: 5, tier1Left: 50, tier2Left: 5, ...o.budget },
-      plan: null, lastPlan: null, debts: [], hint: null, crossroads: null, ownerLetterDay: 0, heading: null, starving: 0, roofless: 0, convictions: 0, secretsKnown: {}, seek: null, watch: [], selves: [], lastSelfDay: 0, doToday: 0, projects: [], beliefs: [],
+      plan: null, lastPlan: null, debts: [], deals: [], hint: null, crossroads: null, ownerLetterDay: 0, heading: null, starving: 0, roofless: 0, convictions: 0, secretsKnown: {}, seek: null, watch: [], selves: [], lastSelfDay: 0, doToday: 0, projects: [], beliefs: [],
       funded: o.funded ?? true, owner: o.owner ?? null, letters: [], intentions: [],
       lastConversation: -999, lastThought: -999, heard: [], workedToday: false, rumors: [], appearance: null, instructions: "", brainKind: "hosted", thinkEvery: null,
       seenToday: [], trustDawn: {}, trustLog: [], lastHungerThought: -999, starvingThoughtDay: 0, debtThoughtDay: 0, gatheringThoughtId: null, replyTo: null,
@@ -211,7 +212,7 @@ export class Town {
         relationships: new Map(sa.relationships.map((r) => [r.other, { trust: r.trust, affection: r.affection, lastSeen: r.lastSeen, opinion: r.opinion, lastPlace: (r as { lastPlace?: string | null }).lastPlace ?? null }])),
         memory: [...sa.memory].sort((x, y) => x.t - y.t),
         budget: { ...sa.state.budget }, funded: sa.funded, owner: sa.owner, letters: sa.state.letters ?? [], intentions: [...sa.state.intentions],
-        lastConversation: sa.state.lastConversation ?? -999, lastThought: sa.state.lastThought ?? -999, heard: [], workedToday: false, rumors: [...sa.state.rumors], appearance: sa.appearance, instructions: sa.state.instructions ?? "", brainKind: sa.state.brainKind ?? "hosted", thinkEvery: sa.state.thinkEvery ?? null, plan: sa.state.plan ?? null, lastPlan: sa.state.lastPlan ?? null, debts: sa.state.debts ?? [], hint: null, crossroads: null, ownerLetterDay: 0, heading: null, starving: sa.state.starving ?? 0, roofless: sa.state.roofless ?? 0, convictions: sa.state.convictions ?? 0, secretsKnown: { ...(sa.state.secretsKnown ?? {}) }, seek: null, watch: [...(sa.state.watch ?? [])], selves: [...(sa.state.selves ?? [])], lastSelfDay: sa.state.lastSelfDay ?? 0, doToday: 0, projects: [...(sa.state.projects ?? [])], beliefs: [...(sa.state.beliefs ?? [])],
+        deals: [...(sa.state.deals ?? [])], lastConversation: sa.state.lastConversation ?? -999, lastThought: sa.state.lastThought ?? -999, heard: [], workedToday: false, rumors: [...sa.state.rumors], appearance: sa.appearance, instructions: sa.state.instructions ?? "", brainKind: sa.state.brainKind ?? "hosted", thinkEvery: sa.state.thinkEvery ?? null, plan: sa.state.plan ?? null, lastPlan: sa.state.lastPlan ?? null, debts: sa.state.debts ?? [], hint: null, crossroads: null, ownerLetterDay: 0, heading: null, starving: sa.state.starving ?? 0, roofless: sa.state.roofless ?? 0, convictions: sa.state.convictions ?? 0, secretsKnown: { ...(sa.state.secretsKnown ?? {}) }, seek: null, watch: [...(sa.state.watch ?? [])], selves: [...(sa.state.selves ?? [])], lastSelfDay: sa.state.lastSelfDay ?? 0, doToday: 0, projects: [...(sa.state.projects ?? [])], beliefs: [...(sa.state.beliefs ?? [])],
         seenToday: [], trustDawn: Object.fromEntries(sa.relationships.map((r) => [r.other, r.trust])), trustLog: [...(sa.state.trustLog ?? [])], lastHungerThought: sa.state.lastHungerThought ?? -999, starvingThoughtDay: sa.state.starvingThoughtDay ?? 0, debtThoughtDay: sa.state.debtThoughtDay ?? 0, gatheringThoughtId: sa.state.gatheringThoughtId ?? null, replyTo: sa.state.replyTo ?? null,
       };
       this.agents.set(a.id, a);
@@ -225,6 +226,7 @@ export class Town {
     this.children.splice(0, this.children.length, ...(snap.children ?? []));
     if (snap.civic) { this.mayor = snap.civic.mayor && this.agents.has(snap.civic.mayor) ? snap.civic.mayor : null; this.electedDay = snap.civic.elected; this.works = [...snap.civic.works]; this.gatherings = (snap.civic.gatherings ?? []).map((g) => ({ ...g })); this.wedded = new Set(snap.civic.wedded ?? []); this.chain = [...(snap.civic.chain ?? [])]; this.rules = [...(snap.civic.rules ?? [])]; this.sayings = [...(snap.civic.sayings ?? [])]; this.nextGatheringId = 1 + Math.max(0, ...this.gatherings.map((g) => g.id)); }
     this.nextLetterId = 1 + Math.max(0, ...[...this.agents.values()].flatMap((a) => a.letters.map((l) => l.id)));
+    this.nextDealId = 1 + Math.max(0, ...[...this.agents.values()].flatMap((a) => a.deals.map((d) => d.id)));
   }
 
   snapshot(): TownSnapshot {
@@ -234,7 +236,7 @@ export class Town {
       jobs: [...this.jobs.values()].filter((j) => this.places.get(j.place)?.owner).map(({ holders: _h, ...j }) => j),
       agents: [...this.agents.values()].map((a): AgentSnapshot => ({
         id: a.id, persona: a.persona, owner: a.owner, funded: a.funded, appearance: a.appearance, arrivedAt: a.arrivedAt,
-        state: { needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, brainKind: a.brainKind, thinkEvery: a.thinkEvery, plan: a.plan, lastPlan: a.lastPlan, replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId, debts: a.debts, starving: a.starving, roofless: a.roofless, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60) },
+        state: { deals: a.deals.filter((d) => d.state === "offered" || d.state === "open"), needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, brainKind: a.brainKind, thinkEvery: a.thinkEvery, plan: a.plan, lastPlan: a.lastPlan, replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId, debts: a.debts, starving: a.starving, roofless: a.roofless, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60) },
         relationships: [...a.relationships.entries()].map(([other, r]) => ({ other, ...r })),
         memory: a.memory,
       })),
@@ -370,7 +372,7 @@ export class Town {
       type: "perceive", agent_id: a.id,
       ...((this.rules.length || this.sayings.some((x) => x.by.length >= 2) || people.length) ? { town: { ...this.ways(), ...(people.length ? { people } : {}) } } : {}),
       time: { sim: this.clock(), day: this.day, minute: this.minuteOfDay, season: this.season, weather: this.weather, weekday: this.weekdayName, ...(this.occasion ? { occasion: this.occasion } : {}), ...(this.nextGathering() ? { gathering: this.nextGathering()! } : {}), ...(this.temperatureC !== null ? { temperature_c: this.temperatureC } : {}) },
-      self: { location: a.location, needs: { ...a.needs }, feels: this.feels(a), coins: a.coins, inventory: [...a.inventory], job: a.job ? (this.jobs.get(a.job)?.title ?? a.job) : null, shift: job ? { place: job.place, wage: job.wage, hours: [job.hours[0], job.hours[1]] } : null, debts: a.debts.map((d) => ({ to: this.agents.get(d.to)?.persona.name ?? d.to, coins: d.coins, overdue: this.t >= d.due })), days_hungry: a.starving, weak: a.starving >= 2, family: { partner: this.partnerOf(a)?.persona.name ?? null, children: this.children.filter((c) => c.parents.includes(a.id)).map((c) => `${c.name}, ${this.day - c.bornDay} days old`) }, owns: [...this.places.values()].filter((p) => p.owner === a.id).map((p) => p.name), housing: a.home ? { kind: a.home.place, nights_left: a.home.nightsPaid } : null ,
+      self: { location: a.location, needs: { ...a.needs }, feels: this.feels(a), coins: a.coins, inventory: [...a.inventory], job: a.job ? (this.jobs.get(a.job)?.title ?? a.job) : null, shift: job ? { place: job.place, wage: job.wage, hours: [job.hours[0], job.hours[1]] } : null, debts: a.debts.map((d) => ({ to: this.agents.get(d.to)?.persona.name ?? d.to, coins: d.coins, overdue: this.t >= d.due })), ...(a.deals.some((d) => d.state === "offered" || d.state === "open") ? { deals: a.deals.filter((d) => d.state === "offered" || d.state === "open").map((d) => ({ id: d.id, with: this.agents.get(d.with)?.persona.name ?? d.with, what: d.what, coins: d.coins, mine: d.mine, state: d.state as "offered" | "open", due_in_days: d.due === null ? null : Math.max(0, Math.ceil((d.due - this.t) / MINUTES_PER_DAY)) })) } : {}), days_hungry: a.starving, weak: a.starving >= 2, family: { partner: this.partnerOf(a)?.persona.name ?? null, children: this.children.filter((c) => c.parents.includes(a.id)).map((c) => `${c.name}, ${this.day - c.bornDay} days old`) }, owns: [...this.places.values()].filter((p) => p.owner === a.id).map((p) => p.name), housing: a.home ? { kind: a.home.place, nights_left: a.home.nightsPaid } : null ,
         ...(this.mayor === a.id ? { mayor: true } : {}), ...(a.convictions ? { convictions: a.convictions } : {}),
         ...(a.watch.length ? { watching: [...a.watch] } : {}),
         ...(a.projects.some((x) => !x.done) ? { projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, progress: x.progress, since_day: x.since })) } : {}),
@@ -421,6 +423,9 @@ export class Town {
       case "build": return { ...action, at: this.resolvePlace(action.at) };
       case "say": return action.to ? { ...action, to: this.resolveRef(action.to, near) } : action;
       case "give": return { ...action, to: this.resolveRef(action.to, near) };
+      case "offer": return { ...action, to: this.resolveRef(action.to, near) };
+      case "accept": case "refuse": return action.from ? { ...action, from: this.resolveRef(action.from, near) } : action;
+      case "settle": return action.to ? { ...action, to: this.resolveRef(action.to, near) } : action;
       case "accuse": return { ...action, who: this.resolveRef(action.who, [...this.agents.values()]) };
       // asking for work without naming the post means whatever is open here, or the post whose title they used
       case "apply": { if (action.job && this.jobs.has(action.job)) return action; const here = this.openJobsAt(a.location); const named = action.job ? here.find((j) => j.title.toLowerCase().includes(action.job!.toLowerCase()) || j.id.includes(action.job!.toLowerCase())) : undefined; return { ...action, job: (named ?? here[0])?.id ?? action.job ?? "" }; }
@@ -647,6 +652,44 @@ export class Town {
         for (const w of this.nearby(a)) this.remember(w, `${name} is hiring at ${here.name}: ${lower(action.title)}, ${action.wage} coins.`, 0.55, "rumor");
         break;
       }
+      case "offer": {
+        const b = this.agents.get(action.to)!; const id = this.nextDealId++;
+        const coins = action.coins ?? 0, due = action.days ? this.t + action.days * MINUTES_PER_DAY : null;
+        const row = { id, what: action.what, coins, state: "offered" as const, due, at: this.t };
+        a.deals.push({ ...row, with: b.id, mine: true }); b.deals.push({ ...row, with: a.id, mine: false });
+        const forCoins = coins ? ` for ${coins} coin${coins > 1 ? "s" : ""}` : "", by = action.days ? `, within ${action.days} day${action.days > 1 ? "s" : ""}` : "";
+        this.emit("deal.offered", [a.id, b.id], here.id, `${name} offered ${b.persona.name}: ${action.what}${forCoins}${by}.`, 0.5, { deal: id });
+        this.remember(a, `I offered ${b.persona.name} that I would ${action.what}${forCoins}.`, 0.7); this.remember(b, `${name} offered to ${action.what}${forCoins}. I have not answered yet.`, 0.7);
+        b.hint = `${name} offered you this: ${action.what}${forCoins}${by}. Take it or turn it down.`;
+        break;
+      }
+      case "accept": case "refuse": {
+        const d = this.dealFor(a, action.kind === "accept" ? action : action, "offered"); if (!d) break;
+        const b = this.agents.get(d.with)!; const theirs = b.deals.find((x) => x.id === d.id)!;
+        const forCoins = d.coins ? ` for ${d.coins} coin${d.coins > 1 ? "s" : ""}` : "";
+        if (action.kind === "accept") {
+          d.state = "open"; theirs.state = "open"; this.rel(a, b.id).trust += 0.05; this.rel(b, a.id).trust += 0.05;
+          this.emit("deal.accepted", [a.id, b.id], here.id, `${name} took ${b.persona.name} up on it: ${d.what}${forCoins}.`, 0.55, { deal: d.id });
+          this.remember(a, `I took ${b.persona.name} up on it: they will ${d.what}${forCoins}.`, 0.8); this.remember(b, `${name} took my offer. I said I would ${d.what}.`, 0.85);
+        } else {
+          d.state = "refused"; theirs.state = "refused"; this.rel(b, a.id).trust -= 0.02;
+          const why = action.why ? ` ${action.why}` : "";
+          this.emit("deal.refused", [a.id, b.id], here.id, `${name} turned down ${b.persona.name}'s offer to ${d.what}.${why}`, 0.5, { deal: d.id });
+          this.remember(a, `I turned down ${b.persona.name}: ${d.what}.${why}`, 0.7); this.remember(b, `${name} turned me down on ${d.what}.`, 0.75);
+        }
+        break;
+      }
+      case "settle": {
+        const d = this.dealFor(a, action, "open", true); if (!d) break;
+        const b = this.agents.get(d.with)!; const theirs = b.deals.find((x) => x.id === d.id)!;
+        d.state = "kept"; theirs.state = "kept";
+        if (d.coins && b.coins >= d.coins) { b.coins -= d.coins; a.coins += d.coins; }
+        const r = this.rel(b, a.id); const before = r.trust; r.trust = Math.min(1, r.trust + 0.15);
+        this.emit("deal.kept", [a.id, b.id], here.id, `${name} did what was promised: ${d.what}.`, 0.6, { deal: d.id });
+        this.remember(a, `I did what I promised ${b.persona.name}: ${d.what}.`, 0.8); this.remember(b, `${name} kept their word: ${d.what}.`, 0.85);
+        if (r.trust - before >= 0.1) this.emit("relation.change", [b.id, a.id], here.id, `${b.persona.name} thinks better of ${name}.`, 0.3);
+        break;
+      }
       case "lend": {
         const b = this.agents.get(action.to)!;
         a.coins -= action.coins; b.coins += action.coins;
@@ -871,6 +914,15 @@ export class Town {
       this.remember(lender, `${a.persona.name} has not paid back the ${d.coins} coins. It was due today.`, 0.85); this.remember(a, `I owe ${lender.persona.name} ${d.coins} coins and it is overdue.`, 0.8);
       const r = this.rel(lender, a.id); r.trust = clamp(r.trust - 0.2);
     }
+    // a promise whose day has passed and which nobody settled is a promise broken, and the other side remembers it
+    for (const a of this.agents.values()) for (const d of a.deals) {
+      if (!d.mine || d.state !== "open" || d.due === null || this.t < d.due) continue;
+      const b = this.agents.get(d.with); d.state = "broken"; if (!b) continue;
+      const theirs = b.deals.find((x) => x.id === d.id); if (theirs) theirs.state = "broken";
+      this.emit("deal.broken", [a.id, b.id], a.location, `${a.persona.name} did not do what was promised ${b.persona.name}: ${d.what}.`, 0.8, { deal: d.id });
+      this.remember(a, `I did not do what I promised ${b.persona.name}: ${d.what}.`, 0.85); this.remember(b, `${a.persona.name} promised to ${d.what} and did not.`, 0.9);
+      const r = this.rel(b, a.id); r.trust = clamp(r.trust - 0.25);
+    }
     // relationships drift toward indifference when people do not meet
     for (const a of this.agents.values()) for (const r of a.relationships.values()) if (this.t - r.lastSeen > MINUTES_PER_DAY * 2) r.trust += (0.3 - r.trust) * 0.05;
     // how trust moved today goes on the log, and tomorrow starts from here
@@ -919,8 +971,18 @@ export class Town {
   private workedOnSite = new Set<string>();
 
   /** What makes a meeting matter: low trust, or coins owed either way. */
+  /** The promise an accept, a refusal or a settling is about: the one named, else the oldest with that person, else the oldest waiting. */
+  private dealFor(a: AgentState, action: { deal?: number | undefined; from?: string | undefined; to?: string | undefined }, state: "offered" | "open", mine = false): Deal | null {
+    const other = action.from ?? action.to; const want = other ? this.resolveRef(other) : null;
+    const open = a.deals.filter((d) => d.state === state && d.mine === mine && (!want || d.with === want) && this.agents.has(d.with));
+    return (action.deal !== undefined ? open.find((d) => d.id === action.deal) : open[0]) ?? null;
+  }
   private stakeBetween(a: AgentState, b: AgentState): string | null {
     const owedByA = a.debts.find((d) => d.to === b.id), owedByB = b.debts.find((d) => d.to === a.id);
+    const promised = a.deals.find((d) => d.with === b.id && (d.state === "open" || d.state === "offered"));
+    if (promised) return promised.state === "offered"
+      ? (promised.mine ? `You offered them this and they have not answered: ${promised.what}.` : `They offered you this and you have not answered: ${promised.what}.`)
+      : (promised.mine ? `You promised them this: ${promised.what}${promised.due !== null && this.t >= promised.due ? ", and the day has passed" : ""}.` : `They promised you this: ${promised.what}${promised.due !== null && this.t >= promised.due ? ", and the day has passed" : ""}.`);
     if (owedByA) return `You owe them ${owedByA.coins} coins${this.t >= owedByA.due ? ", and it is overdue" : ""}.`;
     if (owedByB) return `They owe you ${owedByB.coins} coins${this.t >= owedByB.due ? ", and it is overdue" : ""}.`;
     const ta = a.relationships.get(b.id)?.trust ?? 0.3, tb = b.relationships.get(a.id)?.trust ?? 0.3;

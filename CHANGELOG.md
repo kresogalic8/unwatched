@@ -6,6 +6,8 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Promises the town remembers. A citizen can offer someone here a thing they will do, for coins if they like and by a day if they name one; the other takes it or turns it down; the one who promised settles it in front of them when it is done, and the coins change hands then. A promise whose day passes unsettled breaks in the open at midnight, and costs more trust than anything else in the engine. What is promised and what is owed shows in the perception, in the morning plan, and in whatever two people have between them when they meet.
+
 ### Changed
 
 - What the island keeps back from the morning boat is the shelf that food keeps to, so a surplus of bread or fish goes to the mainland for coins instead of going stale on the shelf overnight.

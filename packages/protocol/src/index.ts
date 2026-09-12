@@ -85,6 +85,11 @@ export const Action = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("hire"), title: z.string().max(60), wage: z.number().int().min(1).max(6) }),
   /** Coins now, remembered by both, due in so many days. Repay with give. */
   z.object({ kind: z.literal("lend"), to: AgentRef, coins: z.number().int().positive(), days: z.number().int().min(1).max(30) }),
+  // a promise the town remembers: what you will do for someone, by when, and for how many coins if any
+  z.object({ kind: z.literal("offer"), to: AgentRef, what: z.string().min(3).max(200), coins: z.number().int().min(0).max(500).optional(), days: z.number().int().min(1).max(30).optional() }),
+  z.object({ kind: z.literal("accept"), deal: z.number().int().optional(), from: AgentRef.optional() }),
+  z.object({ kind: z.literal("refuse"), deal: z.number().int().optional(), from: AgentRef.optional(), why: z.string().max(200).optional() }),
+  z.object({ kind: z.literal("settle"), deal: z.number().int().optional(), to: AgentRef.optional() }),
   /** Take someone into a house you own. They sleep free until you say otherwise. */
   z.object({ kind: z.literal("lodge"), who: AgentRef }),
   /** Board the boat and leave the island for good. Only from the harbor, only when a boat runs. */
@@ -153,6 +158,8 @@ export const Perception = z.object({
     /** The needs in words, on a scale that ends in the body failing. */
     feels: z.object({ hunger: z.string(), rest: z.string(), social: z.string() }).optional(),
     debts: z.array(z.object({ to: z.string(), coins: z.number().int(), overdue: z.boolean() })).optional(),
+    /** Promises: yours to keep, and the ones made to you. An offered one is waiting on an answer; an open one is owed. */
+    deals: z.array(z.object({ id: z.number().int(), with: z.string(), what: z.string(), coins: z.number().int(), mine: z.boolean(), state: z.enum(["offered", "open"]), due_in_days: z.number().int().nullable() })).optional(),
     family: z.object({ partner: z.string().nullable(), children: z.array(z.string()) }).optional(),
     /** Days without a proper meal, and whether the body has begun to fail. */
     days_hungry: z.number().int().optional(), weak: z.boolean().optional(),
@@ -206,6 +213,7 @@ export const EventKind = z.enum([
   "agent.work", "agent.hired", "agent.quit", "agent.fired", "agent.sleep", "agent.wake",
   "agent.eat", "agent.rent", "agent.evicted", "agent.reflect", "agent.letter",
   "relation.change", "economy.price", "weather.change", "law.proposed", "law.vote", "law.passed", "law.failed",
+  "deal.offered", "deal.accepted", "deal.refused", "deal.kept", "deal.broken",
   "conversation", "action.rejected", "town.notice", "town.book", "town.mayor", "town.works", "town.verdict", "town.gathering", "town.fire", "boat.cargo", "cart.leg", "agent.do", "agent.became", "town.recipe", "town.named", "town.rule", "town.saying", "agent.search", "town.expose", "law.passed", "law.failed", "agent.plan", "agent.build", "town.built", "agent.unpaid", "agent.hire", "agent.lend", "agent.lodge", "agent.debt", "agent.weak", "agent.died", "town.born", "town.of_age", "agent.inherit", "boat.news",
 ]);
 export type EventKind = z.infer<typeof EventKind>;

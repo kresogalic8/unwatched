@@ -161,6 +161,30 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if ([...v.jobs.values()].filter((j) => j.place === here.id).length >= 3) return { ok: false, reason: "no room for more help here" };
       return { ok: true };
     }
+    case "offer": {
+      const b = action.to ? v.agents.get(action.to) : undefined;
+      if (!b) return { ok: false, reason: "no such person" };
+      if (b.id === a.id) return { ok: false, reason: "you cannot promise yourself anything" };
+      if (b.location !== a.location) return { ok: false, reason: "they are not here to hear it" };
+      if (b.asleep) return { ok: false, reason: "they are asleep" };
+      if (a.deals.some((d) => d.with === b.id && d.state === "offered")) return { ok: false, reason: "there is already an offer between you waiting on an answer" };
+      return { ok: true };
+    }
+    case "accept": case "refuse": {
+      const open = a.deals.filter((d) => d.state === "offered" && !d.mine);
+      if (!open.length) return { ok: false, reason: "nobody has offered you anything" };
+      if (action.deal !== undefined && !open.some((d) => d.id === action.deal)) return { ok: false, reason: "no such offer" };
+      return { ok: true };
+    }
+    case "settle": {
+      const mine = a.deals.filter((d) => d.state === "open" && d.mine);
+      if (!mine.length) return { ok: false, reason: "you have promised nobody anything" };
+      const d = action.deal !== undefined ? mine.find((x) => x.id === action.deal) : mine[0];
+      if (!d) return { ok: false, reason: "no such promise" };
+      const b = v.agents.get(d.with);
+      if (!b || b.location !== a.location) return { ok: false, reason: "they are not here to see it done" };
+      return { ok: true };
+    }
     case "lend": {
       const other = v.agents.get(action.to);
       if (!other || other.location !== a.location) return { ok: false, reason: "not here" };

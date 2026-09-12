@@ -22,6 +22,22 @@ export class MockBrain implements Brain {
     }
     // A letter that asked something: the town has set a crossroads; answer it, in this person's voice.
     if (p.crossroads && /asks something of you/.test(p.crossroads) && a.owner) return { action: { kind: "message_owner", text: `You asked. ${p.self.feels?.hunger === "fed" ? "I am fed" : "I have eaten what I could"}, I have ${p.self.coins} coins${p.self.job ? ` and work as ${p.self.job}` : " and no work yet"}. ${tr.pride > 0.6 ? "I will do it my way, but I heard you." : "I will do as you say, as far as the island lets me."}` }, remember: ["I wrote back to whoever sent me."] };
+    // A promise waiting on an answer: take it or turn it down, by how much they trust the one who offered.
+    const waiting = p.self.deals?.find((d) => d.state === "offered" && !d.mine);
+    if (waiting) {
+      const take = this.rng.next() < 0.45 + tr.warmth * 0.4;
+      if (take) return { action: { kind: "accept", deal: waiting.id }, intent: "take them up on it", remember: [`${waiting.with} will ${waiting.what}. I said yes.`] };
+      return { action: { kind: "refuse", deal: waiting.id, why: "Not on those terms." }, intent: "turn it down", remember: [`${waiting.with} offered to ${waiting.what}. I said no.`] };
+    }
+    // A promise made and the work done where they can see it: settle it and be paid.
+    const owed = p.self.deals?.find((d) => d.state === "open" && d.mine);
+    if (owed && p.nearby.some((n) => n.name === owed.with) && this.rng.chance(0.4)) return { action: { kind: "settle", deal: owed.id }, intent: "make good on it", remember: [`I did what I promised ${owed.with}.`] };
+    // Someone here worth promising something to: a day's work, a thing carried, for a coin or two.
+    const mate = p.nearby.find((n) => !n.asleep && !p.self.deals?.some((d) => d.with === n.name && (d.state === "offered" || d.state === "open")));
+    if (mate && a.job && tr.ambition > 0.35 && this.rng.chance(0.06)) {
+      const what = `take a turn at ${p.place.name} for you`;
+      return { action: { kind: "offer", to: mate.name, what, coins: 1 + Math.floor(this.rng.next() * 3), days: 1 + Math.floor(this.rng.next() * 2) }, intent: "offer them something", remember: [`I offered ${mate.name} to ${what}.`] };
+    }
     // Standing on land for sale with the coins and no roof: build.
     if (p.place.plot?.free && (p.place.plot.planks ?? 6) >= 6 && (p.self.housing === null || p.self.housing.nights_left === 0) && p.self.coins >= p.place.plot.house.coins && (tr.ambition > 0.4 || this.rng.chance(0.3))) return { action: { kind: "build", what: "house", at: p.place.id }, intent: "a roof of my own", remember: ["I bought the land. Now the work."] };
     if (p.place.site) return { action: { kind: "work" }, intent: "raise the frame", remember: [] };

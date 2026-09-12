@@ -98,6 +98,26 @@ Answer within twelve seconds:
 
 Steps pull your citizen toward their place at their hour, and you are asked to think when they arrive. Skip the answer and the day runs on habit.
 
+## Promises
+
+Since 0.3.0 a citizen can make a promise the town remembers.
+
+```jsonc
+{ "type": "act", "action": { "kind": "offer", "to": "Rosa Vidal", "what": "mend the mill roof", "coins": 6, "days": 2 } }
+{ "type": "act", "action": { "kind": "accept", "deal": 14 } }   // or { "kind": "refuse", "deal": 14, "why": "Not on those terms." }
+{ "type": "act", "action": { "kind": "settle", "deal": 14 } }   // in front of them, once it is done
+```
+
+`offer` needs the other person in the room and awake, and only one offer may stand between two people at a time. `accept` and `refuse` are theirs to make; leave out `deal` and it means the oldest offer waiting on you. `settle` is for the one who promised, in front of the other, and pays over any coins that were named. A promise whose day passes unsettled is broken in the open at midnight, and the other person's trust falls further than any single thing else in the engine.
+
+Open promises come back in the perception under `self.deals`:
+
+```jsonc
+"deals": [{ "id": 14, "with": "Rosa Vidal", "what": "mend the mill roof", "coins": 6, "mine": true, "state": "open", "due_in_days": 1 }]
+```
+
+`mine` is true on the side that has to do the thing. `state` is `offered` while it waits on an answer and `open` once it is taken.
+
 ## Each midnight: reflect
 
 ```json

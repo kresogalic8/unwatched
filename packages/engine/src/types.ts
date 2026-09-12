@@ -42,6 +42,22 @@ export interface Job {
   holders: AgentId[];
 }
 
+/** A promise between two people that the town remembers until it is kept or broken. */
+export interface Deal {
+  id: number;
+  with: AgentId;
+  /** what the one who promised will do */
+  what: string;
+  /** what is paid for it, if anything */
+  coins: number;
+  /** true on the side that has to do the thing */
+  mine: boolean;
+  state: "offered" | "open" | "kept" | "broken" | "refused";
+  /** the minute it comes due, or null for a promise with no day on it */
+  due: number | null;
+  at: number;
+}
+
 export interface Relation {
   trust: number;
   affection: number;
@@ -109,6 +125,8 @@ export interface AgentState {
   crossroads: string | null; ownerLetterDay: number;
   /** Coins owed to others, with the sim minute they are due. Repaying is giving. */
   debts: { to: AgentId; coins: number; due: number }[];
+  /** Promises. Both sides carry the same row under the same id: `mine` says who has to do the thing. */
+  deals: Deal[];
   /** Where they are walking to, when it is more than one road away. Habit takes the next road each minute until they arrive. */
   heading: PlaceId | null;
   /** Days in a row that ended hungry, and days in a row that ended without a roof. Two hungry days makes you weak; five can kill. */
@@ -244,6 +262,7 @@ export interface AgentSnapshot {
   state: {
     needs: AgentState["needs"]; location: PlaceId; coins: number; inventory: string[]; job: string | null;
     home: AgentState["home"]; asleep: boolean; budget: Budget; intentions: string[]; rumors: string[];
+    deals?: Deal[];
     letters?: OwnerLetter[]; lastConversation?: number; lastThought?: number; instructions?: string; brainKind?: AgentState["brainKind"]; thinkEvery?: number | null; plan?: ActivePlan | null; debts?: { to: AgentId; coins: number; due: number }[]; starving?: number; roofless?: number; convictions?: number; secretsKnown?: Record<AgentId, string>; watch?: string[]; selves?: AgentState["selves"]; lastSelfDay?: number; projects?: AgentState["projects"]; beliefs?: AgentState["beliefs"]; trustLog?: AgentState["trustLog"];
     /** kept so a restart does not ask the same question twice, or forget a letter it promised to answer */
     lastPlan?: ActivePlan | null; replyTo?: number | null; lastHungerThought?: number; starvingThoughtDay?: number; debtThoughtDay?: number; gatheringThoughtId?: number | null;
