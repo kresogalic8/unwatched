@@ -6,6 +6,8 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Optional Telegram delivery of an explicitly paired agent's letters to its owner, with ownership checks, plain-text messages and secret-safe failure reporting.
+
 ### Changed
 
 ### Fixed
