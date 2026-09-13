@@ -1,3 +1,4 @@
+import { desiresForMind, desireEvidence, reviseDesires, recordDesireAttempt } from "./desires.ts";
 import { recordEvolution, type EvolutionStory } from "./evolution.ts";
 import { skillId, achieved, importedSkill, type SkillMeasure } from "./skills.ts";
 import { recordPurchase, foodExperience, teachable, ADVICE_LIFETIME } from "./learning.ts";
@@ -223,6 +224,7 @@ export class Town {
         coins: sa.state.coins, inventory: [...sa.state.inventory], job: sa.state.job && this.jobs.has(sa.state.job) ? sa.state.job : null,
         home: sa.state.home, asleep: sa.state.asleep, arrivedAt: sa.arrivedAt,
         relationships: new Map(sa.relationships.map((r) => [r.other, { trust: r.trust, affection: r.affection, lastSeen: r.lastSeen, opinion: r.opinion, lastPlace: (r as { lastPlace?: string | null }).lastPlace ?? null }])),
+        desires: structuredClone(sa.state.desires ?? []),
         skills: structuredClone(sa.state.skills ?? []), practice: structuredClone(sa.state.practice ?? null), lastSkillTrialDay: sa.state.lastSkillTrialDay ?? -1, foodAdvice: structuredClone(sa.state.foodAdvice ?? []), foodLessons: structuredClone(sa.state.foodLessons ?? []), foodRoutineDecisions: structuredClone(sa.state.foodRoutineDecisions ?? []),
         memory: [...sa.memory].sort((x, y) => x.t - y.t),
         budget: { ...sa.state.budget }, funded: sa.funded, owner: sa.owner, letters: sa.state.letters ?? [], intentions: [...sa.state.intentions],
@@ -251,7 +253,7 @@ export class Town {
       jobs: [...this.jobs.values()].filter((j) => this.places.get(j.place)?.owner).map(({ holders: _h, ...j }) => j),
       agents: [...this.agents.values()].map((a): AgentSnapshot => ({
         id: a.id, persona: a.persona, owner: a.owner, funded: a.funded, appearance: a.appearance, arrivedAt: a.arrivedAt,
-        state: { skills: structuredClone(a.skills ?? []), practice: structuredClone(a.practice ?? null), lastSkillTrialDay: a.lastSkillTrialDay ?? -1, foodAdvice: structuredClone(a.foodAdvice ?? []), foodRoutineDecisions: structuredClone(a.foodRoutineDecisions ?? []), foodLessons: structuredClone(a.foodLessons ?? []), deals: a.deals.filter((d) => d.state === "offered" || d.state === "open"), needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, brainKind: a.brainKind, thinkEvery: a.thinkEvery, plan: a.plan, lastPlan: a.lastPlan, replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId, debts: a.debts, starving: a.starving, roofless: a.roofless, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60) },
+        state: { desires: structuredClone(a.desires ?? []), skills: structuredClone(a.skills ?? []), practice: structuredClone(a.practice ?? null), lastSkillTrialDay: a.lastSkillTrialDay ?? -1, foodAdvice: structuredClone(a.foodAdvice ?? []), foodRoutineDecisions: structuredClone(a.foodRoutineDecisions ?? []), foodLessons: structuredClone(a.foodLessons ?? []), deals: a.deals.filter((d) => d.state === "offered" || d.state === "open"), needs: a.needs, location: a.location, coins: a.coins, inventory: a.inventory, job: a.job, home: a.home, asleep: a.asleep, budget: a.budget, intentions: a.intentions, rumors: a.rumors.slice(-5), letters: a.letters.filter((l) => !l.read || (!l.answered && asksSomething(l.text))), lastConversation: a.lastConversation, lastThought: a.lastThought, instructions: a.instructions, brainKind: a.brainKind, thinkEvery: a.thinkEvery, plan: a.plan, lastPlan: a.lastPlan, replyTo: a.replyTo, lastHungerThought: a.lastHungerThought, starvingThoughtDay: a.starvingThoughtDay, debtThoughtDay: a.debtThoughtDay, gatheringThoughtId: a.gatheringThoughtId, debts: a.debts, starving: a.starving, roofless: a.roofless, convictions: a.convictions, secretsKnown: a.secretsKnown, watch: a.watch, selves: a.selves, lastSelfDay: a.lastSelfDay, projects: a.projects, beliefs: a.beliefs, trustLog: a.trustLog.slice(-60) },
         relationships: [...a.relationships.entries()].map(([other, r]) => ({ other, ...r })),
         memory: a.memory,
       })),
@@ -369,7 +371,9 @@ export class Town {
       // a mind that has nothing better to do than wait keeps walking to where it was going
       let chosen = proposal.action;
       if (chosen.kind === "wait" && th.a.heading && th.a.heading !== th.a.location && this.places.has(th.a.heading)) { const nx = this.path(th.a.location, th.a.heading); if (nx) chosen = { kind: "move", to: nx }; }
-      this.apply(th.a, chosen, `tier ${th.tier}: ${th.why}`);
+      const eventStart = this.events.length;
+      const accepted = this.apply(th.a, chosen, `tier ${th.tier}: ${th.why}`);
+      recordDesireAttempt(th.a.desires ?? [], proposal.desire_id, this.t, chosen.kind, accepted, this.events.slice(eventStart).filter(e => e.actors.includes(th.a.id)));
       // they thought it over and did not write: the question goes unanswered, and the next letter that asks gets its own crossroads
       if (wasAsked && th.a.replyTo !== null) th.a.replyTo = null;
       this.because = null;
@@ -402,6 +406,7 @@ export class Town {
         ...(this.mayor === a.id ? { mayor: true } : {}), ...(a.convictions ? { convictions: a.convictions } : {}),
         ...(a.watch.length ? { watching: [...a.watch] } : {}),
         ...(a.projects.some((x) => !x.done) ? { projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, progress: x.progress, since_day: x.since, ...(x.construction ? { construction: { ...x.construction } } : {}) })) } : {}),
+        ...(a.desires?.length ? { desires: desiresForMind(a.desires) } : {}),
         ...(a.skills?.length ? { skills: a.skills.map(s => ({ id:s.id, recipe:s.recipe, attempts:s.attempts, successes:s.successes, ...(s.learnedFrom ? {learned_from:s.learnedFrom}:{}), ...(s.trial ? {trial:s.trial}:{} ) })) } : {}),
         ...(this.learning && a.foodLessons?.length ? { learned_food: a.foodLessons.map(l => ({ place: l.place, item: l.item, ...foodExperience(a.foodLessons, l.place, l.item, this.t) })) } : {}),
         ...(this.learning && a.foodAdvice?.length ? { food_advice: a.foodAdvice.filter(x => this.t - x.sourceT <= ADVICE_LIFETIME).map(x => ({ from: x.from, name: this.agents.get(x.from)?.persona.name ?? x.from, place: x.place, item: x.item, confidence: x.confidence, source_t: x.sourceT, shared_t: x.sharedT, trust: a.relationships.get(x.from)?.trust ?? .3, ...(x.tested ? { tested: x.tested.matched } : {}) })) } : {}),
@@ -1032,12 +1037,14 @@ export class Town {
       const dayMemories = a.memory.filter((m) => m.t >= dayStart && m.kind !== "reflect").sort((x, y) => y.importance - x.importance).slice(0, 12).map(memoryForMind);
       const keyMemories = retrieve(a.memory, a.persona.want, this.t, 6).map(memoryForMind);
       const rels = [...a.relationships.entries()].map(([id, r]) => ({ id, name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion }));
+      const experiences = desireEvidence(todays, a.id, dayStart);
       let ref: Reflection;
-      try { ref = await this.brain.reflect({ agent: a, day: this.day, actionEvidence: todays.filter(e => e.actors.includes(a.id) && ["agent.trade", "agent.work", "agent.hired", "agent.quit", "agent.build", "town.built", "agent.give", "agent.take", "action.rejected"].includes(e.kind)).slice(-24).map(e => `[event ${e.id}, minute ${e.t}, ${e.kind}] ${e.text}`), dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
+      try { ref = await this.brain.reflect({ desireEvidence: experiences, agent: a, day: this.day, actionEvidence: todays.filter(e => e.actors.includes(a.id) && ["agent.trade", "agent.work", "agent.hired", "agent.quit", "agent.build", "town.built", "agent.give", "agent.take", "action.rejected"].includes(e.kind)).slice(-24).map(e => `[event ${e.id}, minute ${e.t}, ${e.kind}] ${e.text}`), dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
       catch (err) { await refundReflection(); this.log(`reflect failed for ${a.persona.name}: ${(err as Error).message}`); continue; }
       this.remember(a, ref.summary, 0.75, "reflect");
       for (const i of ref.insights) this.remember(a, i, 0.6, "reflect");
       for (const o0 of ref.opinions) { const about = this.resolveRef(o0.about); if (!this.agents.has(about) || about === a.id) continue; const o = { ...o0, about }; const r = this.rel(a, o.about); r.opinion = o.opinion; r.trust = clamp(r.trust + o.trust_delta); if (Math.abs(o.trust_delta) > 0.1) this.emit("relation.change", [a.id, o.about], undefined, `${a.persona.name} now thinks of ${this.agents.get(o.about)?.persona.name ?? o.about}: “${o.opinion}”`, 0.4 + Math.abs(o.trust_delta)); }
+      a.desires = reviseDesires(a.desires ?? [], ref.desires ?? [], experiences, this.t, a.id);
       a.intentions = ref.intentions;
       if (ref.watch) a.watch = ref.watch.map((w) => w.trim()).filter(Boolean).slice(0, 4);
       // a saying: when two people find themselves saying the same thing, the island keeps it

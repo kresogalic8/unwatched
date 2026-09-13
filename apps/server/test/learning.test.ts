@@ -19,3 +19,10 @@ it("shows public receipts without exposing rejected attempts or private lessons"
  expect(view).not.toHaveProperty("foodRoutineDecisions");
  expect(ownerAgent(town,a).foodLessons).toHaveLength(2);
 });
+it("keeps desires and their evidence private to the citizen owner",()=>{
+ const town=new Town({seed:7,brain:new MockBrain(7)});
+ const a=town.addAgent({persona:{name:"Mira",age:30,origin:"mainland",summary:"curious",want:"learn",fear:"hunger",secret:"none",strangers:"polite",advice:"listens",traits:{warmth:.5,pride:.5,caution:.5,honesty:.5,ambition:.5}}});
+ a.desires=[{id:"want-1",title:"PRIVATE_DESIRE",why:"PRIVATE_REASON",state:"active",since:10,updated:10,history:[{t:10,title:"PRIVATE_DESIRE",why:"PRIVATE_REASON",state:"active",evidence:[{id:1,t:5,kind:"agent.say",text:"PRIVATE_EXPERIENCE"}]}],attempts:[]}];
+ expect(JSON.stringify(publicAgent(town,a))).not.toContain("PRIVATE");
+ expect(ownerAgent(town,a).desires).toEqual(a.desires);
+});

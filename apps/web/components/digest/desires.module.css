@@ -1,0 +1,21 @@
+.section { margin-top: 32px; border-top: 1px solid var(--rule, #cdd0c4); padding-top: 28px; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted, #606557); }
+.section h2 { font-size: 28px; line-height: 1.1; letter-spacing: -.04em; margin: 12px 0; }
+.intro, .empty { font-size: 14px; line-height: 1.6; color: var(--muted, #606557); }
+.empty { padding: 20px 0; }
+.desire { border-top: 1px solid var(--rule, #cdd0c4); padding: 22px 0; margin-top: 20px; }
+.meta { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--muted, #606557); }
+.meta span:first-child { color: #b34322; }
+.desire h3 { font-size: 21px; line-height: 1.2; margin: 12px 0; letter-spacing: -.025em; }
+.desire p { font-size: 14px; line-height: 1.6; }
+.desire summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; cursor: pointer; font-size: 13px; list-style: none; }
+.desire summary::-webkit-details-marker { display: none; }
+.desire summary svg { transition: transform 180ms ease; }
+.desire details[open] summary svg { transform: rotate(45deg); }
+.desire summary:hover { color: #b34322; }
+.desire summary:focus-visible { outline: 2px solid #b34322; outline-offset: 3px; }
+.desire .note, .entry small { font-size: 12px; color: var(--muted, #606557); }
+.entry { margin-top: 16px; }
+.entry blockquote { border-left: 2px solid var(--rule, #cdd0c4); padding-left: 12px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
+.entry blockquote span { display: block; font-size: 10px; color: var(--muted, #606557); margin-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) { .desire summary svg { transition: none; } }

@@ -96,6 +96,7 @@ export interface Budget {
 export interface OwnerLetter { id: number; text: string; t: number; read: boolean; /** set once the citizen has written back to this letter; one answer per letter */ answered?: boolean }
 
 export interface AgentState {
+  desires?: import("@unwatched/protocol").Desire[];
   skills?: import("./skills.ts").LearnedSkill[];
   practice?: import("./skills.ts").SkillPractice | null;
   lastSkillTrialDay?: number;
@@ -194,6 +195,7 @@ export interface ReflectContext {
   agent: AgentState; day: number; dayMemories: string[]; keyMemories: string[];
   /** Bounded personal action records; speech is evidence of speaking, not of its claims. */
   actionEvidence?: string[];
+  desireEvidence?: import("@unwatched/protocol").TownEvent[];
   relationships: { id: AgentId; name: string; trust: number; opinion: string }[];
   unreadLetters: string[];
   /** What they meant to do this morning and what came of each step; what they carry across weeks; what they believe; what they chose to watch. Shown so a night's answer keeps what it means to keep. */
@@ -281,6 +283,7 @@ export interface AgentSnapshot {
   appearance: Record<string, unknown> | null;
   arrivedAt: number;
   state: {
+    desires?: import("@unwatched/protocol").Desire[];
     skills?: import("./skills.ts").LearnedSkill[];
     practice?: import("./skills.ts").SkillPractice | null;
     lastSkillTrialDay?: number;

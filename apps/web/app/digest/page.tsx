@@ -1,4 +1,5 @@
 "use client";
+import { Desires } from "@/components/digest/Desires";
 import { Icon as ArrowIcon } from "@/components/icons";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -353,6 +354,7 @@ export default function DigestPage() {
               </p>
             )}
           </Card>
+          <Desires desires={agent.desires ?? []} name={first ?? agent.name} />
           {agent.watch?.length ||
           agent.selves?.length ||
           agent.projects?.length ||

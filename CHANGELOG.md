@@ -6,6 +6,11 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Emerging desires: citizens can form, reconsider, set aside or report fulfillment of lasting wants during existing nightly reflection, citing personal experience records validated by the engine.
+- Compact desire context in planning and decisions, with optional action-to-desire links and recorded accepted/rejected outcomes. No assigned careers, quests or guaranteed outcomes.
+- A private “What they want now” section in the owner digest with reasons, bounded revision history, experience records and action attempts.
+- Backward-compatible optional external-brain fields and persisted desire state; existing snapshots start without invented desires. No database migration or additional model calls.
+
 ### Changed
 
 ### Fixed

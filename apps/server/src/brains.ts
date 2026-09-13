@@ -1,3 +1,4 @@
+import { desiresForMind } from "@unwatched/engine";
 import { randomBytes } from "node:crypto";
 import type { WebSocket } from "ws";
 import type { ActionProposal, DayPlan, DigestText, Dialogue, Paper, LifeText, Judgement, Perception, Persona, Reflection } from "@unwatched/protocol";
@@ -90,12 +91,12 @@ export class OwnBrain implements Brain {
   }
   async converse(ctx: ConverseContext): Promise<Dialogue> { return this.fallback.converse(ctx); } // never called: own-brains talk turn by turn
   async reflect(ctx: ReflectContext): Promise<Reflection> {
-    const got = await this.ask({ type: "reflect", agent_id: ctx.agent.id, day: ctx.day, day_memories: ctx.dayMemories, key_memories: ctx.keyMemories, relationships: ctx.relationships, coins: ctx.agent.coins, job: ctx.agent.job, unread_letters: ctx.unreadLetters, plan: ctx.plan, projects: ctx.projects, beliefs: ctx.beliefs, watch: ctx.watch, quiet: ctx.quiet }, 30000); // an own brain sees the same night a hosted one does
+    const got = await this.ask({ type: "reflect", desires: desiresForMind(ctx.agent.desires), desire_evidence: (ctx.desireEvidence ?? []).map(e => ({id:e.id,kind:e.kind,text:e.text.slice(0,240)})), agent_id: ctx.agent.id, day: ctx.day, day_memories: ctx.dayMemories, key_memories: ctx.keyMemories, relationships: ctx.relationships, coins: ctx.agent.coins, job: ctx.agent.job, unread_letters: ctx.unreadLetters, plan: ctx.plan, projects: ctx.projects, beliefs: ctx.beliefs, watch: ctx.watch, quiet: ctx.quiet }, 30000); // an own brain sees the same night a hosted one does
     const parsed = got ? ReflectionSchema.safeParse(got) : null;
     return parsed?.success ? parsed.data : this.fallback.reflect(ctx);
   }
   async plan(ctx: PlanContext, tier: Tier): Promise<DayPlan> {
-    const got = await this.ask({ type: "plan", agent_id: ctx.agent.id, day: ctx.day, hour: ctx.hour, weather: ctx.weather, yesterday: ctx.yesterday, intentions: ctx.intentions, key_memories: ctx.keyMemories, relationships: ctx.relationships, places: ctx.places, jobs_open: ctx.jobsOpen, letters: ctx.unreadLetters, coins: ctx.agent.coins, job: ctx.agent.job }, 12000);
+    const got = await this.ask({ type: "plan", desires: desiresForMind(ctx.agent.desires), agent_id: ctx.agent.id, day: ctx.day, hour: ctx.hour, weather: ctx.weather, yesterday: ctx.yesterday, intentions: ctx.intentions, key_memories: ctx.keyMemories, relationships: ctx.relationships, places: ctx.places, jobs_open: ctx.jobsOpen, letters: ctx.unreadLetters, coins: ctx.agent.coins, job: ctx.agent.job }, 12000);
     const parsed = got ? DayPlanSchema.safeParse(got) : null;
     return parsed?.success ? parsed.data : this.fallback.plan(ctx, tier);
   }

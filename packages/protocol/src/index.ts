@@ -136,8 +136,25 @@ export const Action = z.discriminatedUnion("kind", [
 ]);
 export type Action = z.infer<typeof Action>;
 
+/** A private, evolving want. Evidence records experiences, not proof of an interpretation. */
+export const DesireUpdate = z.object({
+  id: z.string().max(40).optional(),
+  title: z.string().trim().min(3).max(100),
+  why: z.string().trim().min(3).max(300),
+  state: z.enum(["active", "set_aside", "fulfilled"]),
+  evidence: z.array(z.number().int().nonnegative()).min(1).max(3),
+});
+export type DesireUpdate = z.infer<typeof DesireUpdate>;
+export const Desire = z.object({
+  id: z.string(), title: z.string(), why: z.string(), state: z.enum(["active", "set_aside", "fulfilled"]), since: z.number(), updated: z.number(),
+  history: z.array(z.object({ t: z.number(), title: z.string(), why: z.string(), state: z.enum(["active", "set_aside", "fulfilled"]), evidence: z.array(z.object({ id: z.number(), t: z.number(), kind: z.string(), text: z.string() })) })),
+  attempts: z.array(z.object({ t: z.number(), action: z.string(), accepted: z.boolean(), events: z.array(z.object({ id: z.number(), text: z.string() })) })),
+});
+export type Desire = z.infer<typeof Desire>;
+
 /** What an agent returns when it thinks. The model proposes, the engine disposes. */
 export const ActionProposal = z.object({
+  desire_id: z.string().max(40).optional(),
   action: Action,
   intent: z.string().max(600).optional(),
   remember: z.array(z.string().max(400)).max(3).default([]),
@@ -204,6 +221,7 @@ export const Perception = z.object({
     /** What this person chose to keep an eye on. */
     watching: z.array(z.string()).optional(),
     /** What they are working toward over weeks, and where each stands. */
+    desires: z.array(Desire.pick({ id: true, title: true, why: true, state: true, since: true, updated: true }).extend({ last_attempt: z.object({ t: z.number(), action: z.string(), accepted: z.boolean() }).optional() })).max(5).optional(),
     projects: z.array(z.object({ title: z.string(), progress: z.string(), since_day: z.number().int(), construction: z.object({ site: PlaceId, labor: z.number().int(), needed: z.number().int() }).optional() })).optional(),
     food_advice: z.array(z.object({ from: AgentId, name: z.string(), place: PlaceId, item: z.string(), confidence: z.number(), source_t: z.number(), shared_t: z.number(), trust: z.number(), tested: z.boolean().optional() })).optional(),
     /** What they believe, and how sure they are. Not necessarily true. */
@@ -276,6 +294,7 @@ export type TownEvent = z.infer<typeof TownEvent>;
 
 /** Nightly reflection, produced by a brain. */
 export const Reflection = z.object({
+  desires: z.array(DesireUpdate).max(2).optional(),
   summary: z.string().max(1500),
   insights: z.array(z.string().max(600)).max(3),
   opinions: z.array(z.object({ about: AgentRef, opinion: z.string().max(600), trust_delta: z.number().min(-0.3).max(0.3) })).max(5),

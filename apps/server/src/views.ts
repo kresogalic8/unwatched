@@ -27,6 +27,7 @@ export function publicAgent(town: Town, a: AgentState) {
 export function ownerAgent(town: Town, a: AgentState) {
   return {
     ...publicAgent(town, a),
+    desires: a.desires ?? [],
     foodAdvice: a.foodAdvice ?? [],
     foodLessons: a.foodLessons ?? [], foodRoutineDecisions: a.foodRoutineDecisions ?? [],
     persona: a.persona,
