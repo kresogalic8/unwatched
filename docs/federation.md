@@ -58,3 +58,7 @@ Trade and letters. A boat that carries flour from a farming island to a hungry b
 ## Cargo
 
 Linked islands trade. At seven each morning, before the mainland buys anything, an island asks each harbour it is linked to what that island is short of (`GET /api/boat/wants`, with the shared secret), sends what it has spare (`POST /api/boat/cargo`), and is paid by the shelves that wanted it. The buying island's tills pay in coins that leave it; the selling island's producers are paid in coins that arrive, so across the federation nothing is minted by the trade itself. What no island wanted goes to the mainland at eight, as before.
+
+## Procedures carried by travelers
+
+Passengers can now include up to twelve bounded, successfully practiced recipes. Each retains its declared island/author origin; the destination resets local attempts and successes to zero. Recipes are data composed of allowed actions, never arbitrary code. Imported knowledge must be tested locally, and a place ID from the previous island may not resolve. See [procedural learning](evolution.md).

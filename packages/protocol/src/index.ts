@@ -40,13 +40,27 @@ export type Persona = z.infer<typeof Persona>;
 export const PersonaDepth = z.object({ voice: z.array(z.string().max(240)).min(2).max(3), habit: z.string().max(240), skill: z.string().max(120), flaw: z.string().max(240), cameBecause: z.string().max(200) });
 export type PersonaDepth = z.infer<typeof PersonaDepth>;
 
+/** Bounded reusable procedures: no recursion, code execution, messages or privileged actions. */
+export const SkillStep = z.discriminatedUnion("kind", [
+  z.object({kind:z.literal("move"),to:PlaceId}),
+  z.object({kind:z.literal("trade"),buy:z.string().min(1).max(30).optional(),sell:z.string().min(1).max(30).optional()}),
+  z.object({kind:z.literal("repair")}),
+  z.object({kind:z.literal("use"),item:z.string().min(1).max(30)}),
+  z.object({kind:z.literal("work")}),
+  z.object({kind:z.literal("apply")}),
+  z.object({kind:z.literal("make"),item:z.string().min(2).max(30),from:z.array(z.string().max(30)).min(1).max(4)}),
+]);
+export const SkillRecipe = z.object({name:z.string().trim().min(3).max(60),goal:z.enum(["eat","earn","repair","produce"]),steps:z.array(SkillStep).min(1).max(8)});
+export type SkillRecipe = z.infer<typeof SkillRecipe>;
+export const TravellingSkill = z.object({recipe:SkillRecipe,origin:z.object({island:z.string().max(100),author:z.string().max(100),name:z.string().max(100)})});
+
 /** The action kinds the town can carry out. Nothing else exists. */
 export const ActionKind = z.enum([
   "move", "say", "give", "take", "use", "work", "apply", "quit", "trade",
   "propose", "vote", "write", "build", "message_owner", "sleep", "wait",
   "hire", "lend", "lodge", "leave",
   "fund", "accuse", "search", "do", "stock", "make", "call",
-  "start_project", "contribute_project", "withdraw_project", "teach",
+  "start_project", "contribute_project", "withdraw_project", "teach", "propose_skill", "test_skill", "practice_skill", "share_skill", "repair", "found_institution", "join_institution", "leave_institution",
 ]);
 export type ActionKind = z.infer<typeof ActionKind>;
 
@@ -60,6 +74,13 @@ export const CommunityProject = z.object({
 export type CommunityProject = z.infer<typeof CommunityProject>;
 
 export const Action = z.discriminatedUnion("kind", [
+  z.object({kind:z.literal("found_institution"),name:z.string().trim().min(3).max(60),charter:z.string().trim().min(10).max(400)}),
+  z.object({kind:z.literal("join_institution")}),z.object({kind:z.literal("leave_institution")}),
+  z.object({kind:z.literal("repair")}),
+  z.object({kind:z.literal("propose_skill"),recipe:SkillRecipe}),
+  z.object({kind:z.literal("test_skill"),id:z.string().max(20)}),
+  z.object({kind:z.literal("practice_skill"),id:z.string().max(20)}),
+  z.object({kind:z.literal("share_skill"),id:z.string().max(20),to:AgentRef}),
   z.object({ kind: z.literal("start_project"), at: PlaceId, name: z.string().trim().min(2).max(60), why: z.string().trim().min(3).max(240) }),
   z.object({ kind: z.literal("contribute_project"), at: PlaceId, coins: z.number().int().min(0).max(500).default(0), help: z.boolean().default(true) }),
   z.object({ kind: z.literal("withdraw_project"), at: PlaceId }),
@@ -149,6 +170,7 @@ export const Passenger = z.object({
   opinions: z.array(z.object({ name: z.string(), trust: z.number(), opinion: z.string() })).max(40),
   instructions: z.string(), why: z.string().nullable(),
   news: z.array(z.string()).max(6),
+  skills: z.array(TravellingSkill).max(12).optional(),
 });
 export type Passenger = z.infer<typeof Passenger>;
 
@@ -188,6 +210,7 @@ export const Perception = z.object({
     believes: z.array(z.object({ about: z.string(), belief: z.string(), confidence: z.number() })).optional(),
     /** Secrets learned by going through someone's things, or read in an exposé. Heavy to carry; heavier to use. */
     knows: z.array(z.object({ who: z.string(), secret: z.string() })).optional(),
+    skills: z.array(z.object({id:z.string(),recipe:SkillRecipe,attempts:z.number(),successes:z.number(),learned_from:z.string().optional(),trial:z.object({success:z.boolean(),accepted:z.number(),total:z.number()}).optional()})).optional(),
     owns: z.array(z.string()).optional(),
     housing: z.object({ kind: z.string(), nights_left: z.number().int() }).nullable(),
   }),
@@ -197,6 +220,7 @@ export const Perception = z.object({
     asleep: z.boolean().optional(),
   })),
   place: z.object({ id: PlaceId, name: z.string(), kind: z.string(), for_sale: z.array(z.object({ item: z.string(), price: z.number() })), jobs_open: z.array(z.string()), exits: z.array(PlaceId),
+    institution: z.object({name:z.string(),charter:z.string(),founder:z.string(),members:z.array(z.string()),founded:z.number()}).optional(),
     community: CommunityProject.optional(),
     owner: z.string().nullable().optional(),
     /** For someone who works here: what is in the store room, and whether the place is broken. */
@@ -226,6 +250,7 @@ export type Perception = z.infer<typeof Perception>;
 /** Everything that happens is one of these. */
 export const EventKind = z.enum([
   "tick.day", "boat.dock", "boat.depart", "agent.arrive", "agent.leave",
+  "institution.founded", "institution.joined", "institution.left", "building.repaired", "skill.proposed", "skill.tested", "skill.practiced", "skill.shared",
   "project.proposed", "project.contributed", "project.withdrawn", "garden.harvest", "knowledge.shared",
   "agent.move", "agent.say", "agent.give", "agent.take", "agent.trade",
   "agent.work", "agent.hired", "agent.quit", "agent.fired", "agent.sleep", "agent.wake",

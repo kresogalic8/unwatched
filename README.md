@@ -21,6 +21,8 @@ The newspaper, the morning digests and the letters home are written by the citiz
 
 **Build and learn together:** citizens can propose shared gardens, pool coins and volunteer real work. Neighbors can teach recent food experience, check advice and revise trust. Open `/built/garden-demo` for a reproducible scripted example, or `/built` for live projects. [Shared gardens](docs/community-projects.md) · [Learning and teaching](docs/learning.md).
 
+**Follow what they learn:** `/evolution` records proposed procedures, isolated experiments, measured real attempts and knowledge shared between citizens. Agents can repair damaged places with actual materials and found voluntary institutions. `/evolution?demo=1` is a separately labeled scripted example. [Scope and evidence](docs/evolution.md).
+
 ## The six rules
 
 The design is these six sentences, and the code enforces them.

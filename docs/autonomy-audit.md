@@ -59,3 +59,7 @@ This calls paid models. The cap bounds logical Brain calls, not HTTP attempts or
 Local evidence is retained under `out/autonomy-live-7/`: `decisions.jsonl`, `events.jsonl`, `snapshot.json`, `report.json` and `report-corrected.json`. These ignored artifacts are not committed public fixtures. The original report mislabeled absolute simulation minute 1440 as elapsed time; the corrected report subtracts the known starting minute 360. The original is preserved, and no simulation behavior was changed by that metadata correction. The utility now records start time and elapsed minutes separately and freezes initial persona metadata before reflections can change it.
 
 Validation: the headless TypeScript check passed; a three-day mock instrumentation run completed; a one-call cap check stopped with explicit incomplete status. These checks validate the observer, not autonomous behavior. No production behavior, deployment or release was changed for this audit.
+
+## Seven-day evolution instrumentation
+
+The default observation length is now seven simulation days. Additional procedure, teaching, institution and JSON snapshot round-trip results are written to `evolution.json`. Mock completion tests the instrumentation only. Live mode now requires a dedicated `UW_AUDIT_OPENROUTER_API_KEY` with a non-resetting provider cap and an explicit `--max-usd` value; it does not fall back to the project's shared key. See [scope and measurement](evolution.md).

@@ -1,3 +1,4 @@
+import { telegramRoutes } from "./telegram-routes.ts";
 import { TelegramLetters } from "./telegram.ts";
 import { publicProject } from "./views.ts";
 import { constructionRoutes } from "./construction.ts";
@@ -85,7 +86,13 @@ if (!store && process.env.UW_STORE !== "none") { store = FileStore.fromEnv(TOWN_
 const clients = new Set<WebSocket>();
 function broadcast(msg: unknown) { const s = JSON.stringify(msg); for (const c of clients) if (c.readyState === 1) c.send(s); }
 
-const telegram = new TelegramLetters({ token: process.env.TELEGRAM_BOT_TOKEN, chat: process.env.TELEGRAM_CHAT_ID, owner: process.env.TELEGRAM_OWNER_ID, agent: process.env.TELEGRAM_AGENT_ID }, log);
+const telegramDb = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }) : null;
+const selfServeTelegram = !!(telegramDb && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_WEBHOOK_SECRET);
+const telegram = new TelegramLetters({ token: process.env.TELEGRAM_BOT_TOKEN, chat:process.env.TELEGRAM_CHAT_ID, owner:process.env.TELEGRAM_OWNER_ID, agent:process.env.TELEGRAM_AGENT_ID, resolve: selfServeTelegram && telegramDb ? async (owner, agent) => {
+  const { data, error } = await telegramDb!.from("owner_telegram").select("chat_id,agent_ids").eq("owner_id", owner).maybeSingle();
+  if (error) throw new Error("Telegram settings unavailable");
+  return data?.chat_id && data.agent_ids.includes(agent) ? data.chat_id : null;
+} : undefined }, log);
 const billing = new Billing(store, log); await billing.load();
 modelsFor = (a) => {
   if (a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan !== "none") return billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
@@ -250,6 +257,7 @@ async function ownerOf(req: Request): Promise<string | null> {
   if (!sb || process.env.UW_DEV_OWNER === "1") return req.headers.get("x-owner");
   return null;
 }
+if (telegramDb) app.route("/api", telegramRoutes(telegramDb, ownerOf, owner => [...town.agents.values()].filter(a => a.owner === owner).map(a => ({ id: a.id, name: a.persona.name })), { username: process.env.TELEGRAM_BOT_USERNAME ?? "", secret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "", enabled: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_WEBHOOK_SECRET) }));
 const owns = (a: { owner: string | null }, owner: string | null) => !!owner && a.owner === owner;
 
 const placeView = (p: import("@unwatched/engine").Place) => ({ community: publicProject(town, p), id: p.id, hasHistory: !!p.history, name: p.nickname ? `${p.name} (${p.nickname})` : p.name, kind: p.kind, exits: p.exits, crowd: town.crowd(p.id), x: p.x, y: p.y, district: p.district, sprite: p.sprite, ...(p.look ? { look: p.look } : {}), ...(Object.keys(p.stock).length ? { stock: p.stock } : {}), owner: p.owner ? (town.agents.get(p.owner)?.persona.name ?? null) : null, site: p.site ? { what: p.site.what, name: p.site.name, by: town.agents.get(p.site.by)?.persona.name ?? p.site.by, done: p.site.labor, of: p.site.laborNeeded } : null, beds: p.beds ? { price: p.beds.price, free: p.freeBeds ?? 0 } : null });
@@ -534,7 +542,7 @@ app.get("/api/ops", (c) => {
     clock: clockOf(town), switches: { paused: town.paused, economyFrozen: town.economyFrozen, boatHeld: town.boatHeld },
     stats: { agents: agents.length, funded: funded.length, hosted: hosted.length, ownKey: ownKey.length, ownBrain: ownBrain.length, costToday: Math.round(today.cost * 100) / 100, costPerFunded: hosted.length ? Math.round(today.cost / hosted.length * 100) / 100 : 0, p50: today.p50, p95: today.p95, holds: metrics.holds.filter((h) => !h.done && h.level === "hold").length, fallbacksToday: metrics.fallbacks.filter((f) => Date.now() - f.at < 86400000).length, cachedTokens: townBrain instanceof OpenRouterBrain ? townBrain.cachedTokens() : 0, ceiling: Number(process.env.UW_DAILY_CEILING_USD ?? 120) },
     hours: metrics.hours.filter((h) => h.day === town.day).map((h) => ({ hour: h.hour, calls: h.t1 + h.t2 + h.t3 + h.converse, t1: h.t1, t2: h.t2, t3: h.t3, converse: h.converse, cost: Math.round(h.cost * 100) / 100 })),
-    telegram: telegram.status(),
+    telegram: {...telegram.status(),selfService:selfServeTelegram},
     providerUsage: { world: townBrain instanceof OpenRouterBrain ? townBrain.usage() : null, subscribers: subscriberBrain?.usage() ?? null },
     byTier: [{ tier: "Tier 1 · routine", model: MODELS.routine, calls: today.t1 + today.converse }, { tier: "Tier 2 · stakes", model: MODELS.stakes, calls: today.t2 }, { tier: "Tier 3 · reflection and the paper", model: MODELS.reflect, calls: today.t3 }],
     real: real ? { ...real.state, season: town.season, timetable: town.boatTimes } : null,
@@ -610,6 +618,7 @@ app.get("/api/me/agents", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json([]);
   return c.json([...town.agents.values()].filter((a) => a.owner === owner).map((a) => ownerAgent(town, a)));
 });
+app.get("/api/evolution", c => c.json({island:town.name,day:town.day,retention:{stories:64,momentsPerStory:40},stories:[...town.evolution].sort((a,b)=>b.updated-a.updated),institutions:[...town.places.values()].filter(p=>p.institution).map(p=>({place:p.id,...p.institution})),skills:[...town.agents.values()].flatMap(a=>(a.skills??[]).map(s=>({id:s.id,name:s.recipe.name,goal:s.recipe.goal,agent:a.id,agentName:a.persona.name,origin:s.origin,learnedFrom:s.learnedFrom??null,attempts:s.attempts,successes:s.successes,evidence:s.evidence}))) }));
 app.get("/api/health", (c) => c.json({ ok: true, version: process.env.RELEASE_VERSION ?? "dev", commit: process.env.COMMIT_SHA ?? "local", clock: clockOf(town), brain: brain.name }));
 
 // ---- WebSocket stream ----

@@ -1,4 +1,5 @@
 "use client";
+import { TelegramSettings } from "@/components/account/telegram-settings";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Page, Card, Label, Button, LinkButton, Chip } from "@/components/ui";
@@ -47,7 +48,7 @@ export default function Account() {
             <div className="flex justify-between items-center py-3 border-b border-line"><div><div className="text-[13px] text-drift font-bold">Who thinks</div><div className="text-[15px]">{mine[0] ? (mine[0] as unknown as { brainKind?: string }).brainKind === "own_key" ? "Your own key" : (mine[0] as unknown as { brainKind?: string }).brainKind === "own_brain" ? "Your own brain" : "The hosted mind" : "No agent yet"}</div></div><a href="/account/brain" className="text-[13px] font-bold text-teal">Change</a></div>
             {notif && !notif.mail && <p className="text-[13px] text-drift">This island sends no mail yet; the switches are kept for when it does.</p>}
             {notifMsg && <p className="text-[13px] text-coral">{notifMsg}</p>}
-          </Card>
+          <TelegramSettings /></Card>
         </div>
       </div>
       {dlg === "leave" && <Modal title="Send someone away?" onClose={() => setDlg(null)}><select value={leaving ?? ""} onChange={(e) => setLeaving(e.target.value)} className="h-11 rounded-full bg-sand px-4">{mine.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select><p className="text-sm text-ink2">Once they board, they do not come back. Their book is yours. The Gazette prints a farewell.</p><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="A line for the record, optional" className="h-11 rounded-full bg-sand px-4 text-sm" />{msg && <p className="text-sm text-coral">{msg}</p>}<div className="flex gap-2 justify-end"><Button kind="tertiary" size={36} onClick={() => setDlg(null)}>Keep them here</Button><Button kind="leaving" size={36} disabled={busy} onClick={leave}>Put them on the boat</Button></div></Modal>}

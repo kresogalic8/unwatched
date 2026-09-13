@@ -1,0 +1,213 @@
+{
+  "source": "scripted-fixture",
+  "island": "Workshop study",
+  "day": 1,
+  "stories": [
+    {
+      "id": "skill-924e321c5098f198294a",
+      "title": "Mira proposed a procedure: Repair before reopening.",
+      "started": 600,
+      "updated": 602,
+      "total": 6,
+      "moments": [
+        {
+          "id": 3,
+          "t": 600,
+          "day": 1,
+          "kind": "skill.proposed",
+          "text": "Mira proposed a procedure: Repair before reopening.",
+          "actors": [
+            "ag_1"
+          ],
+          "simulated": false,
+          "success": null
+        },
+        {
+          "id": 4,
+          "t": 600,
+          "day": 1,
+          "kind": "skill.tested",
+          "text": "Mira tested Repair before reopening in an isolated thought experiment.",
+          "actors": [
+            "ag_1"
+          ],
+          "simulated": true,
+          "success": true
+        },
+        {
+          "id": 6,
+          "t": 600,
+          "day": 1,
+          "kind": "skill.practiced",
+          "text": "Mira achieved the measured goal of Repair before reopening.",
+          "actors": [
+            "ag_1"
+          ],
+          "simulated": false,
+          "success": true
+        },
+        {
+          "id": 8,
+          "t": 601,
+          "day": 1,
+          "kind": "skill.shared",
+          "text": "Mira shared Repair before reopening with Ivo; they have not tested it yet.",
+          "actors": [
+            "ag_1",
+            "ag_2"
+          ],
+          "simulated": false,
+          "success": null
+        },
+        {
+          "id": 13,
+          "t": 601,
+          "day": 1,
+          "kind": "skill.practiced",
+          "text": "Ivo achieved the measured goal of Repair before reopening.",
+          "actors": [
+            "ag_2"
+          ],
+          "simulated": false,
+          "success": true
+        },
+        {
+          "id": 16,
+          "t": 602,
+          "day": 1,
+          "kind": "skill.practiced",
+          "text": "Ivo did not achieve the measured goal of Repair before reopening.",
+          "actors": [
+            "ag_2"
+          ],
+          "simulated": false,
+          "success": false
+        }
+      ]
+    },
+    {
+      "id": "place-mill",
+      "title": "Mira used two planks to repair the mill; 2 days of damage remain.",
+      "started": 600,
+      "updated": 601,
+      "total": 4,
+      "moments": [
+        {
+          "id": 5,
+          "t": 600,
+          "day": 1,
+          "kind": "building.repaired",
+          "text": "Mira used two planks to repair the mill; 2 days of damage remain.",
+          "actors": [
+            "ag_1"
+          ],
+          "simulated": false,
+          "success": null
+        },
+        {
+          "id": 9,
+          "t": 601,
+          "day": 1,
+          "kind": "institution.founded",
+          "text": "Mira founded The patient workshop: Test ideas, share what works, and leave everyone free to choose.",
+          "actors": [
+            "ag_1"
+          ],
+          "simulated": false,
+          "success": null
+        },
+        {
+          "id": 10,
+          "t": 601,
+          "day": 1,
+          "kind": "institution.joined",
+          "text": "Ivo joined The patient workshop.",
+          "actors": [
+            "ag_2"
+          ],
+          "simulated": false,
+          "success": null
+        },
+        {
+          "id": 12,
+          "t": 601,
+          "day": 1,
+          "kind": "building.repaired",
+          "text": "Ivo used two planks to repair the mill; 1 days of damage remain.",
+          "actors": [
+            "ag_2"
+          ],
+          "simulated": false,
+          "success": null
+        }
+      ]
+    }
+  ],
+  "institutions": [
+    {
+      "place": "mill",
+      "name": "The patient workshop",
+      "charter": "Test ideas, share what works, and leave everyone free to choose.",
+      "founder": "ag_1",
+      "members": [
+        "ag_1",
+        "ag_2"
+      ],
+      "founded": 601
+    }
+  ],
+  "skills": [
+    {
+      "id": "924e321c5098f198294a",
+      "name": "Repair before reopening",
+      "goal": "repair",
+      "agent": "ag_1",
+      "agentName": "Mira",
+      "origin": {
+        "island": "Workshop study",
+        "author": "ag_1",
+        "name": "Mira"
+      },
+      "learnedFrom": null,
+      "attempts": 1,
+      "successes": 1,
+      "evidence": [
+        {
+          "island": "Workshop study",
+          "event": 6,
+          "t": 600,
+          "success": true
+        }
+      ]
+    },
+    {
+      "id": "924e321c5098f198294a",
+      "name": "Repair before reopening",
+      "goal": "repair",
+      "agent": "ag_2",
+      "agentName": "Ivo",
+      "origin": {
+        "island": "Workshop study",
+        "author": "ag_1",
+        "name": "Mira"
+      },
+      "learnedFrom": "ag_1",
+      "attempts": 2,
+      "successes": 1,
+      "evidence": [
+        {
+          "island": "Workshop study",
+          "event": 13,
+          "t": 601,
+          "success": true
+        },
+        {
+          "island": "Workshop study",
+          "event": 16,
+          "t": 602,
+          "success": false
+        }
+      ]
+    }
+  ]
+}

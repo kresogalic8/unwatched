@@ -1,3 +1,4 @@
+import { skillId } from "./skills.ts";
 import { teachable } from "./learning.ts";
 import { gardenReady } from "./community.ts";
 import type { Action } from "@unwatched/protocol";
@@ -28,6 +29,29 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
   if (!here) return { ok: false, reason: "nowhere" };
   if (a.asleep && action.kind !== "sleep" && action.kind !== "wait") return { ok: false, reason: "asleep" };
   switch (action.kind) {
+    case "found_institution": return here.owner===a.id&&!here.institution&&!a.asleep ? {ok:true}:{ok:false,reason:"found an institution at your own place, which must not already have one"};
+    case "join_institution": return here.institution&&!here.institution.members.includes(a.id)&&here.institution.members.length<100?{ok:true}:{ok:false,reason:"no institution to join here, already a member, or full"};
+    case "leave_institution": return here.institution?.members.includes(a.id)?{ok:true}:{ok:false,reason:"not a member here"};
+    case "repair": return here.brokenUntil && here.brokenUntil>(v.day??0) && a.inventory.filter(i=>i==="planks").length>=2 ? {ok:true} : {ok:false,reason:"stand at a damaged building with two planks to reduce its repair time by one day"};
+    case "propose_skill": {
+      if(v.learning===false)return {ok:false,reason:"learning is disabled"};
+      if((a.skills?.length??0)>=12)return {ok:false,reason:"the procedure library is full"};
+      if(a.skills?.some(s=>s.id===skillId(action.recipe)))return {ok:false,reason:"already know this exact procedure"};
+      return {ok:true};
+    }
+    case "test_skill": case "practice_skill": case "share_skill": {
+      if(v.learning===false)return {ok:false,reason:"learning is disabled"};
+      const skill=a.skills?.find(s=>s.id===action.id);if(!skill)return {ok:false,reason:"unknown procedure"};
+      if(action.kind==="test_skill" && a.lastSkillTrialDay===(v.day??0))return {ok:false,reason:"one isolated experiment each day"};
+      if(action.kind==="practice_skill" && a.practice)return {ok:false,reason:"already practicing a procedure"};
+      if(action.kind==="share_skill") {
+        const b=v.agents.get(action.to);
+        if(!b||b.id===a.id||b.asleep||b.location!==a.location)return {ok:false,reason:"no awake listener here"};
+        if(skill.successes<1)return {ok:false,reason:"first verify the procedure through real actions"};
+        if((b.skills?.length??0)>=12||b.skills?.some(s=>s.id===skill.id))return {ok:false,reason:"listener already knows it or their library is full"};
+      }
+      return {ok:true};
+    }
     case "teach": {
       const b = v.agents.get(action.to);
       if (v.learning === false) return { ok: false, reason: "learning is disabled" };

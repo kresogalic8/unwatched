@@ -29,6 +29,7 @@ export interface Place {
   stock: Record<string, number>;
   /** The day a broken place works again, if a storm took its roof. */
   brokenUntil?: number;
+  institution?: {name:string;charter:string;founder:string;members:string[];founded:number};
   /** An unfinished building on a plot. Work adds labor; at laborNeeded it becomes a place. */
   site: { what: "house" | "shop" | "garden"; name: string; by: AgentId; labor: number; laborNeeded: number; startedDay: number; look?: string; project?: string; workedDay?: Record<AgentId, number> } | null;
   /** How the builder wanted it to look, in their words. The island draws it from this; the hash of it names the sprite. */
@@ -95,6 +96,9 @@ export interface Budget {
 export interface OwnerLetter { id: number; text: string; t: number; read: boolean; /** set once the citizen has written back to this letter; one answer per letter */ answered?: boolean }
 
 export interface AgentState {
+  skills?: import("./skills.ts").LearnedSkill[];
+  practice?: import("./skills.ts").SkillPractice | null;
+  lastSkillTrialDay?: number;
   id: AgentId;
   persona: Persona;
   needs: { hunger: number; rest: number; social: number };
@@ -277,6 +281,9 @@ export interface AgentSnapshot {
   appearance: Record<string, unknown> | null;
   arrivedAt: number;
   state: {
+    skills?: import("./skills.ts").LearnedSkill[];
+    practice?: import("./skills.ts").SkillPractice | null;
+    lastSkillTrialDay?: number;
     needs: AgentState["needs"]; location: PlaceId; coins: number; inventory: string[]; job: string | null;
     home: AgentState["home"]; asleep: boolean; budget: Budget; intentions: string[]; rumors: string[];
     foodAdvice?: import("./learning.ts").FoodAdvice[];
@@ -306,5 +313,5 @@ export interface TownSnapshot {
   laws: { text: string; by: AgentId; yes: number; no: number; open: boolean; voters?: AgentId[] }[];
   children?: Child[];
   /** The institutions: who is mayor, since when, and what the council has built. */
-  civic?: { nextDealId?: number; mayor: AgentId | null; elected: number; works: string[]; gatherings?: Gathering[]; wedded?: string[]; chain?: Seal[]; rules?: Rule[]; sayings?: { text: string; by: AgentId[] }[] };
+  civic?: { evolution?: import("./evolution.ts").EvolutionStory[]; nextDealId?: number; mayor: AgentId | null; elected: number; works: string[]; gatherings?: Gathering[]; wedded?: string[]; chain?: Seal[]; rules?: Rule[]; sayings?: { text: string; by: AgentId[] }[] };
 }

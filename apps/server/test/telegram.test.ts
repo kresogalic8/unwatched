@@ -2,6 +2,17 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { TownEvent } from '@unwatched/protocol';
 import { TelegramLetters } from '../src/telegram.ts';
 afterEach(() => vi.unstubAllGlobals());
+it('resolves each owner separately and respects disconnection without legacy fallback', async () => {
+  const f = vi.fn(async () => new Response('{"ok":true}')); vi.stubGlobal('fetch', f);
+  const chats = new Map([['owner:agent', '123'], ['other:second', '456']]);
+  const t = new TelegramLetters({token:'secret',chat:'legacy',owner:'owner',agent:'agent',resolve:async (owner,agent) => chats.get(`${owner}:${agent}`) ?? null},()=>{});
+  await t.deliver(e,who);
+  await t.deliver({...e,id:2,actors:['second']},()=>({id:'second',owner:'other',name:'Second'}));
+  chats.delete('owner:agent');
+  await t.deliver({...e,id:3},who);
+  expect(f).toHaveBeenCalledTimes(2);
+  expect(f.mock.calls.map(call => JSON.parse((call as unknown as [string,RequestInit])[1].body as string).chat_id)).toEqual(['123','456']);
+});
 const e = { id: 1, kind: 'agent.letter', actors: ['agent'], text: 'Hello', payload: { text: 'A problem needs your attention.' } } as TownEvent;
 const who = () => ({ id: 'agent', owner: 'owner', name: 'Godfather' });
 it('delivers only the paired owner and agent letters once, as plain text', async () => {
