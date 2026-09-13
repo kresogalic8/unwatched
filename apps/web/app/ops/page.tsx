@@ -7,6 +7,7 @@ import { Button, LinkButton, Label } from "@/components/explore/ExplorePage";
 import theme from "@/components/explore/explore.module.css";
 import s from "./ops.module.css";
 import type { Ops } from "./types";
+import { citizenLabels } from "@/lib/ops-citizens";
 type Row = Record<string, unknown>;
 type Report = {
   id: string;
@@ -113,6 +114,7 @@ export default function OpsRoom() {
   const [checking, setChecking] = useState(true);
   const [d, setD] = useState<Ops | null>(null);
   const [overview, setOverview] = useState<Row>({});
+  const [population,setPopulation]=useState<Row[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -139,16 +141,16 @@ export default function OpsRoom() {
   async function refresh() {
     const ticket=++generation.current;setError("");
     try {
-      let nextRows:Row[]|undefined;let nextOps:Ops|undefined;let meta:Row|undefined;let nextCount:number|undefined;let nextMembers:Row[]|undefined;
+      let nextPopulation:Row[]|undefined;let nextRows:Row[]|undefined;let nextOps:Ops|undefined;let meta:Row|undefined;let nextCount:number|undefined;let nextMembers:Row[]|undefined;
       if (["Overview","Usage","Operations"].includes(tab)) {
-        [nextOps,meta]=await Promise.all([api<Ops>("/api/ops"),api<Row>("/api/backoffice/overview")]);
+        [nextOps,meta,nextPopulation]=await Promise.all([api<Ops>("/api/ops"),api<Row>("/api/backoffice/overview"),api<Row[]>("/api/backoffice/citizens")]);
         if(tab==="Operations")nextRows=await api<Row[]>("/api/backoffice/audit");
       } else if(tab==="Users") {const v=await api<{users:Row[];count:number}>(`/api/backoffice/users?q=${encodeURIComponent(search)}&page=${page}`);nextRows=v.users;nextCount=v.count;}
       else if(tab==="Citizens")nextRows=await api<Row[]>("/api/backoffice/citizens");
       else if(tab==="Feedback"){[nextRows,nextMembers]=await Promise.all([api<Row[]>(`/api/backoffice/feedback?status=${status}`),api<Row[]>("/api/backoffice/members")]);}
       else nextRows=await api<Row[]>("/api/backoffice/deliveries");
       if(ticket!==generation.current)return;
-      if(nextRows)setRows(nextRows);if(nextOps)setD(nextOps);if(meta)setOverview(meta);if(nextCount!==undefined)setCount(nextCount);if(nextMembers)setMembers(nextMembers);setLoaded(new Date().toLocaleTimeString());
+      if(nextPopulation)setPopulation(nextPopulation);if(nextRows)setRows(nextRows);if(nextOps)setD(nextOps);if(meta)setOverview(meta);if(nextCount!==undefined)setCount(nextCount);if(nextMembers)setMembers(nextMembers);setLoaded(new Date().toLocaleTimeString());
     }catch(e){if(ticket===generation.current){if([401,403].includes((e as {status:number}).status)){setSession(null);setD(null);setRows([]);setDetail(null);setReport(null);}setError((e as Error).message);}}
   }
   useEffect(() => {
@@ -278,7 +280,11 @@ export default function OpsRoom() {
               <div className={s.metrics}>
                 {[
                   [d.stats.agents, "Citizens"],
-                  [d.stats.funded, "Funded"],
+                  [population.filter(a=>citizenLabels(a).funding === "World-funded").length, "World-funded citizens"],
+                  [population.filter(a=>a.brain==="hosted" && a.owner && a.plan!=="none" && a.plan).length,"Hosted · with subscription"],
+                  [population.filter(a=>a.brain==="hosted" && a.owner && a.plan==="none").length,"Hosted · no subscription"],
+                  [population.filter(a=>a.brain==="own_key").length,"Personal API key"],
+                  [population.filter(a=>a.brain==="own_brain").length,"External brain"],
                   [d.stats.holds, "Open holds"],
                   [d.stats.fallbacksToday, "Fallbacks · last 24h"],
                 ].map(([v, l]) => (
@@ -480,7 +486,7 @@ export default function OpsRoom() {
                 />
               </label>
               <Table
-                rows={rows.filter((r) =>
+                rows={rows.map((r):Row=>({...r,...citizenLabels(r)})).filter((r) =>
                   `${r.name} ${r.id} ${r.owner}`
                     .toLowerCase()
                     .includes(query.toLowerCase()),
@@ -488,17 +494,19 @@ export default function OpsRoom() {
                 columns={[
                   "name",
                   "id",
-                  "brain",
-                  "plan",
-                  "funded",
+                  "funding",
+                  "subscription",
+                  "ai_access",
                   "asleep",
                   "lastThought",
                 ]}
                 onSelect={(r) => void selectCitizen(r)}
               />
+              <p className={s.muted}>Hosted describes where the brain runs, not a paid plan. Routine only means no available AI allowance or credits; the citizen still follows simulation routines. AI access does not guarantee a successful provider response.</p>
               {detail && (
                 <section className={s.panel}>
                   <h2>Explain {display(detail.name)}</h2>
+                  <Facts data={citizenLabels({...detail,owner:rows.find(r=>r.id===detail.id)?.owner})} />
                   <Facts
                     data={Object.fromEntries(
                       Object.entries(detail).filter(
@@ -507,7 +515,7 @@ export default function OpsRoom() {
                             "events",
                             "projects",
                             "foodRoutineDecisions",
-                            "attempts",
+                            "attempts", "funded", "plan",
                           ].includes(k),
                       ),
                     )}
