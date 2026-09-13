@@ -11,6 +11,7 @@ export interface HourBucket { hour: number; day: number; t1: number; t2: number;
  */
 export class Metrics implements Brain {
   readonly name: string;
+  onAttempt: ((a:AgentState|undefined,kind:string,outcome:string,duration:number,t:number)=>void)|null=null;
   hours: HourBucket[] = [];
   holds: { id: number; level: "hold" | "watch" | "ok"; text: string; at: number; source: string; done: boolean }[] = [];
   private nextHold = 1;
@@ -26,12 +27,12 @@ export class Metrics implements Brain {
   private meter(b: HourBucket, model: string) {
     if (this.townBrain instanceof OpenRouterBrain) { const u = this.townBrain.usage(); const [i, o] = PRICE[model] ?? [3, 15]; b.cost += ((u.prompt - this.lastUsage.prompt) * i + (u.completion - this.lastUsage.completion) * o) / 1e6; this.lastUsage = { prompt: u.prompt, completion: u.completion }; }
   }
-  private async timed<T>(b: HourBucket, f: () => Promise<T>): Promise<T> { const s = Date.now(); try { return await f(); } finally { b.ms.push(Date.now() - s); if (b.ms.length > 500) b.ms.shift(); } }
-  async decide(p: Perception, a: AgentState, tier: Tier): Promise<ActionProposal> { const b = this.bucket(); if (tier >= 2) b.t2++; else b.t1++; const out = await this.timed(b, () => this.inner.decide(p, a, tier)); if (a.brainKind === "hosted") this.meter(b, this.modelOf(a, tier >= 2 ? "stakes" : "routine")); return out; }
-  async converse(ctx: ConverseContext): Promise<Dialogue> { const b = this.bucket(); b.converse++; const out = await this.timed(b, () => this.inner.converse(ctx)); this.meter(b, this.modelOf(ctx.a, "routine")); return out; }
-  async reflect(ctx: ReflectContext): Promise<Reflection> { const b = this.bucket(); b.t3++; const out = await this.timed(b, () => this.inner.reflect(ctx)); if (ctx.agent.brainKind === "hosted") this.meter(b, this.modelOf(ctx.agent, ctx.quiet && ctx.agent.budget.reflectionIncluded !== true ? "stakes" : "reflect")); return out; } // a quiet night runs on the stakes mind, so the day's cost counts it there
-  async plan(ctx: PlanContext, tier: Tier): Promise<DayPlan> { const b = this.bucket(); if (tier >= 2) b.t2++; else b.t1++; const out = await this.timed(b, () => this.inner.plan(ctx, tier)); if (ctx.agent.brainKind === "hosted") this.meter(b, this.modelOf(ctx.agent, tier >= 2 ? "stakes" : "routine")); return out; }
-  async digest(ctx: DigestContext): Promise<DigestText> { const b = this.bucket(); b.t2++; const out = await this.timed(b, () => this.inner.digest(ctx)); this.meter(b, this.modelOf(ctx.agent, "stakes")); return out; }
+  private async timed<T>(b: HourBucket, f: () => Promise<T>, agent?:AgentState, kind="other"): Promise<T> { const s = Date.now(); let outcome="completed"; try { return await f(); } catch(e){outcome="failed";throw e;} finally { const duration=Date.now()-s;b.ms.push(duration); if (b.ms.length > 500) b.ms.shift();this.onAttempt?.(agent,kind,outcome,duration,this.clock().t); } }
+  async decide(p: Perception, a: AgentState, tier: Tier): Promise<ActionProposal> { const b = this.bucket(); if (tier >= 2) b.t2++; else b.t1++; const out = await this.timed(b, () => this.inner.decide(p, a, tier),a,"decide"); if (a.brainKind === "hosted") this.meter(b, this.modelOf(a, tier >= 2 ? "stakes" : "routine")); return out; }
+  async converse(ctx: ConverseContext): Promise<Dialogue> { const b = this.bucket(); b.converse++; const out = await this.timed(b, () => this.inner.converse(ctx),ctx.a,"converse"); this.meter(b, this.modelOf(ctx.a, "routine")); return out; }
+  async reflect(ctx: ReflectContext): Promise<Reflection> { const b = this.bucket(); b.t3++; const out = await this.timed(b, () => this.inner.reflect(ctx),ctx.agent,"reflect"); if (ctx.agent.brainKind === "hosted") this.meter(b, this.modelOf(ctx.agent, ctx.quiet && ctx.agent.budget.reflectionIncluded !== true ? "stakes" : "reflect")); return out; } // a quiet night runs on the stakes mind, so the day's cost counts it there
+  async plan(ctx: PlanContext, tier: Tier): Promise<DayPlan> { const b = this.bucket(); if (tier >= 2) b.t2++; else b.t1++; const out = await this.timed(b, () => this.inner.plan(ctx, tier),ctx.agent,"plan"); if (ctx.agent.brainKind === "hosted") this.meter(b, this.modelOf(ctx.agent, tier >= 2 ? "stakes" : "routine")); return out; }
+  async digest(ctx: DigestContext): Promise<DigestText> { const b = this.bucket(); b.t2++; const out = await this.timed(b, () => this.inner.digest(ctx),ctx.agent,"digest"); this.meter(b, this.modelOf(ctx.agent, "stakes")); return out; }
   fallbacks: { at: number; what: string; model: string; reason: string }[] = [];
   fallback(f: { what: string; model: string; reason: string }) { this.fallbacks.unshift({ at: Date.now(), ...f }); if (this.fallbacks.length > 200) this.fallbacks.pop(); this.hold("watch", `The town's mind could not use a ${f.model} answer for ${f.what} (${f.reason}); the plain fallback stood in.`, "models"); }
   async child(ctx: ChildContext): Promise<Persona> { const b = this.bucket(); b.t2++; const out = await this.timed(b, () => this.inner.child(ctx)); this.meter(b, this.models.stakes); return out; }

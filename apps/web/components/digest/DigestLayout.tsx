@@ -27,7 +27,7 @@ export function DigestLayout({
           </Link>
           <Link href="/letters" aria-current={active === "letters" ? "page" : undefined}>Letters</Link>
           <Link href="/people" aria-current={active === "people" ? "page" : undefined}>People</Link>
-          <Link href="/town">Town</Link>
+          <Link href="/town">Town</Link><Link href="/feedback">Feedback</Link>
         </nav>
         <Link href="/account">
           {name ?? "Your account"} <span aria-hidden="true">↗</span>

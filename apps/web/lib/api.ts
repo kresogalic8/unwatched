@@ -14,7 +14,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = { "Content-Type": "application/json", ...(await authHeaders()), ...(init?.headers as Record<string, string> | undefined) };
   const res = await fetch(`${API}${path}`, { ...init, headers, cache: "no-store" });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? `The boat office answered ${res.status}.`);
+  if (!res.ok) throw Object.assign(new Error((body as { error?: string }).error ?? `The boat office answered ${res.status}.`),{status:res.status});
   return body as T;
 }
 

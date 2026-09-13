@@ -1,3 +1,4 @@
+import { FeedbackEntry } from "@/components/feedback/FeedbackEntry";
 import type { Metadata, Viewport } from "next";
 import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import { Familjen_Grotesk } from "next/font/google";
@@ -22,7 +23,7 @@ export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={familjen.variable}>
-      <body className="min-h-screen">{children}<GoogleAnalytics /></body>
+      <body className="min-h-screen">{children}<GoogleAnalytics /><FeedbackEntry /></body>
     </html>
   );
 }

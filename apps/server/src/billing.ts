@@ -112,7 +112,7 @@ export class Billing {
     return { url: s.url };
   }
   /** The plan a subscription stands for, read off its price; visitor once it is no longer paid. */
-  private planOf(sub: Stripe.Subscription): Plan {
+  planOf(sub: Stripe.Subscription): Plan {
     if (!(sub.status === "active" || sub.status === "trialing" || sub.status === "past_due")) return "none";
     for (const it of sub.items.data) { const k = it.price.lookup_key; for (const plan of ["patron", "resident", "visitor"] as const) if (k === LOOKUP[plan] || it.price.id === this.prices.get(LOOKUP[plan])) return plan; }
     return (sub.metadata?.plan as Plan) ?? "none";

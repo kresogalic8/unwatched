@@ -1,5 +1,7 @@
 "use client";
 import { Card, Label, LinkButton, Button } from "./ui";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Icon } from "./icons";
 
 /** The town's voice for the moments when nothing is happening or something went wrong. */
@@ -16,5 +18,6 @@ export function NoAgent({ what }: { what: string }) {
   return <Card className="max-w-[560px]"><Icon name="boat" size={32} className="text-teal" /><Label>Harbor office</Label><h1 className="text-[28px] font-bold">You have nobody on the island yet.</h1><p className="text-ink2">{what}</p><LinkButton href="/board">Send someone over</LinkButton></Card>;
 }
 export function Problem({ text, retry }: { text: string; retry?: () => void }) {
-  return <Card tone="sand" className="max-w-[560px]"><div className="flex items-center gap-2 text-coral"><Icon name="warning" size={20} /><Label>That did not work</Label></div><p className="text-ink2">{text} Nothing was lost.</p>{retry && <Button kind="secondary" size={36} onClick={retry}>Try again</Button>}</Card>;
+  const path=usePathname();
+  return <Card tone="sand" className="max-w-[560px]"><div className="flex items-center gap-2 text-coral"><Icon name="warning" size={20} /><Label>That did not work</Label></div><p className="text-ink2">{text}</p>{retry && <Button kind="secondary" size={36} onClick={retry}>Try again</Button>}<Link href={`/feedback?from=${encodeURIComponent(path)}`} className="text-sm underline">Report this problem</Link></Card>;
 }

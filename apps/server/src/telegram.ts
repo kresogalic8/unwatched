@@ -1,3 +1,4 @@
+import { recordDelivery } from "./delivery-log.ts";
 import type { TownEvent } from '@unwatched/protocol';
 
 /** Optional delivery to each owner’s explicitly connected chat and selected agents. */
@@ -28,8 +29,10 @@ export class TelegramLetters {
         const result = await r.json() as { ok?: boolean };
         if (!r.ok || !result.ok) throw new Error('Delivery rejected');
         this.sent++;
+        await recordDelivery({channel:"telegram",kind:"letter",status:"accepted",owner_id:a.owner,agent_id:a.id});
       } catch {
         this.failed++;
+        await recordDelivery({channel:"telegram",kind:"letter",status:"failed",owner_id:a.owner,agent_id:a.id,error:"Telegram request failed"});
         // Never log fetch errors: Telegram URLs contain the bot token.
         this.log('Telegram delivery failed; the original letter remains in the app.');
       }

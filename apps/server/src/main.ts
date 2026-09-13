@@ -1,3 +1,5 @@
+import { adminResolver, backofficeRoutes } from "./backoffice.ts";
+import { configureDeliveryLog } from "./delivery-log.ts";
 import { telegramRoutes } from "./telegram-routes.ts";
 import { TelegramLetters } from "./telegram.ts";
 import { publicProject } from "./views.ts";
@@ -32,6 +34,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const envFile = resolve(here, "../../../.env");
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
+const processStarted = new Date().toISOString();
 const PORT = Number(process.env.PORT ?? 4000);
 const SEED = Number(process.env.UW_SEED ?? 42);
 const MS_PER_SIM_MINUTE = Number(process.env.UW_MS_PER_SIM_MINUTE ?? 1000); // 60000 is real time
@@ -87,6 +90,10 @@ const clients = new Set<WebSocket>();
 function broadcast(msg: unknown) { const s = JSON.stringify(msg); for (const c of clients) if (c.readyState === 1) c.send(s); }
 
 const telegramDb = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }) : null;
+configureDeliveryLog(telegramDb);
+// Retry content is private and retained only for the provider's deduplication window.
+if(telegramDb) setInterval(()=>{void telegramDb.from('delivery_jobs').update({payload:{},status:'expired'}).in('status',['failed','sending','pending']).lt('created_at',new Date(Date.now()-24*3600000).toISOString()).then(()=>{});},3600000).unref();
+const adminOf = adminResolver(telegramDb);
 const selfServeTelegram = !!(telegramDb && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_WEBHOOK_SECRET);
 const telegram = new TelegramLetters({ token: process.env.TELEGRAM_BOT_TOKEN, chat:process.env.TELEGRAM_CHAT_ID, owner:process.env.TELEGRAM_OWNER_ID, agent:process.env.TELEGRAM_AGENT_ID, resolve: selfServeTelegram && telegramDb ? async (owner, agent) => {
   const { data, error } = await telegramDb!.from("owner_telegram").select("chat_id,agent_ids").eq("owner_id", owner).maybeSingle();
@@ -103,6 +110,7 @@ if (subscriberBrain) {
   subscriberBrain.modelsFor = (a) => a.owner && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
   subscriberBrain.onFallback = f => metrics.fallback(f);
 }
+if(telegramDb) metrics.onAttempt=(a,kind,outcome,duration,t)=>{void telegramDb.from('cognition_attempts').insert({agent_id:a?.id??null,kind,outcome,duration_ms:duration,island_minute:t,funding:a?.brainKind==='own_key'?'user_key':a?.brainKind==='own_brain'?'external_brain':a?.owner&&billing.wallet(a.owner).plan!=='none'?'subscriber':'world'}).then(({error})=>{if(error)log('Could not persist cognition diagnostic.');});};
 const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.wallet(a.owner).plan === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
 const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, creditRefund: billing.refund, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
@@ -159,7 +167,7 @@ async function morningMail(): Promise<void> {
         const since = sinceFor(a, (await readOf(owner, a.id)).lastDigestT); const d = town.digest(a.id, since); const w = await writtenDigest(a, since);
         const lines = [...d.items].sort((x, y) => y.importance - x.importance).slice(0, 3).sort((x, y) => x.t - y.t).map((e) => `${town.clockAt(e.t)}: ${e.text}`);
         const m = digestMail({ to: email, name: a.persona.name, day: town.day, headline: w?.headline ?? (d.items.length ? d.headline : `Nothing changed for ${first}.`), text: w?.text ?? (d.items.length ? `What the record shows for ${first} since you last read.` : `${first} worked, ate at the inn, and slept. No coral today, and that is allowed.`), lines, url: `${SITE_URL}/digest` });
-        if (await sendMail(m, log)) { sent++; log(`morning mail to ${owner} about ${a.persona.name}`); }
+        if (await sendMail({...m,ownerId:owner,agentId:a.id,kind:"digest",deliveryKey:`digest:${owner}:${a.id}:${town.day}`}, log)) { sent++; log(`morning mail to ${owner} about ${a.persona.name}`); }
       }
       if (sent === agents.length) await savePrefs({ ...p, lastMailedDay: town.day }); // the day is marked only when every citizen has been covered
     } catch (err) { log(`morning mail for ${owner}: ${(err as Error).message}`); }
@@ -172,7 +180,7 @@ async function noticeLetter(e: TownEvent): Promise<void> {
   const read = await readOf(a.owner, a.id); if (read.lastLetterMailDay === e.day) return;
   const email = store ? await store.ownerEmail(a.owner) : null; if (!email) { log(`no email on file for ${a.owner}; ${a.persona.name}'s letter waits on the page`); return; }
   const m = letterMail({ to: email, name: a.persona.name, day: e.day, text: String(e.payload?.text ?? e.text), url: `${SITE_URL}/letters` });
-  if (await sendMail(m, log)) await saveRead({ ...read, lastLetterMailDay: e.day });
+  if (await sendMail({...m,ownerId:a.owner,agentId:a.id,kind:"letter",deliveryKey:`letter:${a.owner}:${a.id}:${e.day}`}, log)) await saveRead({ ...read, lastLetterMailDay: e.day });
 }
 // ---- the clock ----
 let running = true; let ticking = false; let lastHour = town.hour; let memoryMark = town.t + 1;
@@ -258,6 +266,26 @@ async function ownerOf(req: Request): Promise<string | null> {
   return null;
 }
 if (telegramDb) app.route("/api", telegramRoutes(telegramDb, ownerOf, owner => [...town.agents.values()].filter(a => a.owner === owner).map(a => ({ id: a.id, name: a.persona.name })), { username: process.env.TELEGRAM_BOT_USERNAME ?? "", secret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "", enabled: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_WEBHOOK_SECRET) }));
+if (telegramDb) app.route("/api", backofficeRoutes({db:telegramDb,ownerOf,adminOf,
+ citizens:()=>[...town.agents.values()].map(a=>({id:a.id,name:a.persona.name,owner:a.owner,brain:a.brainKind,funded:a.funded,asleep:a.asleep,place:a.location,plan:a.owner?billing.wallet(a.owner).plan:null,budget:a.budget,entitlementMatch:a.owner&&a.brainKind==='hosted'?(a.budget.tier1Max===billing.allowance(a.owner).tier1Max&&a.budget.tier2Max===billing.allowance(a.owner).tier2Max):null,lastThought:a.lastThought,thinkEvery:a.thinkEvery})),
+ diagnostic:async(id)=>{const a=town.agents.get(id);if(!a)return null;const b=brain.perAgent.get(id);const attempts=await telegramDb!.from('cognition_attempts').select('id,kind,outcome,funding,island_minute,duration_ms,created_at').eq('agent_id',id).order('created_at',{ascending:false}).limit(30);return {attempts:attempts.error?null:attempts.data,id:a.id,name:a.persona.name,now:town.t,paused:town.paused,funded:a.funded,asleep:a.asleep,brain:a.brainKind,plan:a.owner?billing.wallet(a.owner).plan:null,allowance:a.owner?billing.allowance(a.owner):null,budget:a.budget,credits:a.owner?billing.wallet(a.owner).credits:null,lastThought:a.lastThought,thinkEvery:a.thinkEvery,brainStatus:b instanceof OwnKeyBrain?{...b.status(),cap:b.row.daily_cap_usd}:b instanceof OwnBrain?b.status():null,events:town.events.filter(e=>e.actors.includes(id)&&!["agent.letter","agent.reflect","relation.change","agent.self"].includes(e.kind)).slice(-30).reverse().map(e=>({id:e.id,t:e.t,kind:e.kind,text:e.text})),projects:a.projects,foodRoutineDecisions:a.foodRoutineDecisions??[]};},
+ retry:async(id)=>{
+ const attempt=await telegramDb!.from('delivery_attempts').select('job_id').eq('id',id).maybeSingle();if(!attempt.data?.job_id)return false;
+ const job=await telegramDb!.from('delivery_jobs').select('*').eq('id',attempt.data.job_id).maybeSingle();if(!job.data||job.data.status!=='failed'||Date.now()-Date.parse(job.data.created_at)>23*3600000)return false;
+ const m=job.data.payload as import('./mail.ts').Mail;
+ if(!m.ownerId||!m.agentId||town.agents.get(m.agentId)?.owner!==m.ownerId)return false;
+ const prefs=await prefsOf(m.ownerId);if(m.kind==='digest'?!prefs.notifyDigest:!prefs.notifyLetters)return false;
+ if((await store?.ownerEmail(m.ownerId))!==m.to)return false;
+ const claim=await telegramDb!.from('delivery_jobs').update({status:'sending',updated_at:new Date().toISOString()}).eq('id',job.data.id).eq('status','failed').select('id');if(!claim.data?.length)return false;
+ return sendMail({...m,jobId:job.data.id},log);
+ },
+ billing:async(owner)=>{const wallet=billing.wallet(owner);if(!billing.stripe||!wallet.stripeCustomer)return {configured:!!billing.stripe,wallet:{plan:wallet.plan,credits:wallet.credits},subscriptions:[],invoices:[]};
+ const [subscriptions,invoices]=await Promise.all([billing.stripe.subscriptions.list({customer:wallet.stripeCustomer,limit:10,status:'all'}),billing.stripe.invoices.list({customer:wallet.stripeCustomer,limit:10})]);
+ const live=subscriptions.data.filter(x=>['active','trialing','past_due'].includes(x.status));
+ return {configured:true,reconciliation:live.length>1?'Multiple active subscriptions: review required':live.length===1?(billing.planOf(live[0]!)===wallet.plan?'Wallet plan matches Stripe':'Mismatch: wallet plan differs from Stripe'):(wallet.plan==='none'?'No active paid plan':'Wallet plan has no active Stripe subscription; check manual grants'),wallet:{plan:wallet.plan,credits:wallet.credits},subscriptions:subscriptions.data.map(x=>({id:x.id,status:x.status,plan:billing.planOf(x),prices:x.items.data.map(i=>i.price.lookup_key??i.price.id)})),invoices:invoices.data.map(x=>({id:x.id,status:x.status,paid:x.amount_paid,due:x.amount_due,currency:x.currency,created:x.created})),allowance:billing.allowance(owner)};
+ },
+ overview:()=>({startedAt:processStarted,version:process.env.RELEASE_VERSION??"development",commit:process.env.COMMIT_SHA??"local",islandDay:town.day,providerWindow:"Since engine process start; provider-reported response costs, not account balance",providers:{world:townBrain instanceof OpenRouterBrain?townBrain.usage():null,subscribers:subscriberBrain?.usage()??null},telegram:telegram.status(),emailConfigured:mailEnabled(),billingLive:!billing.testMode,storage:!!store})
+}));
 const owns = (a: { owner: string | null }, owner: string | null) => !!owner && a.owner === owner;
 
 const placeView = (p: import("@unwatched/engine").Place) => ({ community: publicProject(town, p), id: p.id, hasHistory: !!p.history, name: p.nickname ? `${p.name} (${p.nickname})` : p.name, kind: p.kind, exits: p.exits, crowd: town.crowd(p.id), x: p.x, y: p.y, district: p.district, sprite: p.sprite, ...(p.look ? { look: p.look } : {}), ...(Object.keys(p.stock).length ? { stock: p.stock } : {}), owner: p.owner ? (town.agents.get(p.owner)?.persona.name ?? null) : null, site: p.site ? { what: p.site.what, name: p.site.name, by: town.agents.get(p.site.by)?.persona.name ?? p.site.by, done: p.site.labor, of: p.site.laborNeeded } : null, beds: p.beds ? { price: p.beds.price, free: p.freeBeds ?? 0 } : null });
@@ -525,10 +553,20 @@ app.post("/api/me/portal", async (c) => {
   const r = await billing.portal(owner, c.req.header("origin") ?? "http://localhost:3000"); return "url" in r ? c.json(r) : c.json({ error: r.error }, 400);
 });
 app.post("/api/stripe/webhook", async (c) => { const r = await billing.webhook(await c.req.text(), c.req.header("stripe-signature")); return c.json(r, r.ok ? 200 : 400); });
-// ---- ops, behind a token ----
-const opsOk = (req: Request) => !!process.env.UW_OPS_TOKEN && req.headers.get("x-ops") === process.env.UW_OPS_TOKEN;
-app.get("/api/ops", (c) => {
-  if (!opsOk(c.req.raw)) return c.json({ error: process.env.UW_OPS_TOKEN ? "ops token required" : "set UW_OPS_TOKEN to open the ops room" }, 401);
+// ---- ops, behind verified staff membership ----
+const opsOk = async (req: Request) => !!(await adminOf(req));
+app.use('/api/ops/*', async (c,next) => {
+ const actor=await adminOf(c.req.raw);if(!actor)return c.json({error:'Administrator sign-in required.'},403);
+ if(c.req.method!=='GET') {
+  if(actor.role==='viewer')return c.json({error:'Read-only administrator.'},403);
+  const audit=await telegramDb!.from('ops_audit').insert({actor:actor.id,action:c.req.path,target:'world',outcome:'requested'}).select('id').single();
+  if(audit.error)return c.json({error:'Audit unavailable; no action was performed.'},503);
+  try {await next(); await telegramDb!.from('ops_audit').update({outcome:c.res.ok?'completed':'failed'}).eq('id',audit.data.id);} catch(e){await telegramDb!.from('ops_audit').update({outcome:'failed'}).eq('id',audit.data.id);throw e;}
+ } else await next();
+});
+app.get("/api/ops", async (c) => {
+  c.header("Cache-Control","private, no-store");
+  if (!(await opsOk(c.req.raw))) return c.json({ error: "Administrator sign-in required." }, 401);
   const agents = [...town.agents.values()]; const funded = agents.filter((a) => a.funded && (a.owner || a.brainKind === "hosted"));
   const hosted = agents.filter((a) => a.brainKind === "hosted"), ownKey = agents.filter((a) => a.brainKind === "own_key"), ownBrain = agents.filter((a) => a.brainKind === "own_brain");
   const today = metrics.today(town.day);
@@ -551,12 +589,13 @@ app.get("/api/ops", (c) => {
     holds: metrics.holds.slice(0, 20), ownBrains: brains,
   });
 });
-app.post("/api/ops/paper", async (c) => { if (!opsOk(c.req.raw)) return c.json({ error: "ops token required" }, 401); await town.printNow(); const p = town.papers[town.papers.length - 1]; return p ? c.json(p) : c.json({ error: "no edition came" }, 500); });
+app.post("/api/ops/paper", async (c) => { if (!(await opsOk(c.req.raw))) return c.json({ error: "Administrator sign-in required." }, 401); await town.printNow(); const p = town.papers[town.papers.length - 1]; return p ? c.json(p) : c.json({ error: "no edition came" }, 500); });
 app.post("/api/ops/switch", async (c) => {
-  if (!opsOk(c.req.raw)) return c.json({ error: "ops token required" }, 401);
+  if (!(await opsOk(c.req.raw))) return c.json({ error: "Administrator sign-in required." }, 401);
   const body = z.object({ which: z.enum(["pause", "economy", "boat", "snapshot"]), on: z.boolean().optional() }).safeParse(await c.req.json()); if (!body.success) return c.json({ error: "no such switch" }, 400);
   const { which } = body.data;
-  if (which === "snapshot") { if (store) await store.snapshot(town); town.actOfGod("The island's record was written down in full."); return c.json({ ok: true }); }
+  if (which === "snapshot") { if (!store) return c.json({error:"Snapshot storage is unavailable."},503); await store.snapshot(town); town.actOfGod("The island's record was written down in full."); return c.json({ ok: true }); }
+  if(body.data.on === undefined) return c.json({error:"Choose an explicit target state."},400);
   const on = body.data.on ?? !(which === "pause" ? town.paused : which === "economy" ? town.economyFrozen : town.boatHeld);
   if (which === "pause") { town.paused = on; town.actOfGod(on ? "Time stood still on the island. Nobody aged, nothing happened, no credits were spent." : "Time began again on the island."); }
   if (which === "economy") { town.economyFrozen = on; town.actOfGod(on ? "No wages were paid and no rent was due. The coins on the island stayed where they were." : "Wages and rent resumed."); }
@@ -564,7 +603,7 @@ app.post("/api/ops/switch", async (c) => {
   log(`act of God: ${which} ${on ? "on" : "off"}`); broadcast({ type: "clock", clock: clockOf(town) });
   return c.json({ ok: true, switches: { paused: town.paused, economyFrozen: town.economyFrozen, boatHeld: town.boatHeld } });
 });
-app.post("/api/ops/hold/:id", (c) => { if (!opsOk(c.req.raw)) return c.json({ error: "ops token required" }, 401); const h = metrics.holds.find((x) => x.id === Number(c.req.param("id"))); if (h) h.done = true; return c.json({ ok: !!h }); });
+app.post("/api/ops/hold/:id", async (c) => { if (!(await opsOk(c.req.raw))) return c.json({ error: "Administrator sign-in required." }, 401); const h = metrics.holds.find((x) => x.id === Number(c.req.param("id"))); if (h) h.done = true; return c.json({ ok: !!h }); });
 app.get("/api/papers", (c) => c.json(town.papers.slice(-14).reverse()));
 // the record's seals: one hash per day, chained; and the day's events in the exact form that was hashed, so anyone can recompute it
 app.get("/api/record", (c) => c.json({ chain: town.chain.slice(-60), how: "sha256(prev + '\\n' + events.map(canonical).join('\\n')), canonical = JSON [id, t, kind, actors, place|null, text, importance to 3 places], events of the day by id" }));

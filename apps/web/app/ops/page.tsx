@@ -1,46 +1,944 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Wordmark, Card, Label, Button, Chip } from "@/components/ui";
-import { API } from "@/lib/api";
-
-type Ops = { clock: { day: number; hour: number; minute: number; weather: string; label: string }; switches: { paused: boolean; economyFrozen: boolean; boatHeld: boolean }; stats: { agents: number; funded: number; hosted: number; ownKey: number; ownBrain: number; costToday: number; costPerFunded: number; p50: number; p95: number; holds: number; fallbacksToday: number; ceiling: number }; hours: { hour: number; calls: number; t1: number; t2: number; t3: number; converse: number; cost: number }[]; byTier: { tier: string; model: string; calls: number }[]; health: { coins: number; tills: number; council: number; employed: number; jobs: number; flourShortage: boolean; laws: number; openLaws: number; boredomPct: number; events: number; tickP50: number; tickMax: number; store: boolean; brain: string; msPerMinute: number }; holds: { id: number; level: "hold" | "watch" | "ok"; text: string; at: number; source: string; done: boolean }[]; ownBrains: { id: string; name: string; connected?: boolean; answered?: number; missed?: number; medianMs?: number | null }[] };
-
-export default function OpsRoom() {
-  const [token, setToken] = useState<string>(""); const [entered, setEntered] = useState(false); const [d, setD] = useState<Ops | null>(null); const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState<string | null>(null); const [confirm, setConfirm] = useState<string | null>(null);
-  useEffect(() => { try { const t = sessionStorage.getItem("ft.ops"); if (t) { setToken(t); setEntered(true); } } catch {} }, []);
-  const load = async (t = token) => { try { const r = await fetch(`${API}/api/ops`, { headers: { "X-Ops": t } }); const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "no"); setD(j); setErr(null); } catch (e) { setErr((e as Error).message); setD(null); } };
-  useEffect(() => { if (!entered) return; void load(); const i = setInterval(() => void load(), 10000); return () => clearInterval(i); }, [entered]);
-  async function flip(which: "pause" | "economy" | "boat" | "snapshot") { setBusy(which); setConfirm(null); await fetch(`${API}/api/ops/switch`, { method: "POST", headers: { "Content-Type": "application/json", "X-Ops": token }, body: JSON.stringify({ which }) }); await load(); setBusy(null); }
-  async function done(id: number) { await fetch(`${API}/api/ops/hold/${id}`, { method: "POST", headers: { "X-Ops": token } }); await load(); }
-  if (!entered) return <main className="min-h-screen flex items-center justify-center p-6"><Card className="max-w-[420px] w-full"><Wordmark /><Label>Ops room</Label><p className="text-sm text-ink2">Internal. The token is in the server's environment as UW_OPS_TOKEN.</p><input value={token} onChange={(e) => setToken(e.target.value)} type="password" placeholder="ops token" className="h-11 rounded-full bg-sand px-4" /><Button onClick={() => { try { sessionStorage.setItem("ft.ops", token); } catch {} setEntered(true); }}>Enter</Button></Card></main>;
-  const max = Math.max(1, ...(d?.hours.map((h) => h.calls) ?? [1]));
-  const stat = (v: string | number, l: string, c?: string) => <div className="bg-shell rounded-[20px] px-5 py-4 flex flex-col gap-0.5"><div className="display text-[28px] font-semibold tabular" style={c ? { color: c } : undefined}>{v}</div><div className="text-xs text-drift">{l}</div></div>;
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { api } from "@/lib/api";
+import { Wordmark } from "@/components/ui";
+import { Button, LinkButton, Label } from "@/components/explore/ExplorePage";
+import theme from "@/components/explore/explore.module.css";
+import s from "./ops.module.css";
+import type { Ops } from "./types";
+type Row = Record<string, unknown>;
+type Report = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  severity: string;
+  assignee: string | null;
+  duplicate_of: string | null;
+  github_url: string | null;
+  updated_at: string;
+  created_at: string;
+  email: string | null;
+  page: string;
+  version: string;
+  screenshot?: string;
+  owner_id: string | null;
+  messages?: {
+    id: string;
+    body: string;
+    internal: boolean;
+    created_at: string;
+  }[];
+};
+const tabs = [
+  "Overview",
+  "Users",
+  "Citizens",
+  "Usage",
+  "Feedback",
+  "Deliveries",
+  "Operations",
+] as const;
+type Tab = (typeof tabs)[number];
+const display = (v: unknown): string =>
+  v === null || v === undefined
+    ? "Unavailable"
+    : typeof v === "boolean"
+    ? v
+      ? "Yes"
+      : "No"
+    : typeof v === "object"
+    ? Object.entries(v as Row)
+        .map(([k, x]) => `${k}: ${display(x)}`)
+        .join(" · ")
+    : String(v);
+function Facts({ data }: { data: Row }) {
   return (
-    <main className="max-w-[1440px] mx-auto px-4 sm:px-8 py-5 flex flex-col gap-4 min-h-screen">
-      <div className="flex items-center justify-between flex-wrap gap-3"><div className="flex items-center gap-3"><Wordmark /><span className="h-7 px-2.5 rounded-full bg-kelp text-sand text-xs font-bold inline-flex items-center">OPS · internal</span></div><div className="flex items-center gap-2 text-sm text-drift">{d && <span>{d.clock.label} · {d.clock.weather} · {d.health.brain} · {d.health.msPerMinute / 1000}s per minute · store {d.health.store ? "on" : "off"}</span>}<button onClick={() => { try { sessionStorage.removeItem("ft.ops"); } catch {} setEntered(false); }} className="text-teal font-bold">Leave</button></div></div>
-      {err && <Card tone="sand"><Label>Closed</Label><p className="text-ink2">{err}</p></Card>}
-      {d && <>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">{stat(d.stats.agents, "agents in town")}{stat(`${d.stats.hosted} · ${d.stats.ownKey} · ${d.stats.ownBrain}`, "hosted · own key · own brain")}{stat(`$${d.stats.costPerFunded}`, "hosted cost per agent, today")}{stat(`$${d.stats.costToday}`, `town spend today · ceiling $${d.stats.ceiling}`, d.stats.costToday > d.stats.ceiling * 0.8 ? "#E8735A" : "#1F5F5B")}{stat(`${(d.stats.p50 / 1000).toFixed(1)} s`, `p50 thought · p95 ${(d.stats.p95 / 1000).toFixed(1)} s`)}{stat(d.stats.holds, "moderation holds", d.stats.holds ? "#E8735A" : undefined)}{stat(d.stats.fallbacksToday, "model fallbacks today", d.stats.fallbacksToday ? "#E8735A" : undefined)}</div>
-        <div className="grid gap-4 grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-4">
-            <Card className="px-6"><div className="flex justify-between items-baseline"><Label>Model calls per hour · today</Label><span className="text-xs text-drift">routine and talk in teal, stakes in kelp, reflection in coral</span></div>
-              <div className="flex items-end gap-1 h-[110px]">{Array.from({ length: 24 }, (_, h) => d.hours.find((x) => x.hour === h) ?? { hour: h, calls: 0, t1: 0, t2: 0, t3: 0, converse: 0, cost: 0 }).map((h) => <div key={h.hour} className="flex-1 flex flex-col justify-end items-center gap-1 h-full"><div className="w-full flex flex-col justify-end" style={{ height: `${(h.calls / max) * 90}px` }}><div style={{ height: `${(h.t3 / Math.max(1, h.calls)) * 100}%`, background: "#E8735A" }} /><div style={{ height: `${(h.t2 / Math.max(1, h.calls)) * 100}%`, background: "#1E2A2B" }} /><div className="rounded-t" style={{ height: `${((h.t1 + h.converse) / Math.max(1, h.calls)) * 100}%`, background: "#1F5F5B" }} /></div><div className="text-[10px] text-drift">{String(h.hour).padStart(2, "0")}</div></div>)}</div>
-            </Card>
-            <Card className="px-6"><Label>Town health</Label><div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[13px]">
-              <div><div className="font-bold">Economy</div><div className="text-ink2">{d.health.coins.toLocaleString()} coins in pockets · {d.health.tills.toLocaleString()} in tills · council holds {d.health.council} · {d.health.employed} of {d.health.jobs} jobs filled · {d.health.flourShortage ? "flour shortage, bread at double" : "flour normal"}</div></div>
-              <div><div className="font-bold">Society</div><div className="text-ink2">{d.health.laws} laws proposed, {d.health.openLaws} open · no court yet</div></div>
-              <div><div className="font-bold">Boredom index</div><div className="text-ink2" style={d.health.boredomPct > 25 ? { color: "#E8735A" } : undefined}>{d.health.boredomPct}% of funded agents had nothing important in 3 days. Threshold 25%.</div></div>
-              <div><div className="font-bold">Engine</div><div className="text-ink2">tick p50 {d.health.tickP50} ms, max {d.health.tickMax} ms · {d.health.events.toLocaleString()} events in memory</div></div>
-            </div></Card>
-            <Card className="px-6"><Label>Moderation queue</Label>{d.holds.filter((h) => !h.done).length === 0 && <p className="text-sm text-drift">Nothing held. The one rule that is ours has not been tested today.</p>}<div className="flex flex-col">{d.holds.filter((h) => !h.done).map((h) => <div key={h.id} className="grid gap-2.5 items-center py-2 border-b border-line last:border-0 text-[13px] grid-cols-[56px_minmax(0,1fr)_90px_80px]"><span className="font-bold" style={{ color: h.level === "hold" ? "#E8735A" : h.level === "watch" ? "#6F7A78" : "#1F5F5B" }}>{h.level === "hold" ? "Hold" : h.level === "watch" ? "Watch" : "OK"}</span><span>{h.text}</span><span className="text-drift">{Math.round((Date.now() - h.at) / 60000)} min ago · {h.source}</span><button onClick={() => done(h.id)} className="font-bold text-teal text-left">Dismiss</button></div>)}</div></Card>
-          </div>
-          <div className="flex flex-col gap-4">
-            <Card className="px-6"><Label>Cost by tier · today</Label>{d.byTier.map((t) => <div key={t.tier} className="flex justify-between text-sm py-1.5 border-b border-line"><span className="text-ink2">{t.tier}<span className="block text-xs text-drift">{t.model}</span></span><span className="tabular font-semibold">{t.calls} calls</span></div>)}<div className="flex justify-between text-sm py-1.5"><span className="text-ink2">Own-key and own-brain agents</span><span className="font-semibold">$0 to us · {d.stats.ownKey + d.stats.ownBrain} agents</span></div><p className="text-xs text-drift">Cost is estimated from tokens at list prices for the hosted mind. Alerts at 80% of the ceiling.</p></Card>
-            <Card className="px-6"><Label>Own brains</Label>{d.ownBrains.length === 0 && <p className="text-sm text-drift">None connected.</p>}{d.ownBrains.map((b) => <div key={b.id} className="flex justify-between items-center text-sm py-1.5 border-b border-line last:border-0"><span><span className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: b.connected ? "#1F5F5B" : "#E8735A" }} />{b.name}</span><span className="text-drift tabular">{b.answered ?? 0} answered · {b.missed ?? 0} missed{b.medianMs != null ? ` · ${b.medianMs} ms` : ""}</span></div>)}</Card>
-            <Card tone="teal" className="px-6 mt-auto"><Label tone="mist">Kill switches</Label><div className="flex flex-wrap gap-2">{([["pause", d.switches.paused ? "Resume time" : "Pause all cognition"], ["economy", d.switches.economyFrozen ? "Thaw the economy" : "Freeze economy"], ["boat", d.switches.boatHeld ? "Release the boat" : "Hold the boat"], ["snapshot", "Snapshot now"]] as const).map(([w, l]) => confirm === w ? <span key={w} className="flex gap-1.5"><button onClick={() => flip(w)} disabled={busy === w} className="h-9 px-3.5 rounded-full bg-coral text-sand text-[13px] font-bold">Yes, {l.toLowerCase()}</button><button onClick={() => setConfirm(null)} className="h-9 px-3 rounded-full bg-shell text-teal text-[13px] font-bold">No</button></span> : <button key={w} onClick={() => (w === "snapshot" ? flip(w) : setConfirm(w))} disabled={!!busy} className="h-9 px-3.5 rounded-full bg-shell text-teal text-[13px] font-bold">{l}</button>)}</div><p className="text-xs text-mist">Every switch is logged and printed in the Gazette as an act of God.</p></Card>
-          </div>
+    <dl className={s.list}>
+      {Object.entries(data).map(([k, v]) => (
+        <div key={k}>
+          <dt>{k.replace(/([A-Z])/g, " $1").replaceAll("_", " ")}</dt>
+          <dd>{display(v)}</dd>
         </div>
-      </>}
+      ))}
+    </dl>
+  );
+}
+function Table({
+  rows,
+  columns,
+  onSelect,
+}: {
+  rows: Row[];
+  columns: string[];
+  onSelect?: (r: Row) => void;
+}) {
+  return (
+    <div className={s.table}>
+      <table>
+        <thead>
+          <tr>
+            {columns.map((c) => (
+              <th key={c}>{c.replaceAll("_", " ")}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={String(r.id ?? i)}>
+              {columns.map((c, j) => (
+                <td key={c}>
+                  {j === 0 && onSelect ? (
+                    <button onClick={() => onSelect(r)}>{display(r[c])}</button>
+                  ) : (
+                    display(r[c])
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!rows.length && <p className={s.muted}>No records in this view.</p>}
+    </div>
+  );
+}
+export default function OpsRoom() {
+  const [tab, setTab] = useState<Tab>("Overview");
+  const [session, setSession] = useState<{ id: string; role: string } | null>(
+    null,
+  );
+  const [checking, setChecking] = useState(true);
+  const [d, setD] = useState<Ops | null>(null);
+  const [overview, setOverview] = useState<Row>({});
+  const [rows, setRows] = useState<Row[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState("");
+  const generation = useRef(0);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [count, setCount] = useState(0);
+  const [detail, setDetail] = useState<Row | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+  const [members, setMembers] = useState<Row[]>([]);
+  const [status, setStatus] = useState("all");
+  const [message, setMessage] = useState("");
+  const [internal, setInternal] = useState(true);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const writable = session?.role !== "viewer";
+  useEffect(() => {
+    void api<{ id: string; role: string }>("/api/backoffice/session")
+      .then(setSession)
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
+  async function refresh() {
+    const ticket=++generation.current;setError("");
+    try {
+      let nextRows:Row[]|undefined;let nextOps:Ops|undefined;let meta:Row|undefined;let nextCount:number|undefined;let nextMembers:Row[]|undefined;
+      if (["Overview","Usage","Operations"].includes(tab)) {
+        [nextOps,meta]=await Promise.all([api<Ops>("/api/ops"),api<Row>("/api/backoffice/overview")]);
+        if(tab==="Operations")nextRows=await api<Row[]>("/api/backoffice/audit");
+      } else if(tab==="Users") {const v=await api<{users:Row[];count:number}>(`/api/backoffice/users?q=${encodeURIComponent(search)}&page=${page}`);nextRows=v.users;nextCount=v.count;}
+      else if(tab==="Citizens")nextRows=await api<Row[]>("/api/backoffice/citizens");
+      else if(tab==="Feedback"){[nextRows,nextMembers]=await Promise.all([api<Row[]>(`/api/backoffice/feedback?status=${status}`),api<Row[]>("/api/backoffice/members")]);}
+      else nextRows=await api<Row[]>("/api/backoffice/deliveries");
+      if(ticket!==generation.current)return;
+      if(nextRows)setRows(nextRows);if(nextOps)setD(nextOps);if(meta)setOverview(meta);if(nextCount!==undefined)setCount(nextCount);if(nextMembers)setMembers(nextMembers);setLoaded(new Date().toLocaleTimeString());
+    }catch(e){if(ticket===generation.current){if([401,403].includes((e as {status:number}).status)){setSession(null);setD(null);setRows([]);setDetail(null);setReport(null);}setError((e as Error).message);}}
+  }
+  useEffect(() => {
+    if (!session) return;
+    setRows([]);
+    setDetail(null);
+    setReport(null);
+    void refresh();
+    return ()=>{generation.current++;};
+  }, [session, tab, page, status, search]);
+  useEffect(() => {
+    if (!session || !["Overview", "Usage"].includes(tab)) return;
+    const timer = setInterval(() => void refresh(), 30000);
+    return () => clearInterval(timer);
+  }, [session, tab]);
+  async function action(task: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await task();
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function openReport(id: string) {
+    try {
+      setReport(await api<Report>(`/api/backoffice/feedback/${id}`));
+      setMessage("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  async function selectCitizen(r: Row) {
+    try {
+      setDetail(await api<Row>(`/api/backoffice/citizens/${r.id}`));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  if (!session)
+    return (
+      <main className={theme.page}>
+        <div className={s.gate}>
+          <Wordmark />
+          <Label>Unwatched back office</Label>
+          <h1>
+            {checking
+              ? "Checking access…"
+              : "For the people behind the island."}
+          </h1>
+          <p className="mb-6">
+            Sign in with an approved administrator account. Access is verified
+            by the server.
+          </p>
+          {!checking && (
+            <LinkButton href="/gate?next=%2Fops">
+              Sign in to back office
+            </LinkButton>
+          )}
+        </div>
+      </main>
+    );
+  return (
+    <main className={theme.page}>
+      <div className={s.shell}>
+        <aside className={s.sidebar}>
+          <Wordmark />
+          <div>
+            <Label>Back office · {session.role}</Label>
+            <nav className={s.nav} aria-label="Back office">
+              {tabs.map((t) => (
+                <button
+                  key={t}
+                  disabled={busy}
+                  aria-current={tab === t ? "page" : undefined}
+                  onClick={() => {
+                    setTab(t);
+                    setPage(0);
+                    setQuery("");setSearch("");
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </nav>
+          </div>
+          <Link href="/town">Return to the island ↗</Link>
+        </aside>
+        <div className={s.main}>
+          <header className={s.header}>
+            <div>
+              <Label>Unwatched operations</Label>
+              <h1>{tab}</h1>
+              <p className={s.muted}>
+                {loaded ? `Last refreshed ${loaded}` : "Loading records…"} ·{" "}
+                {tab === "Overview" || tab === "Usage"
+                  ? "updates every 30 seconds"
+                  : "manual refresh"}
+              </p>
+            </div>
+            <Button
+              kind="secondary"
+              disabled={busy}
+              onClick={() => void refresh()}
+            >
+              Refresh
+            </Button>
+          </header>
+          {error && (
+            <div role="alert" className={s.error}>
+              {error} Previous data may be out of date.
+            </div>
+          )}
+          {(tab === "Overview" || tab === "Usage") && d && (
+            <>
+              <div className={s.metrics}>
+                {[
+                  [d.stats.agents, "Citizens"],
+                  [d.stats.funded, "Funded"],
+                  [d.stats.holds, "Open holds"],
+                  [d.stats.fallbacksToday, "Fallbacks · last 24h"],
+                ].map(([v, l]) => (
+                  <div className={s.metric} key={l}>
+                    <strong>{v}</strong>
+                    <span>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <section className={s.panel}>
+                <h2>Needs attention</h2>
+                {d.switches.paused && <p>Simulation is paused.</p>}
+                {!d.health.store && <p>Snapshot storage is unavailable.</p>}
+                {d.stats.holds > 0 && (
+                  <p>{d.stats.holds} moderation holds need review.</p>
+                )}
+                {!d.switches.paused &&
+                  d.health.store &&
+                  d.stats.holds === 0 && (
+                    <p>No active pause, storage warning or moderation hold.</p>
+                  )}
+                <p className={s.muted}>
+                  Additional provider and delivery failures are shown in Usage
+                  and Deliveries.
+                </p>
+              </section>
+              <section className={s.panel}>
+                <h2>Provider usage</h2>
+                <p className={s.muted}>
+                  {display(overview.providerWindow)}. Started{" "}
+                  {display(overview.startedAt)}. USD costs may be unavailable
+                  for providers that do not return them.
+                </p>
+                <Facts data={(overview.providers ?? {}) as Row} />
+                <p className={s.muted}>
+                  User-key estimates are available in each citizen’s diagnostic.
+                  External own-brain costs are not visible to Unwatched.
+                </p>
+              </section>
+              {tab === "Overview" ? (
+                <>
+                  <section className={s.panel}>
+                    <h2>Service health</h2>
+                    <Facts
+                      data={{
+                        engineVersion: overview.version,
+                        engineCommit: overview.commit,
+                        emailConfigured: overview.emailConfigured,
+                        telegram: overview.telegram,
+                        billingLive: overview.billingLive,
+                        storage: overview.storage,
+                        tickP50Ms: d.health.tickP50,
+                        tickMaxMs: d.health.tickMax,
+                      }}
+                    />
+                  </section>
+                  <section className={s.panel}>
+                    <h2>World health</h2>
+                    <Facts data={{ ...d.health, islandDay: d.clock.day }} />
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className={s.panel}>
+                    <h2>Calls per island hour · day {d.clock.day}</h2>
+                    <div
+                      className={s.bars}
+                      role="img"
+                      aria-label="Model calls per island hour; values in the table below"
+                    >
+                      {d.hours.map((h) => (
+                        <div
+                          key={h.hour}
+                          className={s.bar}
+                          title={`${h.hour}:00: ${h.calls} calls`}
+                          style={{
+                            height: `${Math.max(
+                              2,
+                              (h.calls /
+                                Math.max(1, ...d.hours.map((h) => h.calls))) *
+                                100,
+                            )}%`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <Table
+                      rows={d.hours as unknown as Row[]}
+                      columns={[
+                        "hour",
+                        "calls",
+                        "t1",
+                        "t2",
+                        "t3",
+                        "converse",
+                        "cost",
+                      ]}
+                    />
+                    <p className={s.muted}>
+                      Cost column is the legacy public-world estimate for this
+                      island day. It is not total billed spend.
+                    </p>
+                  </section>
+                  <section className={s.panel}>
+                    <h2>Calls by tier · island day {d.clock.day}</h2>
+                    <Table
+                      rows={d.byTier}
+                      columns={["tier", "model", "calls"]}
+                    />
+                  </section>
+                </>
+              )}
+            </>
+          )}
+          {tab === "Users" && (
+            <>
+              <form
+                className={s.toolbar}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setPage(0);
+                  void refresh();
+                }}
+              >
+                <label className={s.field}>
+                  Find a user
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Name or email"
+                  />
+                </label>
+                <Button>Search</Button>
+              </form>
+              <Table
+                rows={rows}
+                columns={["email", "display_name", "wallet", "created_at"]}
+                onSelect={(r) =>
+                  void action(async () =>
+                    setDetail({
+                      user: r,
+                      ledger: await api(`/api/backoffice/users/${r.id}/ledger`),
+                      billing: await api(
+                        `/api/backoffice/users/${r.id}/billing`,
+                      ),
+                    }),
+                  )
+                }
+              />
+              <div className={s.toolbar}>
+                <Button
+                  kind="secondary"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <span>
+                  Page {page + 1} · {count} users
+                </span>
+                <Button
+                  kind="secondary"
+                  disabled={(page + 1) * 50 >= count}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+              {detail && (
+                <section className={s.panel}>
+                  <h2>Account & credit ledger</h2>
+                  <Facts data={detail.user as Row} />
+                  <Table
+                    rows={detail.ledger as Row[]}
+                    columns={["created_at", "delta", "reason"]}
+                  />
+                  <h2>Stripe reconciliation</h2>
+                  <Facts data={detail.billing as Row} />
+                  <p className={s.muted}>
+                    Stripe amounts are in the currency’s smallest unit. Compare
+                    active subscription prices to the wallet plan and the
+                    promised allowance above. Latest 100 ledger entries. This is
+                    recorded credits activity, not a reconciliation against
+                    Stripe invoices.
+                  </p>
+                </section>
+              )}
+            </>
+          )}
+          {tab === "Citizens" && (
+            <>
+              <label className={s.field}>
+                Find a citizen
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Name, owner ID or citizen ID"
+                />
+              </label>
+              <Table
+                rows={rows.filter((r) =>
+                  `${r.name} ${r.id} ${r.owner}`
+                    .toLowerCase()
+                    .includes(query.toLowerCase()),
+                )}
+                columns={[
+                  "name",
+                  "id",
+                  "brain",
+                  "plan",
+                  "funded",
+                  "asleep",
+                  "lastThought",
+                ]}
+                onSelect={(r) => void selectCitizen(r)}
+              />
+              {detail && (
+                <section className={s.panel}>
+                  <h2>Explain {display(detail.name)}</h2>
+                  <Facts
+                    data={Object.fromEntries(
+                      Object.entries(detail).filter(
+                        ([k]) =>
+                          ![
+                            "events",
+                            "projects",
+                            "foodRoutineDecisions",
+                          ].includes(k),
+                      ),
+                    )}
+                  />
+                  <p className={s.muted}>
+                    last thought and now use island minutes. Cadence is an
+                    eligibility interval, not a guaranteed appointment. These
+                    are recorded state and events; provider failures may require
+                    provider logs.
+                  </p>
+                  <h2>Recent cognition attempts</h2><Table rows={(detail.attempts??[]) as Row[]} columns={["created_at","kind","outcome","funding","duration_ms"]}/><p className={s.muted}>Completed means the brain method returned; it does not prove the action succeeded. History starts with this deployment.</p><h2>Recent recorded events</h2>
+                  {(detail.events as Row[]).map((e) => (
+                    <div className={s.event} key={String(e.id)}>
+                      <Label>
+                        {display(e.kind)} · minute {display(e.t)}
+                      </Label>
+                      <p>{display(e.text)}</p>
+                    </div>
+                  ))}
+                  <h2>Projects & learning</h2>
+                  <Facts
+                    data={{
+                      projects: detail.projects,
+                      foodRoutineDecisions: detail.foodRoutineDecisions,
+                    }}
+                  />
+                </section>
+              )}
+            </>
+          )}
+          {tab === "Feedback" && (
+            <>
+              <label className={s.field}>
+                Status
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  {[
+                    "all",
+                    "new",
+                    "reviewing",
+                    "planned",
+                    "in_progress",
+                    "resolved",
+                    "closed",
+                  ].map((v) => (
+                    <option key={v} value={v}>
+                      {v.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Table
+                rows={rows}
+                columns={[
+                  "title",
+                  "category",
+                  "status",
+                  "severity",
+                  "created_at",
+                ]}
+                onSelect={(r) => void openReport(String(r.id))}
+              />
+              <p className={s.muted}>
+                Latest 200 matching reports. Incoming reports are private.
+              </p>
+              {report && (
+                <section className={s.panel}>
+                  <h2>{report.title}</h2>
+                  <p className="whitespace-pre-wrap mb-6">
+                    {report.description}
+                  </p>
+                  <Facts
+                    data={{
+                      reference: report.id,
+                      page: report.page,
+                      version: report.version,
+                      email: report.email,
+                      owner: report.owner_id,
+                    }}
+                  />
+                  {report.email && (
+                    <a href={`mailto:${report.email}`}>Reply by email ↗</a>
+                  )}
+                  {report.screenshot && (
+                    <img
+                      className="max-h-96 my-5"
+                      src={report.screenshot}
+                      alt="User-provided report screenshot"
+                    />
+                  )}
+                  <div className={s.split}>
+                    <label className={s.field}>
+                      Status
+                      <select
+                        disabled={!writable}
+                        value={report.status}
+                        onChange={(e) =>
+                          setReport({ ...report, status: e.target.value })
+                        }
+                      >
+                        {[
+                          "new",
+                          "reviewing",
+                          "planned",
+                          "in_progress",
+                          "resolved",
+                          "closed",
+                        ].map((v) => (
+                          <option key={v}>{v}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={s.field}>
+                      Severity
+                      <select
+                        disabled={!writable}
+                        value={report.severity}
+                        onChange={(e) =>
+                          setReport({ ...report, severity: e.target.value })
+                        }
+                      >
+                        {["low", "normal", "high", "urgent"].map((v) => (
+                          <option key={v}>{v}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={s.field}>
+                      Assignee
+                      <select
+                        disabled={!writable}
+                        value={report.assignee ?? ""}
+                        onChange={(e) =>
+                          setReport({
+                            ...report,
+                            assignee: e.target.value || null,
+                          })
+                        }
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((m) => (
+                          <option
+                            key={String(m.user_id)}
+                            value={String(m.user_id)}
+                          >
+                            {m.user_id === session.id
+                              ? "You"
+                              : String(m.user_id)}{" "}
+                            · {String(m.role)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={s.field}>
+                      Duplicate of · report ID
+                      <input
+                        disabled={!writable}
+                        value={report.duplicate_of ?? ""}
+                        onChange={(e) =>
+                          setReport({
+                            ...report,
+                            duplicate_of: e.target.value || null,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className={s.field}>
+                      Linked GitHub issue
+                      <input
+                        disabled={!writable}
+                        value={report.github_url ?? ""}
+                        placeholder="https://github.com/kresogalic8/unwatched/issues/…"
+                        onChange={(e) =>
+                          setReport({
+                            ...report,
+                            github_url: e.target.value || null,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className={s.toolbar}>
+                    <Button
+                      disabled={busy || !writable}
+                      onClick={() =>
+                        void action(async () => {
+                          await api(`/api/backoffice/feedback/${report.id}`, {
+                            method: "PATCH",
+                            body: JSON.stringify({
+                              status: report.status,
+                              severity: report.severity,
+                              assignee: report.assignee,
+                              duplicate_of: report.duplicate_of,
+                              github_url: report.github_url,
+                              updated_at: report.updated_at,
+                            }),
+                          });
+                          await openReport(report.id);
+                        })
+                      }
+                    >
+                      Save report
+                    </Button>
+                    <a
+                      href="https://github.com/kresogalic8/unwatched/issues/new"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Draft a GitHub issue ↗
+                    </a>
+                  </div>
+                  <p className={s.muted}>
+                    Review and remove private details before publishing to
+                    GitHub.
+                  </p>
+                  {report.messages?.map((m) => (
+                    <div className={s.message} key={m.id}>
+                      <Label>
+                        {m.internal
+                          ? "Internal note"
+                          : "Reply visible to reporter"}{" "}
+                        · {new Date(m.created_at).toLocaleString()}
+                      </Label>
+                      <p>{m.body}</p>
+                    </div>
+                  ))}
+                  <label className={s.field}>
+                    Message
+                    <textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      maxLength={5000}
+                    />
+                  </label>
+                  <label className={s.toolbar}>
+                    <input
+                      type="checkbox"
+                      checked={internal}
+                      onChange={(e) => setInternal(e.target.checked)}
+                    />
+                    Internal note (staff only)
+                  </label>
+                  {!internal && !report.owner_id && (
+                    <p>
+                      Guest reports have no account inbox. Use their reply email
+                      if provided.
+                    </p>
+                  )}
+                  <Button
+                    disabled={
+                      busy ||
+                      !writable ||
+                      !message.trim() ||
+                      (!internal && !report.owner_id)
+                    }
+                    onClick={() =>
+                      void action(async () => {
+                        await api(
+                          `/api/backoffice/feedback/${report.id}/messages`,
+                          {
+                            method: "POST",
+                            body: JSON.stringify({ body: message, internal }),
+                          },
+                        );
+                        await openReport(report.id);
+                      })
+                    }
+                  >
+                    {internal ? "Add internal note" : "Send reply to account"}
+                  </Button>
+                </section>
+              )}
+            </>
+          )}
+          {tab === "Deliveries" && (
+            <section className={s.panel}>
+              <h2>Delivery attempts</h2>
+              <p className={s.muted}>
+                Latest 200 attempts recorded after this update. Accepted means
+                the provider accepted the request; inbox delivery is not
+                confirmed. Auth emails sent directly by Supabase are outside
+                this log.
+              </p>
+              <Table
+                rows={rows}
+                columns={[
+                  "created_at",
+                  "channel",
+                  "kind",
+                  "status",
+                  "agent_id",
+                  "provider_id",
+                  "error",
+                ]}
+                onSelect={(r) => setDetail(r)}
+              />
+              {detail && (
+                <div>
+                  <Facts data={detail} />
+                  {detail.channel === "email" &&
+                    detail.status === "failed" &&
+                    !!detail.job_id && (
+                      <>
+                        <p className={s.muted}>
+                          Retry uses the original message and checks current
+                          ownership, recipient and preferences. Available for 23
+                          hours; requests are deduplicated by Resend.
+                        </p>
+                        <Button
+                          disabled={busy || !writable}
+                          onClick={() =>
+                            void action(() =>
+                              api(
+                                `/api/backoffice/deliveries/${detail.id}/retry`,
+                                { method: "POST" },
+                              ),
+                            )
+                          }
+                        >
+                          Retry failed email
+                        </Button>
+                      </>
+                    )}
+                </div>
+              )}
+            </section>
+          )}
+          {tab === "Operations" && d && (
+            <>
+              <section className={`${s.panel} ${s.danger}`}>
+                <h2>World controls</h2>
+                <p className={s.muted}>
+                  Changes affect everyone. Every request is attributed to your
+                  account. Successful world switches also appear in the Gazette.
+                </p>
+                <Facts data={d.switches} />
+                <div className={s.toolbar}>
+                  {(["pause", "economy", "boat", "snapshot"] as const).map(
+                    (w) => (
+                      <Button
+                        key={w}
+                        kind="secondary"
+                        disabled={busy || !writable}
+                        onClick={() => setConfirm(w)}
+                      >
+                        {w === "snapshot"
+                          ? "Save snapshot"
+                          : w === "pause"
+                          ? d.switches.paused
+                            ? "Resume time"
+                            : "Pause time"
+                          : w === "economy"
+                          ? d.switches.economyFrozen
+                            ? "Resume economy"
+                            : "Freeze economy"
+                          : d.switches.boatHeld
+                          ? "Release boat"
+                          : "Hold boat"}
+                      </Button>
+                    ),
+                  )}
+                </div>
+                {confirm && (
+                  <div role="alert">
+                    <p>Apply {confirm} to the live world?</p>
+                    <div className={s.toolbar}>
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          void action(async () => {
+                            await api("/api/ops/switch", {
+                              method: "POST",
+                              body: JSON.stringify({
+                                which: confirm,
+                                on:
+                                  confirm === "pause"
+                                    ? !d.switches.paused
+                                    : confirm === "economy"
+                                    ? !d.switches.economyFrozen
+                                    : !d.switches.boatHeld,
+                              }),
+                            });
+                            setConfirm(null);
+                          })
+                        }
+                      >
+                        Confirm change
+                      </Button>
+                      <Button kind="secondary" onClick={() => setConfirm(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </section>
+              <section className={s.panel}>
+                <h2>Moderation queue</h2>
+                {d.holds
+                  .filter((h) => !h.done)
+                  .map((h) => (
+                    <div className={s.event} key={h.id}>
+                      <Label>
+                        {h.level} · {h.source}
+                      </Label>
+                      <p>{h.text}</p>
+                      <Button
+                        kind="secondary"
+                        disabled={busy || !writable}
+                        onClick={() =>
+                          void action(() =>
+                            api(`/api/ops/hold/${h.id}`, { method: "POST" }),
+                          )
+                        }
+                      >
+                        Mark reviewed
+                      </Button>
+                    </div>
+                  ))}
+                {!d.holds.some((h) => !h.done) && (
+                  <p>No open moderation items.</p>
+                )}
+              </section>
+              <section className={s.panel}>
+                <h2>Administrator audit trail</h2>
+                <Table
+                  rows={rows}
+                  columns={[
+                    "created_at",
+                    "actor",
+                    "action",
+                    "target",
+                    "outcome",
+                  ]}
+                />
+              </section>
+            </>
+          )}
+        </div>
+      </div>
     </main>
   );
 }

@@ -1,0 +1,119 @@
+.entry {
+  position: fixed;
+  right: 20px;
+  bottom: 22px;
+  z-index: 40;
+  border: 1px solid #cdd0c4;
+  border-radius: 4px;
+  background: #f2f1eb;
+  color: #20291f !important;
+  padding: 10px 15px;
+  font-size: 13px;
+  text-decoration: none !important;
+  box-shadow: 0 3px 12px #20291f12;
+}
+.entry:hover {
+  background: #e7e7dd;
+}
+.entry:focus-visible {
+  outline: 2px solid #e4572e;
+  outline-offset: 3px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 48px;
+  align-items: start;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 13px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  box-shadow: none;
+}
+.field :is(input, textarea, select):focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.field textarea {
+  min-height: 160px;
+  resize: vertical;
+}
+.types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.types button {
+  text-align: left;
+  border: 1px solid var(--rule);
+  padding: 16px;
+  border-radius: 4px;
+  background: transparent;
+  min-height: 52px;
+}
+.types button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.types button:hover {
+  background: var(--surface);
+}
+.note {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.report {
+  padding: 22px 0;
+  border-top: 1px solid var(--rule);
+}
+.report h2 {
+  font-size: 21px;
+  margin: 8px 0;
+}
+.report p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.reply {
+  margin: 16px 0;
+  padding: 18px;
+  background: var(--surface);
+  border-radius: 4px;
+}
+.trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .entry {
+    bottom: 82px;
+    right: 12px;
+  }
+}
