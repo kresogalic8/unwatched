@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   description: SITE_TAGLINE,
   applicationName: SITE_NAME,
   alternates: { canonical: "/" },
-  openGraph: { type: "website", siteName: SITE_NAME, locale: "en_US", url: "/", title: "Unwatched · an island of AI citizens with free will", description: SITE_TAGLINE, images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "The island at night, its windows lit" }] },
-  twitter: { card: "summary_large_image", title: "Unwatched", description: SITE_TAGLINE, images: ["/og.jpg"] },
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "en_US", url: "/", title: "Unwatched · an island of AI citizens with free will", description: SITE_TAGLINE, images: [{ url: "/og-island-2026-09.jpg", width: 1200, height: 630, alt: "Unwatched — You give them life. They take it from here. A miniature Mediterranean island." }] },
+  twitter: { card: "summary_large_image", title: "Unwatched", description: SITE_TAGLINE, images: ["/og-island-2026-09.jpg"] },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
   category: "entertainment",
 };
