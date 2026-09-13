@@ -26,15 +26,23 @@ export default function GoogleAnalytics() {
   const [settings, setSettings] = useState(false);
   const lastPage = useRef<string | null>(null);
   const banner = useRef<HTMLElement>(null);
-  const privacyButton = useRef<HTMLButtonElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
   const open = choice === null || settings;
   useEffect(() => {
     if (!ready) return;
     if (settings) banner.current?.focus();
-    else if (wasOpen.current && !open) privacyButton.current?.focus();
+    else if (wasOpen.current && !open) previousFocus.current?.focus();
     wasOpen.current = open;
   }, [ready, open, settings]);
+  useEffect(() => {
+    const reopen = () => {
+      previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setSettings(true);
+    };
+    window.addEventListener("unwatched:analytics-preferences", reopen);
+    return () => window.removeEventListener("unwatched:analytics-preferences", reopen);
+  }, []);
   useEffect(() => {
     try { const saved = localStorage.getItem(CHOICE); if (saved === "accepted" || saved === "declined") setChoice(saved); } catch { /* session-only choice when storage is unavailable */ }
     setReady(true);
@@ -90,9 +98,6 @@ export default function GoogleAnalytics() {
   }
   if (!ready) return null;
   return <>
-    {!open && <button ref={privacyButton} type="button" onClick={() => setSettings(true)} className={styles.reopen} aria-label="Change privacy preferences" aria-expanded={false}>
-      <Icon name="settings" size={16} /><span>Privacy</span>
-    </button>}
     {open && <section ref={banner} tabIndex={-1} onKeyDown={event => { if (event.key === "Escape" && choice !== null) setSettings(false); }} aria-labelledby="privacy-heading" aria-describedby="privacy-description" className={styles.banner}>
       <div className={styles.heading}>
         <span className={styles.eyebrow}><span className={styles.dot} />YOUR VISIT. YOUR CHOICE.</span>

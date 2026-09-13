@@ -1,5 +1,4 @@
-.banner,
-.reopen {
+.banner {
   --consent-paper: #f2f1eb;
   --consent-ink: #20291f;
   --consent-muted: #606557;
@@ -30,8 +29,7 @@
 .description { margin: 0; font-size: 15px; line-height: 1.5; color: var(--consent-muted); }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
 .actions button,
-.close,
-.reopen { cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.close { cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
 .actions button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 12px 14px; border: 1px solid var(--consent-rule); border-radius: 3px; background: transparent; color: inherit; font-size: 14px; font-weight: 500; transition: background 160ms, color 160ms, border-color 160ms; }
 .actions button:hover { background: var(--consent-ink); color: var(--consent-paper); border-color: var(--consent-ink); }
 .footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--consent-rule); font-size: 12px; color: var(--consent-muted); }
@@ -39,10 +37,7 @@
 .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .close { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; margin: -10px -10px -10px 0; border: 0; border-radius: 3px; background: transparent; color: inherit; }
 .close:hover { background: var(--consent-rule); }
-.reopen { position: fixed; z-index: 100; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 9px 13px; border-radius: 24px; font-size: 12px; box-shadow: 0 3px 12px #20291f12; }
-.reopen:hover { background: var(--consent-ink); color: var(--consent-paper); }
-.banner :is(button, a):focus-visible,
-.reopen:focus-visible { outline: 2px solid #e4572e; outline-offset: 3px; }
+.banner :is(button, a):focus-visible { outline: 2px solid #e4572e; outline-offset: 3px; }
 @media (max-width: 480px) {
   .banner { left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); width: calc(100vw - 20px); max-height: calc(100dvh - 20px); padding: 20px; }
   .banner h2 { font-size: 28px; }
@@ -56,7 +51,7 @@
   .actions button { gap: 4px; padding: 12px 8px; white-space: nowrap; }
 }
 @media (prefers-color-scheme: dark) {
-  .banner, .reopen { --consent-paper: #28322b; --consent-ink: #f2f1e7; --consent-muted: #b9c2b2; --consent-rule: #515b50; }
+  .banner { --consent-paper: #28322b; --consent-ink: #f2f1e7; --consent-muted: #b9c2b2; --consent-rule: #515b50; }
 }
 @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .banner { animation: none; } .actions button { transition: none; } }
