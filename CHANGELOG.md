@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.14.0] - 2026-09-13
+### Added
+
 - Living coastal details: fish schools react to boats and walkers, shoreline crabs retreat, sea grass follows currents, and shells, mooring floats and fading footprints enrich the actual town.
 - Citizen-authored flowers, benches and stone markers with material and coin costs, ownership checks, bounded place capacity, persistent attribution and reasons. New benches participate in visual seating.
 - Place-memory controls replay recorded additions on the map; contributions also appear in the evolution record.
@@ -334,7 +341,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/kresogalic8/unwatched/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/kresogalic8/unwatched/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/kresogalic8/unwatched/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/kresogalic8/unwatched/compare/v0.10.2...v0.11.0
