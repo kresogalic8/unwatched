@@ -115,6 +115,13 @@ if(telegramDb) metrics.onAttempt=(a,kind,outcome,duration,t)=>{void telegramDb.f
 const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.wallet(a.owner).plan === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
 const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, creditRefund: billing.refund, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
+const waitingTown=new Town({seed:SEED,brain:new MockBrain(SEED)});
+function detachCitizen(a:AgentState){
+ town.agents.delete(a.id);
+ for(const job of town.jobs.values())job.holders=job.holders.filter(id=>id!==a.id);
+ if(a.asleep){const place=town.places.get(a.location);if(place?.beds)place.freeBeds=Math.min(place.beds.capacity,(place.freeBeds??0)+1);}
+}
+const allCitizens=()=>[...town.agents.values(),...waitingTown.agents.values()];
 if (townBrain instanceof OpenRouterBrain) townBrain.primer = primerOf(town);
 if (subscriberBrain) subscriberBrain.primer = primerOf(town);
 let saved: Awaited<ReturnType<NonNullable<typeof store>["loadSnapshot"]>> = null;
@@ -122,8 +129,11 @@ try { saved = store ? await store.loadSnapshot() : null; }
 catch (err) { log(`${(err as Error).message}; not starting, so the island on record is not seeded over. Apply the migrations, then start again.`); process.exit(1); }
 if (saved && saved.agents.length > 0) {
   town.restore(saved);
+  const waiting=await store!.waitingCitizens();
+  waitingTown.restore({...saved,agents:waiting});
+  for(const a of waitingTown.agents.values())detachCitizen(town.agents.get(a.id)??a);
   town.events.push(...(await store!.recentEvents(300)));
-  for (const row of await store!.loadBrains()) { const a = town.agents.get(row.agent_id); if (!a) continue; brain.set(row.agent_id, row); a.brainKind = row.kind; a.thinkEvery = row.kind === "own_key" ? row.think_every : null; }
+  for (const row of await store!.loadBrains()) { const a = town.agents.get(row.agent_id)??waitingTown.agents.get(row.agent_id); if (!a) continue; brain.set(row.agent_id, row); a.brainKind = row.kind; a.thinkEvery = row.kind === "own_key" ? row.think_every : null; }
   for (const a of town.agents.values()) billing.applyPlan(a);
   log(`restored the island from its record: ${town.clock()}, ${town.agents.size} citizens, ${saved.papers.length} editions`);
 } else {
@@ -184,12 +194,13 @@ async function noticeLetter(e: TownEvent): Promise<void> {
   if (await sendMail({...m,ownerId:a.owner,agentId:a.id,kind:"letter",deliveryKey:`letter:${a.owner}:${a.id}:${e.day}`}, log)) await saveRead({ ...read, lastLetterMailDay: e.day });
 }
 // ---- the clock ----
+let worldTransition=false;
 let running = true; let ticking = false; let lastHour = town.hour; let memoryMark = town.t + 1;
 async function loop() {
   while (running) {
     const started = Date.now();
     // an island a minute or two ahead of the real clock (a restart inside the same minute) holds still until the clock catches up
-    if (!ticking && !(real && real.ahead() > 0)) {
+    if (!worldTransition && !ticking && !(real && real.ahead() > 0)) {
       ticking = true;
       try {
         const plannedBefore = [...town.agents.values()].filter((a) => a.plan?.day === town.day).length;
@@ -268,8 +279,8 @@ async function ownerOf(req: Request): Promise<string | null> {
 }
 if (telegramDb) app.route("/api", telegramRoutes(telegramDb, ownerOf, owner => [...town.agents.values()].filter(a => a.owner === owner).map(a => ({ id: a.id, name: a.persona.name })), { username: process.env.TELEGRAM_BOT_USERNAME ?? "", secret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "", enabled: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_WEBHOOK_SECRET) }));
 if (telegramDb) app.route("/api", backofficeRoutes({db:telegramDb,ownerOf,adminOf,
- citizens:()=>[...town.agents.values()].map(a=>({id:a.id,name:a.persona.name,owner:a.owner,brain:a.brainKind,funded:a.funded,asleep:a.asleep,place:a.location,plan:a.owner?billing.wallet(a.owner).plan:null,budget:a.budget,credits:a.owner?billing.wallet(a.owner).credits:null,entitlementMatch:a.owner&&a.brainKind==='hosted'?(a.budget.tier1Max===billing.allowance(a.owner).tier1Max&&a.budget.tier2Max===billing.allowance(a.owner).tier2Max):null,lastThought:a.lastThought,thinkEvery:a.thinkEvery})),
- diagnostic:async(id)=>{const a=town.agents.get(id);if(!a)return null;const b=brain.perAgent.get(id);const attempts=await telegramDb!.from('cognition_attempts').select('id,kind,outcome,funding,island_minute,duration_ms,created_at').eq('agent_id',id).order('created_at',{ascending:false}).limit(30);return {attempts:attempts.error?null:attempts.data,id:a.id,name:a.persona.name,now:town.t,paused:town.paused,funded:a.funded,asleep:a.asleep,brain:a.brainKind,plan:a.owner?billing.wallet(a.owner).plan:null,allowance:a.owner?billing.allowance(a.owner):null,budget:a.budget,credits:a.owner?billing.wallet(a.owner).credits:null,lastThought:a.lastThought,thinkEvery:a.thinkEvery,brainStatus:b instanceof OwnKeyBrain?{...b.status(),cap:b.row.daily_cap_usd}:b instanceof OwnBrain?b.status():null,events:town.events.filter(e=>e.actors.includes(id)&&!["agent.letter","agent.reflect","relation.change","agent.self"].includes(e.kind)).slice(-30).reverse().map(e=>({id:e.id,t:e.t,kind:e.kind,text:e.text})),projects:a.projects,foodRoutineDecisions:a.foodRoutineDecisions??[]};},
+ citizens:()=>allCitizens().map(a=>({admission:waitingTown.agents.has(a.id)?"Awaiting activation":"On island",id:a.id,name:a.persona.name,owner:a.owner,brain:a.brainKind,funded:a.funded,asleep:a.asleep,place:a.location,plan:a.owner?billing.wallet(a.owner).plan:null,budget:a.budget,credits:a.owner?billing.wallet(a.owner).credits:null,entitlementMatch:a.owner&&a.brainKind==='hosted'?(a.budget.tier1Max===billing.allowance(a.owner).tier1Max&&a.budget.tier2Max===billing.allowance(a.owner).tier2Max):null,lastThought:a.lastThought,thinkEvery:a.thinkEvery})),
+ diagnostic:async(id)=>{const a=town.agents.get(id)??waitingTown.agents.get(id);if(!a)return null;const b=brain.perAgent.get(id);const attempts=await telegramDb!.from('cognition_attempts').select('id,kind,outcome,funding,island_minute,duration_ms,created_at').eq('agent_id',id).order('created_at',{ascending:false}).limit(30);return {attempts:attempts.error?null:attempts.data,id:a.id,name:a.persona.name,now:town.t,paused:town.paused,funded:a.funded,asleep:a.asleep,brain:a.brainKind,plan:a.owner?billing.wallet(a.owner).plan:null,allowance:a.owner?billing.allowance(a.owner):null,budget:a.budget,credits:a.owner?billing.wallet(a.owner).credits:null,lastThought:a.lastThought,thinkEvery:a.thinkEvery,brainStatus:b instanceof OwnKeyBrain?{...b.status(),cap:b.row.daily_cap_usd}:b instanceof OwnBrain?b.status():null,events:town.events.filter(e=>e.actors.includes(id)&&!["agent.letter","agent.reflect","relation.change","agent.self"].includes(e.kind)).slice(-30).reverse().map(e=>({id:e.id,t:e.t,kind:e.kind,text:e.text})),projects:a.projects,foodRoutineDecisions:a.foodRoutineDecisions??[]};},
  retry:async(id)=>{
  const attempt=await telegramDb!.from('delivery_attempts').select('job_id').eq('id',id).maybeSingle();if(!attempt.data?.job_id)return false;
  const job=await telegramDb!.from('delivery_jobs').select('*').eq('id',attempt.data.job_id).maybeSingle();if(!job.data||job.data.status!=='failed'||Date.now()-Date.parse(job.data.created_at)>23*3600000)return false;
@@ -346,8 +357,9 @@ app.get("/api/towns", async (c) => {
 });
 app.get("/api/agents", (c) => c.json([...town.agents.values()].map((a) => publicAgent(town, a))));
 app.get("/api/agents/:id", async (c) => {
-  const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person on the island" }, 404);
+  const a = town.agents.get(c.req.param("id"))??waitingTown.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person on the island" }, 404);
   const owner = await ownerOf(c.req.raw);
+  if(waitingTown.agents.has(a.id))return owns(a,owner)?c.json({...ownerAgent(town,a),awaitingActivation:true}):c.json({error:"No such person on the island"},404);
   return c.json(owns(a, owner) ? ownerAgent(town, a) : publicAgent(town, a));
 });
 /** The written digest is one model call; it is remembered for the sim hour so a page refresh costs nothing. */
@@ -363,9 +375,10 @@ async function writtenDigest(a: AgentState, since: number): Promise<{ text: stri
 /** An intent is the owner's to read, not the town's. Public streams carry the deed, never the why. */
 function publicEvent(e: TownEvent): TownEvent { if (!e.payload || !("because" in e.payload)) return e; const { because: _b, ...rest } = e.payload; const { payload: _p, ...base } = e; return { ...base, ...(Object.keys(rest).length ? { payload: rest } : {}) } as TownEvent; }
 app.get("/api/agents/:id/digest", async (c) => {
-  const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
+  const a = town.agents.get(c.req.param("id"))??waitingTown.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
   const owner = await ownerOf(c.req.raw);
   const mine = owns(a, owner);
+  if(waitingTown.agents.has(a.id))return mine?c.json({written:null,headline:"Awaiting activation",items:[],people:[],since:town.t,now:town.t,agent:{...ownerAgent(town,a),awaitingActivation:true},letters:[]}):c.json({error:"No such person on the island"},404);
   // the window: what the page asked for, else where this owner last read, else three days; the true start goes back so the kicker counts right
   const asked = c.req.query("since"); const askedT = asked !== undefined && asked !== "" && Number.isFinite(Number(asked)) ? Number(asked) : null;
   const read = mine ? await readOf(owner!, a.id) : null;
@@ -376,7 +389,8 @@ app.get("/api/agents/:id/digest", async (c) => {
   if (read && (read.lastDigestT ?? -1) < town.t) void saveRead({ ...read, lastDigestT: town.t }).catch((err: Error) => log(`read mark failed: ${err.message}`)); // opening the digest is reading it
   return c.json({ ...d, written, since, now: town.t, readAt: read?.lastDigestT ?? null, agent: mine ? ownerAgent(town, a) : publicAgent(town, a), letters: mine ? town.events.filter((e) => e.kind === "agent.letter" && e.actors[0] === a.id && e.t >= since).map((e) => ({ t: e.t, text: String(e.payload?.text ?? e.text) })) : [] });
 });
-app.get("/api/agents/:id/events", (c) => {
+app.get("/api/agents/:id/events", async(c) => {
+  const waiting=waitingTown.agents.get(c.req.param("id"));if(waiting&&!owns(waiting,await ownerOf(c.req.raw)))return c.json({error:"No such person on the island"},404);
   const id = c.req.param("id"); const since = Number(c.req.query("since") ?? 0);
   return c.json(town.events.filter((e) => e.actors.includes(id) && e.t >= since).slice(-300));
 });
@@ -468,6 +482,7 @@ app.get("/api/hall", (c) => {
 app.post("/api/me/delete", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
   for (const a of [...town.agents.values()]) if (a.owner === owner) { town.removeAgent(a.id, "left", "Their owner closed the account."); if (store) await store.markLeft(a.id, town.t); }
+  for(const a of [...waitingTown.agents.values()])if(a.owner===owner){if(store)await store.markLeft(a.id,town.t);waitingTown.agents.delete(a.id);}
   if (store) { await store.snapshot(town); await store.deleteOwner(owner); }
   prefsCache.delete(owner); for (const k of [...readCache.keys()]) if (k.startsWith(`${owner}:`)) readCache.delete(k);
   return c.json({ ok: true });
@@ -501,12 +516,12 @@ const boardingLocks=new Set<string>();
 const brainRows = new Map<string, BrainRow>();
 if (store) for (const row of await store.loadBrains()) brainRows.set(row.agent_id, row);
 app.get("/api/agents/:id/brain", async (c) => {
-  const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
+  const a = town.agents.get(c.req.param("id"))??waitingTown.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
   const owner = await ownerOf(c.req.raw); if (!owns(a, owner)) return c.json({ error: "not your agent" }, 403);
   return c.json(brainView(a, brainRows.get(a.id)));
 });
 app.put("/api/agents/:id/brain", async (c) => {
-  const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
+  const a = town.agents.get(c.req.param("id"))??waitingTown.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
   const owner = await ownerOf(c.req.raw); if (!owns(a, owner)) return c.json({ error: "not your agent" }, 403);
   const body = z.object({ kind: z.enum(["hosted", "own_key", "own_brain"]), apiKey: z.string().min(8).optional(), models: z.object({ routine: z.string(), stakes: z.string(), reflect: z.string() }).optional(), thinkEvery: z.number().int().min(1).max(240).optional(), dailyCapUsd: z.number().min(0).max(100).optional(), memory: z.enum(["lease", "own"]).optional() }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? "that setting does not exist" }, 400);
@@ -514,17 +529,18 @@ app.put("/api/agents/:id/brain", async (c) => {
   const row: BrainRow = { agent_id: a.id, kind: body.data.kind, provider: "openrouter", api_key: body.data.apiKey ?? prev?.api_key ?? null, models: body.data.models ?? prev?.models ?? null, think_every: body.data.thinkEvery ?? prev?.think_every ?? 5, daily_cap_usd: body.data.dailyCapUsd ?? prev?.daily_cap_usd ?? 2, token: body.data.kind === "own_brain" ? (prev?.token ?? newToken()) : (prev?.token ?? null), memory: body.data.memory ?? prev?.memory ?? "lease" };
   if (row.kind === "own_key") {
     if (!row.api_key) return c.json({ error: "an own key needs a key" }, 400);
+    if(waitingTown.agents.has(a.id)){if(!row.models||!row.daily_cap_usd)return c.json({error:"Choose models and a positive daily cap"},400);try{await verifyBoardingKey(row.api_key,row.models);}catch(e){return c.json({error:(e as Error).message},400);}}
     // one cheap test call before we keep it
     const test = await fetch("https://openrouter.ai/api/v1/auth/key", { headers: { Authorization: `Bearer ${row.api_key}` } });
     if (!test.ok) return c.json({ error: "OpenRouter says this key is not valid. Nothing was saved." }, 400);
   }
+  if (store) await store.saveBrain(row);
   brainRows.set(a.id, row); brain.set(a.id, row);
   a.brainKind = row.kind; a.thinkEvery = row.kind === "own_key" ? row.think_every : null;
-  if (store) await store.saveBrain(row);
   return c.json({ ...brainView(a, row), ...(body.data.kind === "own_brain" && !prev?.token ? { token: row.token } : {}) });
 });
 app.post("/api/agents/:id/brain/token", async (c) => {
-  const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
+  const a = town.agents.get(c.req.param("id"))??waitingTown.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
   const owner = await ownerOf(c.req.raw); if (!owns(a, owner)) return c.json({ error: "not your agent" }, 403);
   const prev = brainRows.get(a.id); if (!prev || prev.kind !== "own_brain") return c.json({ error: "this agent is not on an own brain" }, 400);
   const row = { ...prev, token: newToken() }; brainRows.set(a.id, row); brain.set(a.id, row); if (store) await store.saveBrain(row);
@@ -566,6 +582,21 @@ app.use('/api/ops/*', async (c,next) => {
   if(audit.error)return c.json({error:'Audit unavailable; no action was performed.'},503);
   try {await next(); await telegramDb!.from('ops_audit').update({outcome:c.res.ok?'completed':'failed'}).eq('id',audit.data.id);} catch(e){await telegramDb!.from('ops_audit').update({outcome:'failed'}).eq('id',audit.data.id);throw e;}
  } else await next();
+});
+app.post("/api/ops/park-unfunded",async(c)=>{
+ if(ticking||worldTransition||boardingLocks.size)return c.json({error:"The world is finishing an update. Retry in a moment."},409);
+ if(!store)return c.json({error:"Persistent storage is required before moving citizens."},503);
+ worldTransition=true;
+ try{
+  const selected=[...town.agents.values()].filter(a=>a.owner&&a.brainKind==="hosted"&&billing.wallet(a.owner).plan==="none"&&billing.wallet(a.owner).credits<=0);
+  const ids=new Set(selected.map(a=>a.id));const snapshot=town.snapshot();const records=snapshot.agents.filter(a=>ids.has(a.id));
+  await store.parkCitizens(records);
+  waitingTown.restore({...snapshot,agents:[...waitingTown.snapshot().agents,...records]});
+  for(const a of selected)detachCitizen(a);
+  await store.snapshot(town);
+  broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(publicEvent)});
+  return c.json({moved:ids.size,remaining:town.agents.size});
+ }finally{worldTransition=false;}
 });
 app.get("/api/ops", async (c) => {
   c.header("Cache-Control","private, no-store");
@@ -637,16 +668,41 @@ app.post("/api/boarding/external/:id/verify",async(c)=>{
 app.get("/api/me/activation",async(c)=>{
   const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);
   const wallet=billing.wallet(owner);c.header("Cache-Control","private, no-store");
-  return c.json({citizens:[...town.agents.values()].filter(a=>a.owner===owner).map(a=>{
+  return c.json({citizens:allCitizens().filter(a=>a.owner===owner).map(a=>{
     const b=brain.perAgent.get(a.id);
     const state=a.brainKind==="own_brain"?(b instanceof OwnBrain&&b.connected?"external":"disconnected"):
       a.brainKind==="own_key"?(b instanceof OwnKeyBrain?(b.status().spentToday>=(b.row.daily_cap_usd??2)?"capped":"personal_key"):"unconfigured"):
       wallet.plan!=="none"?"subscription":wallet.credits>0?"credits":"activation_required";
-    return {id:a.id,name:a.persona.name,state};
+    return {id:a.id,name:a.persona.name,state,awaiting:waitingTown.agents.has(a.id)};
   })});
+});
+app.post("/api/agents/:id/activate",async(c)=>{
+ const owner=await ownerOf(c.req.raw);const a=waitingTown.agents.get(c.req.param("id"));
+ if(!a||!owns(a,owner))return c.json({error:"No waiting citizen for this account."},404);
+ if(worldTransition||ticking)return c.json({error:"The world is finishing a tick. Retry in a moment."},409);
+ if(boardingLocks.has(owner!))return c.json({error:"Activation is already being checked."},409);
+ boardingLocks.add(owner!);
+ try{
+  if(a.brainKind==="hosted"){if(!await billing.boardingReady(owner!))return c.json({error:"Activate a subscription first."},402);}
+  else if(a.brainKind==="own_key"){const row=brainRows.get(a.id);if(!row?.api_key||!row.models||!row.daily_cap_usd)return c.json({error:"Configure a key and positive daily cap first."},400);try{await verifyBoardingKey(row.api_key,row.models);}catch(e){return c.json({error:(e as Error).message},400);}}
+  else {const b=brain.perAgent.get(a.id);if(!(b instanceof OwnBrain)||!await b.verify(waitingTown.perceive(a)))return c.json({error:"Connect your process and answer its test perception before returning."},400);}
+  if(ticking||worldTransition)return c.json({error:"The world is finishing a tick. Your brain is ready; retry in a moment."},409);
+  worldTransition=true;
+  try{
+   const preview=new Town({seed:SEED,brain:new MockBrain(SEED)});preview.restore({...waitingTown.snapshot(),agents:waitingTown.snapshot().agents.filter(x=>x.id===a.id)});
+   const ready=preview.agents.get(a.id)!;ready.location="harbor";ready.asleep=false;ready.job=null;ready.plan=null;ready.budget.tier1Used=0;ready.budget.tier2Used=0;billing.applyPlan(ready);
+   if(store)await store.resumeCitizen(preview,a.id);
+   waitingTown.agents.delete(a.id);town.agents.set(a.id,ready);
+   town.emit("agent.arrive",[a.id],"harbor",`${a.persona.name} returned to the island with their brain activated.`,0.5);
+   if(store)await store.snapshot(town);
+   broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(x=>publicAgent(town,x)),recent:town.events.slice(-80).map(publicEvent)});
+   return c.json({id:a.id,activated:true});
+  }finally{worldTransition=false;}
+ }finally{boardingLocks.delete(owner!);}
 });
 app.post("/api/board", async (c) => {
   const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in at the boat office first."},401);
+  if(worldTransition)return c.json({error:"The island is updating. Your draft is safe; retry shortly."},409);
   if(boardingLocks.has(owner))return c.json({error:"A boarding request is already being checked. Please wait."},409);
   boardingLocks.add(owner);
   try {
@@ -683,6 +739,7 @@ app.post("/api/board", async (c) => {
     const prepared=staged.addAgent({persona:data.persona,owner,funded:true},id);
     prepared.appearance=data.appearance??null;prepared.instructions=data.instructions??"";
     prepared.brainKind=data.brain;prepared.thinkEvery=data.brain==="own_key"?5:null;billing.applyPlan(prepared);
+    if(worldTransition)return c.json({error:"The island is updating. Your draft is safe; retry shortly."},409);
     if(store)await store.admitCitizen(staged,id,row);
     if(row){brainRows.set(id,row);if(external)brain.perAgent.set(id,external.brain);else brain.set(id,row);}
     const a=town.addAgent({persona:data.persona,owner,funded:true},id);Object.assign(a,prepared);
@@ -693,7 +750,7 @@ app.post("/api/board", async (c) => {
 });
 app.get("/api/me/agents", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json([]);
-  return c.json([...town.agents.values()].filter((a) => a.owner === owner).map((a) => ownerAgent(town, a)));
+  return c.json(allCitizens().filter(a=>a.owner===owner).map(a=>({...ownerAgent(town,a),awaitingActivation:waitingTown.agents.has(a.id)})));
 });
 app.get("/api/evolution", c => c.json({island:town.name,day:town.day,retention:{stories:64,momentsPerStory:40},stories:[...town.evolution].sort((a,b)=>b.updated-a.updated),institutions:[...town.places.values()].filter(p=>p.institution).map(p=>({place:p.id,...p.institution})),skills:[...town.agents.values()].flatMap(a=>(a.skills??[]).map(s=>({id:s.id,name:s.recipe.name,goal:s.recipe.goal,agent:a.id,agentName:a.persona.name,origin:s.origin,learnedFrom:s.learnedFrom??null,attempts:s.attempts,successes:s.successes,evidence:s.evidence}))) }));
 app.get("/api/health", (c) => c.json({ ok: true, version: process.env.RELEASE_VERSION ?? "dev", commit: process.env.COMMIT_SHA ?? "local", clock: clockOf(town), brain: brain.name }));

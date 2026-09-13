@@ -280,11 +280,12 @@ export default function OpsRoom() {
               <div className={s.metrics}>
                 {[
                   [d.stats.agents, "Citizens"],
-                  [population.filter(a=>citizenLabels(a).funding === "World-funded").length, "World-funded citizens"],
-                  [population.filter(a=>a.brain==="hosted" && a.owner && a.plan!=="none" && a.plan).length,"Hosted · with subscription"],
-                  [population.filter(a=>a.brain==="hosted" && a.owner && a.plan==="none").length,"Hosted · no subscription"],
-                  [population.filter(a=>a.brain==="own_key").length,"Personal API key"],
-                  [population.filter(a=>a.brain==="own_brain").length,"External brain"],
+                  [population.filter(a=>a.admission!=="Awaiting activation" && citizenLabels(a).funding === "World-funded").length, "World-funded citizens"],
+                  [population.filter(a=>a.admission!=="Awaiting activation" && a.brain==="hosted" && a.owner && a.plan!=="none" && a.plan).length,"Hosted · with subscription"],
+                  [population.filter(a=>a.admission!=="Awaiting activation" && a.brain==="hosted" && a.owner && a.plan==="none").length,"Hosted · no subscription"],
+                  [population.filter(a=>a.admission!=="Awaiting activation" && a.brain==="own_key").length,"Personal API key"],
+                  [population.filter(a=>a.admission!=="Awaiting activation" && a.brain==="own_brain").length,"External brain"],
+                  [population.filter(a=>a.admission==="Awaiting activation").length,"Awaiting activation · off island"],
                   [d.stats.holds, "Open holds"],
                   [d.stats.fallbacksToday, "Fallbacks · last 24h"],
                 ].map(([v, l]) => (
@@ -494,6 +495,7 @@ export default function OpsRoom() {
                 columns={[
                   "name",
                   "id",
+                  "admission",
                   "funding",
                   "subscription",
                   "ai_access",
@@ -853,6 +855,8 @@ export default function OpsRoom() {
                   account. Successful world switches also appear in the Gazette.
                 </p>
                 <Facts data={d.switches} />
+                <p className={s.muted}>Move user-owned hosted citizens with no plan and no credits out of the live world. Their full state is preserved for activation.</p>
+                <Button kind="secondary" disabled={busy||!writable} onClick={()=>setConfirm("park-unfunded")}>Move unfunded citizens to awaiting activation</Button>
                 <div className={s.toolbar}>
                   {(["pause", "economy", "boat", "snapshot"] as const).map(
                     (w) => (
@@ -881,13 +885,13 @@ export default function OpsRoom() {
                 </div>
                 {confirm && (
                   <div role="alert">
-                    <p>Apply {confirm} to the live world?</p>
+                    <p>{confirm==="park-unfunded"?"Move unfunded user citizens off the live island? Their full state will be preserved for activation.":`Apply ${confirm} to the live world?`}</p>
                     <div className={s.toolbar}>
                       <Button
                         disabled={busy}
                         onClick={() =>
                           void action(async () => {
-                            await api("/api/ops/switch", {
+                            await api(confirm==="park-unfunded"?"/api/ops/park-unfunded":"/api/ops/switch", {
                               method: "POST",
                               body: JSON.stringify({
                                 which: confirm,

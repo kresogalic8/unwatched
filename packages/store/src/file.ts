@@ -10,6 +10,7 @@ export type Store = Pick<TownStore, keyof TownStore>;
 
 interface Data {
   town: { id: string; name: string; seed: number; sim_t: number; day: number; weather: string; flour_shortage: boolean; places: unknown[]; jobs: unknown[]; children?: unknown[]; civic?: unknown; created_at: string } | null;
+  waiting?: AgentSnapshot[];
   agents: { id: string; owner_id: string | null; name: string; persona: unknown; appearance: unknown; brain: string; funded: boolean; arrived_t: number | null; left_t: number | null; state: Record<string, unknown> }[];
   events: TownEvent[];
   memories: { agent_id: string; t: number; kind: string; text: string; importance: number }[];
@@ -77,8 +78,11 @@ export class FileStore {
   async markLeft(agentId: string, t: number): Promise<void> { const r = this.d.agents.find((a) => a.id === agentId); if (r) { r.left_t = t; this.dirty = true; } }
   async saveInstructions(agentId: string, text: string): Promise<void> { this.d.instructions[agentId] = text; this.dirty = true; }
   async lifeOf(agentId: string) { return { events: this.d.events.filter((e) => e.actors.includes(agentId)), memories: this.d.memories.filter((m) => m.agent_id === agentId).map(({ t, kind, text, importance }) => ({ t, kind, text, importance })), letters: this.d.letters.filter((l) => l.agent_id === agentId).map(({ direction, text, t }) => ({ direction, text, t })) }; }
-  async deleteOwner(ownerId: string): Promise<void> { for (const a of this.d.agents) if (a.owner_id === ownerId) a.owner_id = null; this.d.wallets = this.d.wallets.filter((w) => w.ownerId !== ownerId); this.d.letters = this.d.letters.filter((l) => l.owner_id !== ownerId); this.d.prefs = (this.d.prefs ?? []).filter((p) => p.ownerId !== ownerId); this.d.reads = (this.d.reads ?? []).filter((r) => r.ownerId !== ownerId); this.save(); }
+  async deleteOwner(ownerId: string): Promise<void> { this.d.waiting=(this.d.waiting??[]).filter(a=>a.owner!==ownerId); for (const a of this.d.agents) if (a.owner_id === ownerId) a.owner_id = null; this.d.wallets = this.d.wallets.filter((w) => w.ownerId !== ownerId); this.d.letters = this.d.letters.filter((l) => l.owner_id !== ownerId); this.d.prefs = (this.d.prefs ?? []).filter((p) => p.ownerId !== ownerId); this.d.reads = (this.d.reads ?? []).filter((r) => r.ownerId !== ownerId); this.save(); }
   async loadBrains(): Promise<BrainRow[]> { return this.d.brains; }
+  async waitingCitizens():Promise<AgentSnapshot[]> {return structuredClone(this.d.waiting??[]);}
+  async parkCitizens(agents:AgentSnapshot[]):Promise<void> {const byId=new Map((this.d.waiting??[]).map(a=>[a.id,a]));for(const a of agents)byId.set(a.id,structuredClone(a));this.d.waiting=[...byId.values()];this.save();}
+  async resumeCitizen(staged:Town,id:string):Promise<void> {const sa=staged.snapshot().agents.find(a=>a.id===id)!;const row=this.d.agents.find(a=>a.id===id);if(!row)throw new Error("Citizen not found");if(!(this.d.waiting??[]).some(a=>a.id===id&&a.owner===sa.owner))throw new Error("Citizen is not waiting for this owner");for(const m of sa.memory)if(!this.d.memories.some(x=>x.agent_id===id&&x.t===m.t&&x.kind===m.kind&&x.text===m.text))this.d.memories.push({agent_id:id,...m});this.d.relationships=this.d.relationships.filter(r=>r.agent_id!==id);for(const r of sa.relationships)this.d.relationships.push({agent_id:id,other_id:r.other,trust:r.trust,affection:r.affection,last_seen:r.lastSeen,opinion:r.opinion});row.state={...sa.state,owner:sa.owner};row.brain=sa.state.brainKind??"hosted";this.d.waiting=(this.d.waiting??[]).filter(a=>a.id!==id);this.save();}
   async admitCitizen(staged: Town, id:string, brain:BrainRow|null):Promise<void> {
     if(this.d.agents.some(a=>a.id===id))return;
     const a=staged.agents.get(id)!;const snap=staged.snapshot().agents.find(x=>x.id===id)!;

@@ -11,7 +11,7 @@ export function citizenLabels(a: Record<string, unknown>) {
     ? String(a.plan).charAt(0).toUpperCase() + String(a.plan).slice(1)
     : "No subscription";
   const funding = ownKey ? "Personal API key" : external ? "External brain" : world ? "World-funded" : subscribed ? "Subscription" : credits ? "Purchased credits" : a.credits === undefined ? "No subscription · credits unknown" : "No AI funding";
-  const ai_access = a.funded === false ? "AI disabled"
+  const ai_access = a.admission === "Awaiting activation" ? "Off island · awaiting activation" : a.funded === false ? "AI disabled"
     : ownKey ? "Personal key · subject to cap"
     : external ? "External service"
     : included ? "Included allowance available"

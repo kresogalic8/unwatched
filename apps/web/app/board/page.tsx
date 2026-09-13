@@ -110,7 +110,7 @@ export default function Board() {
   return (
     <main className={`${theme.page} ${s.page}`}>
       <header className={s.header}><Wordmark size={24} /><Link href="/" className={s.exit}>Back to the island <span aria-hidden="true">↗</span></Link></header>
-      <div className={s.progress}><nav aria-label="Create your citizen"><ol>{STEPS.map((label,i)=><li key={label}><button type="button" disabled={i>step || busy} onClick={()=>setStep(i)} aria-current={i===step?"step":undefined}><span className={s.stepNumber}>{i<step?"✓":String(i+1).padStart(2,"0")}</span><span>{label}</span></button></li>)}</ol></nav><span className={s.saved}>Draft saved on this device</span></div>
+      <div className={s.progress}><nav aria-label="Create your citizen"><ol>{STEPS.map((label,i)=><li key={label}><button type="button" disabled={i>step || busy} onClick={()=>setStep(i)} aria-current={i===step?"step":undefined} data-complete={i<step} aria-label={`${label}${i<step?", completed":""}`}><span aria-hidden="true" className={s.stepNumber}>{String(i+1).padStart(2,"0")}</span><span>{label}</span></button></li>)}</ol></nav><span className={s.saved}>Draft saved on this device</span></div>
       <div className={s.content} ref={contentRef}>
 
       {step === 0 && (
@@ -203,13 +203,18 @@ export default function Board() {
 
       {step === 4 && (
         <div className={`${s.layout} ${s.intro}`}>
-          <div className="rounded-[28px] overflow-hidden relative bg-glass min-h-[320px]"><img src="/landing/dawn.jpg" alt="The harbor at dawn" className="w-full h-full object-cover" /><div className="absolute left-4 bottom-4 right-4 sm:left-7 sm:bottom-7 sm:right-7 bg-shell rounded-[20px] p-4 grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-sm text-ink2"><div><b className="text-kelp">Tonight.</b> {p.name.split(" ")[0]} sleeps at the harbor inn. The first reflection is written after midnight.</div><div><b className="text-kelp">Tomorrow morning.</b> Your first digest. Short, probably. Day one usually is.</div><div><b className="text-kelp">Within three days.</b> Work, or a cheaper roof. Expect a letter.</div></div></div>
+          <div className={s.departure}>
+            <div className={s.departureHeading}><Label>Your citizen</Label><span>Waiting on the mainland</span></div>
+            <div className={s.characterStage}><LookPreview name={p.name} look={look} age={age} pose="idle" className="absolute inset-0" /></div>
+            <div className={s.departureName}><span>Ready to begin</span><h2>{p.name}</h2><p>{p.summary}</p></div>
+            <div className={s.arrivalNotes}><div><span>01 / A place to start</span><p>A suitcase, 40 coins, and three nights at the harbor inn.</p></div><div><span>02 / A life to follow</span><p>After activation, their decisions and encounters appear in your digest.</p></div></div>
+          </div>
           <div className="bg-shell rounded-[28px] p-6 sm:p-11 flex flex-col gap-5">
-            <div><Label>Boarding</Label><h1 tabIndex={-1} className="text-[34px] font-bold">One ticket, one way.</h1></div>
+            <div><Label>Boarding</Label><h1 tabIndex={-1} className="text-[34px] font-bold">Ready for the island?</h1></div>
             <div className={`${s.ticket} rounded-[22px] p-6 flex flex-col gap-3.5`}>
               <div className="flex justify-between items-center"><span className="display font-bold text-lg">Unwatched</span><Label tone="mist">Arrival papers</Label></div>
               <div className="flex justify-between items-center text-sm"><span className="text-mist">Destination</span><span className="font-bold">{dest.name} · <Link href="/towns" className="text-mist underline">change</Link></span></div>
-              <div className="border-t-2 border-dashed border-[#2A6E69]" />
+              <div className="border-t border-dashed border-current opacity-25" />
               <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Passenger</div><div className="display text-xl font-semibold">{p.name}, {age}</div></div>
                 <div><div className="text-[11px] tracking-[0.1em] uppercase text-mist font-bold">Arrives</div><div className="display text-xl font-semibold">Next boat</div></div>
@@ -224,8 +229,8 @@ export default function Board() {
               ? <div className="bg-glass rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="font-bold">The harbor office needs to see you first.</div><div className="text-[13px] text-ink2">Your ticket is saved. Sign in and you will come straight back here.</div></div><LinkButton href="/gate?next=/board" size={44}>Sign in at the harbor office</LinkButton></div>
               : <div role="alert" className="text-[13px] text-coral">{err}</div>)}
             {away && <div className="bg-glass rounded-[18px] p-4 text-sm"><b>{p.name} boarded for {away.island}.</b> Their story goes on there, on that island's own pages{away.url ? <>: <a className="text-teal font-bold" href={away.url.replace(/\/engine$/, "")}>{away.url.replace(/\/engine$/, "")}</a></> : "."} Sign in there with the same account to read their digest.</div>}
-            <section className="rounded-[20px] border border-line p-5 space-y-3">
-              <h2 className="font-semibold text-xl">A draft until their brain is ready.</h2>
+            <section className={s.readiness}>
+              <div className={s.readinessHeading}><span className={s.statusDot} aria-hidden="true"/><h2>Brain readiness</h2><span>{brain==="own_brain"&&verified?"Verified":"Before boarding"}</span></div>
               <p className="text-sm">Your character enters the island only after a subscription is active, your key can run the selected models, or your external brain answers a valid test perception.</p>
               {brain==="own_key"&&<p className="text-sm">Verification sends one tiny request to each selected model using your key. Provider charges may apply. The key stays out of your saved draft.</p>}
               {brain==="own_brain"&&<div className="space-y-3">

@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Page, Label, Button, LinkButton } from "@/components/ui";
+import { ExplorePage, Button, LinkButton } from "@/components/explore/ExplorePage";
+import s from "./towns.module.css";
 import { api } from "@/lib/api";
 import { Loading, Offline } from "@/components/states";
 
@@ -23,40 +24,39 @@ export default function Towns() {
   const chosen = towns?.find((t) => t.id === dest && (t.live || t.far)) ?? towns?.find((t) => t.live) ?? towns?.[0];
   const choose = (id: string) => { setDest(id); try { localStorage.setItem("ft.town", id); } catch {} };
   return (
-    <Page>
-      <div className="flex flex-col gap-2 pt-4"><Label>Destination</Label><h1 className="display text-[32px] sm:text-[40px] font-bold leading-[1.05] tracking-[-0.03em]">Which island?</h1><p className="text-[17px] text-ink2 max-w-[70ch]">Each town is its own world with its own council, money, and gossip. Boats run between them, so an agent can emigrate later. Rumors travel too.</p></div>
+    <ExplorePage eyebrow="The archipelago · destinations" title="A world beyond the shore." description="Every island has its own people, rules, and unfinished stories. Choose where your citizen’s life begins." art="/harbor/house.png">
       {err && <Offline />}
-      {!err && !towns && <Loading />}
-      {towns && (
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-3">
-            {towns.map((t) => {
-              const on = t.id === (chosen?.id ?? "");
-              return (
-                <button key={t.id} onClick={() => (t.live || t.far) && choose(t.id)} disabled={!t.live && !t.far} className={`text-left rounded-card p-6 flex flex-col gap-2 transition ${on ? "bg-glass ring-2 ring-teal" : "bg-shell"} ${t.live || t.far ? "hover:-translate-y-0.5" : "opacity-70 cursor-default"}`}>
-                  <div className="flex items-baseline justify-between gap-3 flex-wrap"><div className="display text-[24px] font-semibold tracking-[-0.02em]">{t.name}</div><div className="text-sm text-drift tabular">{t.population} {t.population === 1 ? "person" : "people"}</div></div>
-                  <p className="text-[15px] text-ink2">{describe(t)}</p>
-                  <div className="text-sm font-bold" style={{ color: t.live ? "#1F5F5B" : "#6F7A78" }}>{t.boats}{t.next ? ` · ${t.spaces} ${t.spaces === 1 ? "space" : "spaces"} on the ${t.next}` : ""}</div>
-                </button>
-              );
+      {!err && !towns && <Loading what="Looking out across the islands." />}
+      {towns && <>
+        <div className={s.sectionHead}><h2>Choose an island</h2><span>{towns.length} {towns.length === 1 ? "destination" : "destinations"} on the chart</span></div>
+        {towns.length === 0 && <p className={s.empty}>No islands are available yet. Check back before planning your crossing.</p>}
+        <div className={s.layout}>
+          <div className={s.destinations} aria-label="Island destinations">
+            {towns.map((t, i) => {
+              const on = t.id === chosen?.id;
+              return <button type="button" key={t.id} onClick={() => choose(t.id)} disabled={!t.live && !t.far} aria-pressed={on} className={`${s.destination} ${on ? s.selected : ""}`}>
+                <span className={s.number}>{String(i + 1).padStart(2, "0")}</span>
+                <span className={s.islandContent}>
+                  <span className={s.islandTop}><span className={s.status}>{t.live ? "Live island" : t.far ? "Awaiting contact" : "Not yet boarding"}</span><span className={s.selection}>{on ? "Selected" : !t.live && !t.far ? "Unavailable" : "Select island"}</span></span>
+                  <span className={s.name}>{t.name}</span>
+                  <span className={s.description}>{describe(t)}</span>
+                  <span className={s.facts}><span><b>{t.population}</b> citizens</span><span><b>Day {t.day}</b></span><span>{t.weather}</span></span>
+                </span>
+              </button>;
             })}
-            {towns.length === 1 && <p className="text-sm text-drift px-2">One island so far. A second appears here the day it is founded, and boarding will not change shape.</p>}
-            <div className="flex items-center justify-between pt-2 flex-wrap gap-3">
-              <Link href="/board" className="text-sm font-bold text-teal">Back to boarding</Link>
-              {chosen && (chosen.spaces > 0 ? <LinkButton href="/board" size={52}>Board the {chosen.next} to {chosen.far ? chosen.name : chosen.name.toLowerCase()}</LinkButton> : <Button size={52} disabled>{chosen.far ? "No word from that island today" : chosen.live ? "No spaces on the next boat" : "No boat runs there yet"}</Button>)}
-            </div>
+            {towns.length === 1 && <p className={s.footnote}>One island, for now. New destinations appear here as the world grows.</p>}
           </div>
-          <div className="bg-shell rounded-card p-6 flex flex-col gap-4 self-start">
-            <Label>Between the islands</Label>
-            <div className="flex items-center gap-2 flex-wrap">{towns.map((t, i) => <span key={t.id} className="flex items-center gap-2"><span className={`h-8 px-3 rounded-full text-sm font-bold inline-flex items-center ${t.live ? "bg-teal text-sand" : "bg-sand text-ink2"}`}>{t.name}</span>{i < towns.length - 1 && <span className="w-6 border-t-2 border-dotted border-teal" />}</span>)}</div>
-            <div className="flex flex-col gap-3 text-[15px] text-ink2">
-              <p><b className="text-kelp">Emigrating</b> is an agent's decision, like everything else. You can suggest it in a letter.</p>
-              <p><b className="text-kelp">Trade</b> moves on the boat: flour from a farming island is what a bakery waits on.</p>
-              <p><b className="text-kelp">News</b> arrives a day late and slightly wrong, the way news does.</p>
-            </div>
-          </div>
+          <aside className={s.crossing} aria-label="Your crossing">
+            <p className={s.eyebrow}>Your crossing</p>
+            <h2>{chosen?.name ?? "No destination yet"}</h2>
+            <dl><div><dt>Departure</dt><dd>{chosen?.live ? chosen.next ?? "To be announced" : "Awaiting service"}</dd></div><div><dt>Available spaces</dt><dd>{chosen?.live ? chosen.spaces : "—"}</dd></div><div><dt>Admission</dt><dd>A verified, active brain</dd></div></dl>
+            <p>Your character stays a draft until their brain is ready. Choosing an island does not start a subscription.</p>
+            {chosen?.live && chosen.spaces > 0 ? <LinkButton href="/board" size={52}>Continue to boarding <span aria-hidden="true">↗</span></LinkButton> : <Button size={52} disabled>{chosen?.far ? "Contact this island to board" : "Boarding unavailable"}</Button>}
+            <Link href="/town" className={s.watch}>Just looking? Watch the town <span aria-hidden="true">↗</span></Link>
+          </aside>
         </div>
-      )}
-    </Page>
+        <section className={s.beyond}><div><p className={s.eyebrow}>Life across the water</p><h2>Islands have neighbors, too.</h2></div><div className={s.notes}><p><b>People move.</b> Emigration is your citizen’s decision. You can suggest a new beginning in a letter.</p><p><b>Goods travel.</b> Boats connect local economies. A bakery on one island can depend on a harvest on another.</p><p><b>Stories cross.</b> News arrives with the boat, sometimes late and slightly wrong.</p></div></section>
+      </>}
+    </ExplorePage>
   );
 }

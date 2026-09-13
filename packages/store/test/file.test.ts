@@ -139,3 +139,20 @@ describe("the file record", () => {
     expect((await s.lifeOf("a1")).letters.map((l) => l.text)).not.toContain("Never written.");
   });
 });
+
+describe("awaiting activation",()=>{
+ it("preserves memories and relationships across storage reload and activation",async()=>{
+  const dir=mkdtempSync(join(tmpdir(),"uw-waiting-"));const store=new FileStore(dir,"test");const town=new Town({seed:1,brain:none});
+  const a=town.addAgent({persona:persona("Waiting citizen"),owner:"owner"});const friend=town.addAgent({persona:persona("Friend")});
+  town.remember(a,"A memory worth keeping",.9);a.relationships.set(friend.id,{trust:.7,affection:.5,opinion:"A friend",lastSeen:town.t});
+  await store.snapshot(town);const snapshot=town.snapshot().agents.find(x=>x.id===a.id)!;await store.parkCitizens([snapshot]);
+  town.agents.delete(a.id);await store.snapshot(town);
+  const reloaded=new FileStore(dir,"test");const waiting=await reloaded.waitingCitizens();expect(waiting).toHaveLength(1);expect(waiting[0]!.memory).toEqual(snapshot.memory);expect(waiting[0]!.relationships).toEqual(snapshot.relationships);
+  const preview=new Town({seed:1,brain:none});preview.restore({...town.snapshot(),agents:waiting});await reloaded.resumeCitizen(preview,a.id);
+  expect(await reloaded.waitingCitizens()).toEqual([]);const restored=await reloaded.loadSnapshot();expect(restored!.agents.find(x=>x.id===a.id)!.state.coins).toBe(a.coins);expect(restored!.agents.find(x=>x.id===a.id)!.memory).toEqual(snapshot.memory);expect(restored!.agents.find(x=>x.id===a.id)!.relationships).toEqual(snapshot.relationships);
+ });
+ it("keeps generated IDs unique after restoring a UUID-based boarding ID",()=>{
+  const town=new Town({seed:1,brain:none});town.addAgent({persona:persona("Boarded")},'ag_ffffffffffffffffffffffffffffffff');
+  const restored=new Town({seed:1,brain:none});restored.restore(town.snapshot());const a=restored.addAgent({persona:persona("One")});const b=restored.addAgent({persona:persona("Two")});expect(a.id).not.toBe(b.id);
+ });
+});

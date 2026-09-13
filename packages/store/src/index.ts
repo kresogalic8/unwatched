@@ -167,6 +167,8 @@ export class TownStore {
     };
   }
   async deleteOwner(ownerId: string): Promise<void> {
+    const waitingDelete=await this.sb.from("waiting_citizens").delete().eq("owner_id",ownerId);
+    if(waitingDelete.error)throw new Error("Could not remove private waiting data");
     await this.sb.from("letters").delete().eq("owner_id", ownerId);
     await this.sb.from("owner_prefs").delete().eq("owner_id", ownerId);
     await this.sb.from("owner_reads").delete().eq("owner_id", ownerId);
@@ -183,6 +185,19 @@ export class TownStore {
     if (error) { console.error("brains read failed:", error.message); return []; }
     return ((data ?? []) as BrainRow[]).filter((r) => ids.has(r.agent_id));
   }
+  async waitingCitizens():Promise<AgentSnapshot[]> {
+    const {data,error}=await this.sb.from("waiting_citizens").select("snapshot").eq("town_id",this.townId);
+    if(error)throw new Error("Could not read waiting citizens");return (data??[]).map(r=>r.snapshot as AgentSnapshot);
+  }
+  async parkCitizens(agents:AgentSnapshot[]):Promise<void> {
+    if(!agents.length)return;
+    const {error}=await this.sb.from("waiting_citizens").upsert(agents.map(a=>({agent_id:a.id,town_id:this.townId,owner_id:a.owner,snapshot:a})),{onConflict:"agent_id"});
+    if(error)throw new Error("Could not preserve waiting citizens; no cleanup performed");
+  }
+  async resumeCitizen(staged:Town,id:string):Promise<void> {
+    const a=staged.agents.get(id)!;const {error}=await this.sb.rpc("resume_waiting_citizen",{p_agent:{...this.agentRow(a),brain:a.brainKind}});
+    if(error)throw new Error("Could not resume citizen; please retry");
+  }
   async admitCitizen(staged: Town, id: string, brain: BrainRow|null): Promise<void> {
     const a=staged.agents.get(id);if(!a)throw new Error("Missing staged citizen");
     const {error}=await this.sb.rpc("admit_citizen",{p_agent:{...this.agentRow(a),brain:a.brainKind},p_brain:brain});
@@ -190,7 +205,7 @@ export class TownStore {
   }
   async saveBrain(row: BrainRow): Promise<void> {
     const { error } = await this.sb.from("agent_brains").upsert({ ...row, town_id: this.townId }, { onConflict: "agent_id" });
-    if (error) console.error("brain save failed:", error.message);
+    if (error) throw new Error("Could not save brain settings. Please retry.");
   }
 
   async wallet(ownerId: string): Promise<Wallet> {

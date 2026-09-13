@@ -10,6 +10,6 @@ The board request supplies a UUID `requestId`, persona, appearance, instructions
 
 `0015_boarding_admission.sql` stores the citizen and brain in one transaction before public admission. Only the service role can call this function. No keys or tokens belong in public RPC access, audit messages or feedback.
 
-Existing citizens are preserved. Those without funding see activation notices in their account/digest area. Disconnected external brains and personal-key caps have explicit notices. This update does not introduce a trial, delete citizens, relocate existing citizens automatically, or change existing billing allowances. No mass transition deadline is imposed.
+Existing citizens are preserved. The audited ops action moves live user-owned hosted citizens with no plan and no credits into private awaiting-activation storage. World-owned citizens and configured personal/external brains are excluded. Waiting citizens do not tick or appear in the public population; their full snapshots retain memories and relationships. Their owners see activation notices and can return the same citizen after a fresh readiness check. Migration `0016_waiting_citizens.sql` persists this state and makes resuming atomic. No new coins are minted when resuming, and billing allowances remain unchanged. Disconnected external brains and personal-key caps have separate notices.
 
 Provider readiness is a point-in-time check, not a guarantee of future uptime. Existing provider failures remain a separate operational concern.
