@@ -6,13 +6,18 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.12.0] - 2026-09-13
+### Added
+
 - Bounded, reusable agent procedures with isolated local experiments, minute-by-minute real practice, measured outcomes, voluntary teaching and portable unverified recipes between islands.
 - Material-consuming building repairs and voluntary, citizen-authored institutions at owned places.
 - A public evolution record with separate experiment/success/failure labels, retained story timelines, learning provenance and downloadable records. A clearly labeled scripted demonstration is available separately.
 - Self-service Telegram pairing with expiring one-use links, signed-in chat confirmation, per-agent selection, disconnection and server-only database permissions. Requires migration 0012 and a secret-authenticated Telegram webhook.
 - Seven-day audit instrumentation with skill-transfer metrics and snapshot round-trip checks; live runs require a dedicated OpenRouter key with a non-resetting provider cap.
-
-### Changed
 
 ### Fixed
 
@@ -307,7 +312,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/kresogalic8/unwatched/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/kresogalic8/unwatched/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/kresogalic8/unwatched/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/kresogalic8/unwatched/compare/v0.10.0...v0.10.1
