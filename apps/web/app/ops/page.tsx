@@ -54,7 +54,7 @@ const display = (v: unknown): string =>
         .map(([k, x]) => `${k}: ${display(x)}`)
         .join(" · ")
     : String(v);
-function Facts({ data }: { data: Row }) {
+function Facts({ data = {} }: { data?: Row }) {
   return (
     <dl className={s.list}>
       {Object.entries(data).map(([k, v]) => (
@@ -178,16 +178,21 @@ export default function OpsRoom() {
     }
   }
   async function openReport(id: string) {
+    const ticket=generation.current;
     try {
-      setReport(await api<Report>(`/api/backoffice/feedback/${id}`));
+      const next=await api<Report>(`/api/backoffice/feedback/${id}`);
+      if(ticket!==generation.current)return;
+      setReport(next);
       setMessage("");
     } catch (e) {
       setError((e as Error).message);
     }
   }
   async function selectCitizen(r: Row) {
+    const ticket=generation.current;
     try {
-      setDetail(await api<Row>(`/api/backoffice/citizens/${r.id}`));
+      const next=await api<Row>(`/api/backoffice/citizens/${r.id}`);
+      if(ticket===generation.current)setDetail(next);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -229,6 +234,8 @@ export default function OpsRoom() {
                   disabled={busy}
                   aria-current={tab === t ? "page" : undefined}
                   onClick={() => {
+                    generation.current++;
+                    setDetail(null);setReport(null);setRows([]);setError("");setConfirm(null);
                     setTab(t);
                     setPage(0);
                     setQuery("");setSearch("");
@@ -393,7 +400,8 @@ export default function OpsRoom() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   setPage(0);
-                  void refresh();
+                  if(search===query && page===0)void refresh();
+                  else setSearch(query);
                 }}
               >
                 <label className={s.field}>
@@ -499,6 +507,7 @@ export default function OpsRoom() {
                             "events",
                             "projects",
                             "foodRoutineDecisions",
+                            "attempts",
                           ].includes(k),
                       ),
                     )}
