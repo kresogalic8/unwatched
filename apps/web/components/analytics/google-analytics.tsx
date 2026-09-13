@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { Icon } from "../icons";
+import styles from "./consent.module.css";
 
 const ID = "G-3N5R9DC64C";
 const CHOICE = "unwatched.analytics.v1";
@@ -23,14 +25,25 @@ export default function GoogleAnalytics() {
   const [ready, setReady] = useState(false);
   const [settings, setSettings] = useState(false);
   const lastPage = useRef<string | null>(null);
+  const banner = useRef<HTMLElement>(null);
+  const privacyButton = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  const open = choice === null || settings;
   useEffect(() => {
-    if (window.location.hostname !== "unwatched.world" && window.location.hostname !== "www.unwatched.world") return;
+    if (!ready) return;
+    if (settings) banner.current?.focus();
+    else if (wasOpen.current && !open) privacyButton.current?.focus();
+    wasOpen.current = open;
+  }, [ready, open, settings]);
+  useEffect(() => {
     try { const saved = localStorage.getItem(CHOICE); if (saved === "accepted" || saved === "declined") setChoice(saved); } catch { /* session-only choice when storage is unavailable */ }
     setReady(true);
   }, []);
 
   useEffect(() => {
     if (!ready || choice !== "accepted") return;
+    // Render the same preferences locally, but only measure the production site.
+    if (!["unwatched.world", "www.unwatched.world"].includes(window.location.hostname)) return;
     // Auth pages are never measured, even after a previously accepted choice.
     if (/^\/(auth|gate|login)(\/|$)/.test(pathname)) return;
     const w = window as AnalyticsWindow;
@@ -77,13 +90,23 @@ export default function GoogleAnalytics() {
   }
   if (!ready) return null;
   return <>
-    <button type="button" onClick={() => setSettings(true)} className="fixed bottom-2 left-2 z-[100] rounded bg-[#f7f6f3]/95 px-2 py-1 text-[11px] text-[#454a46] shadow-sm">Privacy</button>
-    {(choice === null || settings) && <section role="dialog" aria-label="Analytics preferences" className="fixed bottom-10 left-3 right-3 z-[101] max-w-sm rounded-xl border border-[#d6d9d0] bg-[#f7f6f3] p-4 text-[#202a25] shadow-xl sm:left-4 sm:right-auto">
-      <p className="text-sm font-semibold">Help us understand visits</p>
-      <p className="mt-2 text-sm leading-relaxed">Allow Google Analytics to measure visits and page views? It is optional. Your letters and account details are not sent. <a className="underline" href="/privacy">Details</a></p>
-      <div className="mt-3 flex gap-2">
-        <button type="button" onClick={() => choose("declined")} className="flex-1 rounded-md border border-[#b9c1b6] px-3 py-2 text-sm">No thanks</button>
-        <button type="button" onClick={() => choose("accepted")} className="flex-1 rounded-md border border-[#b9c1b6] px-3 py-2 text-sm">Allow analytics</button>
+    {!open && <button ref={privacyButton} type="button" onClick={() => setSettings(true)} className={styles.reopen} aria-label="Change privacy preferences" aria-expanded={false}>
+      <Icon name="settings" size={16} /><span>Privacy</span>
+    </button>}
+    {open && <section ref={banner} tabIndex={-1} onKeyDown={event => { if (event.key === "Escape" && choice !== null) setSettings(false); }} aria-labelledby="privacy-heading" aria-describedby="privacy-description" className={styles.banner}>
+      <div className={styles.heading}>
+        <span className={styles.eyebrow}><span className={styles.dot} />YOUR VISIT. YOUR CHOICE.</span>
+        {choice !== null && <button type="button" onClick={() => setSettings(false)} className={styles.close} aria-label="Close privacy preferences"><Icon name="close" size={20} /></button>}
+      </div>
+      <h2 id="privacy-heading">A little insight.<br />Only with your permission.</h2>
+      <p id="privacy-description" className={styles.description}>Optional Google Analytics helps us understand which pages people visit. Your letters and account details stay out of analytics.</p>
+      <div className={styles.actions}>
+        <button type="button" onClick={() => choose("declined")}>No thanks<Icon name="close" size={16} /></button>
+        <button type="button" onClick={() => choose("accepted")}>Allow analytics<Icon name="check" size={16} /></button>
+      </div>
+      <div className={styles.footer}>
+        <span>{choice === null ? "Off until you say yes." : `Analytics is ${choice === "accepted" ? "on" : "off"}. Change anytime.`}</span>
+        <a href="/privacy">Privacy details<Icon name="arrowUpRight" size={16} /></a>
       </div>
     </section>}
   </>;
