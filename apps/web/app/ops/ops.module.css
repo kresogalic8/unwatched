@@ -8,6 +8,7 @@
   width: 100%;
 }
 .sidebar {
+  min-width: 0;
   padding: 30px 0;
   border-right: 1px solid var(--rule);
   display: flex;
@@ -243,7 +244,7 @@
 }
 @media (max-width: 760px) {
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
   .sidebar {
