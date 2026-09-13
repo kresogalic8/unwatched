@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Town, AgentState, TownSnapshot, AgentSnapshot } from "@unwatched/engine";
 import { compress } from "@unwatched/engine";
 import type { TownEvent, Paper } from "@unwatched/protocol";
-import type { LifeRow, BrainRow, Wallet, TownStore, OwnerPrefs, OwnerRead } from "./index.ts";
+import type { LifeRow, BrainRow, Wallet, TownStore, OwnerPrefs, OwnerRead, CreditSpending, SubscriptionCitizen } from "./index.ts";
 
 /** The record's shape, whichever thing keeps it. Both the Supabase store and the file store answer to this. */
 export type Store = Pick<TownStore, keyof TownStore>;
@@ -22,6 +22,9 @@ interface Data {
   laws: { text: string; by: string; yes: number; no: number; open: boolean; voters?: string[] }[];
   brains: BrainRow[];
   wallets: Wallet[];
+  subscriptionCitizens?: SubscriptionCitizen[];
+  spending?: Record<string,{autoSpend:boolean;dailyLimit:number|null}>;
+  creditOperations?: Record<string,{owner:string;delta:number;reason:string;ref:string|null;refundOf:string|null;at:string}>;
   ledger: { owner_id: string; delta: number; reason: string; ref: string | null; at: string }[];
   instructions: Record<string, string>;
   prefs?: OwnerPrefs[];
@@ -38,6 +41,9 @@ export class FileStore {
   constructor(dir: string, readonly townId: string) {
     mkdirSync(dir, { recursive: true }); this.file = join(dir, `${townId}.json`);
     this.d = existsSync(this.file) ? (JSON.parse(readFileSync(this.file, "utf8")) as Data) : empty();
+    if(!this.d.spending)this.d.spending=Object.fromEntries(this.d.wallets.map(w=>[w.ownerId,{autoSpend:true,dailyLimit:null}]));
+    if(!this.d.subscriptionCitizens){this.d.subscriptionCitizens=[];for(const a of this.d.agents){if(a.owner_id&&a.brain==="hosted"&&a.left_t===null&&!this.d.waiting?.some(x=>x.id===a.id)&&this.d.wallets.some(w=>w.ownerId===a.owner_id&&w.plan!=="none"))this.d.subscriptionCitizens.push({agentId:a.id,ownerId:a.owner_id,grandfathered:this.d.subscriptionCitizens.some(x=>x.ownerId===a.owner_id),subscriptionId:null});}}
+
   }
   static fromEnv(townId = "island"): FileStore { return new FileStore(process.env.UW_DATA_DIR ?? "out/town", townId); }
   private save(): void { const tmp = `${this.file}.tmp`; writeFileSync(tmp, JSON.stringify(this.d)); renameSync(tmp, this.file); this.dirty = false; }
@@ -78,7 +84,7 @@ export class FileStore {
   async markLeft(agentId: string, t: number): Promise<void> { const r = this.d.agents.find((a) => a.id === agentId); if (r) { r.left_t = t; this.dirty = true; } }
   async saveInstructions(agentId: string, text: string): Promise<void> { this.d.instructions[agentId] = text; this.dirty = true; }
   async lifeOf(agentId: string) { return { events: this.d.events.filter((e) => e.actors.includes(agentId)), memories: this.d.memories.filter((m) => m.agent_id === agentId).map(({ t, kind, text, importance }) => ({ t, kind, text, importance })), letters: this.d.letters.filter((l) => l.agent_id === agentId).map(({ direction, text, t }) => ({ direction, text, t })) }; }
-  async deleteOwner(ownerId: string): Promise<void> { this.d.waiting=(this.d.waiting??[]).filter(a=>a.owner!==ownerId); for (const a of this.d.agents) if (a.owner_id === ownerId) a.owner_id = null; this.d.wallets = this.d.wallets.filter((w) => w.ownerId !== ownerId); this.d.letters = this.d.letters.filter((l) => l.owner_id !== ownerId); this.d.prefs = (this.d.prefs ?? []).filter((p) => p.ownerId !== ownerId); this.d.reads = (this.d.reads ?? []).filter((r) => r.ownerId !== ownerId); this.save(); }
+  async deleteOwner(ownerId: string): Promise<void> { if(this.d.spending)delete this.d.spending[ownerId];this.d.subscriptionCitizens=(this.d.subscriptionCitizens??[]).filter(s=>s.ownerId!==ownerId); this.d.waiting=(this.d.waiting??[]).filter(a=>a.owner!==ownerId); for (const a of this.d.agents) if (a.owner_id === ownerId) a.owner_id = null; this.d.wallets = this.d.wallets.filter((w) => w.ownerId !== ownerId); this.d.letters = this.d.letters.filter((l) => l.owner_id !== ownerId); this.d.prefs = (this.d.prefs ?? []).filter((p) => p.ownerId !== ownerId); this.d.reads = (this.d.reads ?? []).filter((r) => r.ownerId !== ownerId); this.save(); }
   async loadBrains(): Promise<BrainRow[]> { return this.d.brains; }
   async waitingCitizens():Promise<AgentSnapshot[]> {return structuredClone(this.d.waiting??[]);}
   async parkCitizens(agents:AgentSnapshot[]):Promise<void> {const byId=new Map((this.d.waiting??[]).map(a=>[a.id,a]));for(const a of agents)byId.set(a.id,structuredClone(a));this.d.waiting=[...byId.values()];this.save();}
@@ -90,8 +96,35 @@ export class FileStore {
     if(brain)this.d.brains.push(brain);this.save();
   }
   async saveBrain(row: BrainRow): Promise<void> { this.d.brains = [...this.d.brains.filter((b) => b.agent_id !== row.agent_id), row]; this.save(); }
+  async subscriptionCitizens():Promise<SubscriptionCitizen[]> {return this.d.subscriptionCitizens??[];}
+  async subscriptionAvailable(ownerId:string,agentId:string):Promise<boolean>{return (this.d.subscriptionCitizens??[]).some(s=>s.ownerId===ownerId&&s.agentId===agentId)||!(this.d.subscriptionCitizens??[]).some(s=>s.ownerId===ownerId&&!s.grandfathered&&!this.d.agents.some(a=>a.id===s.agentId&&a.left_t!==null&&!this.d.waiting?.some(w=>w.id===a.id)));}
+  async claimSubscription(ownerId:string,agentId:string,subscriptionId:string|null=null):Promise<void> {
+    this.d.subscriptionCitizens=(this.d.subscriptionCitizens??[]).filter(s=>s.ownerId!==ownerId||s.grandfathered||!this.d.agents.some(a=>a.id===s.agentId&&a.left_t!==null&&!this.d.waiting?.some(w=>w.id===a.id)));
+    const seats=this.d.subscriptionCitizens;const found=seats.find(x=>x.agentId===agentId);
+    if(found){if(found.ownerId!==ownerId)throw new Error("Citizen belongs to another owner");return;}
+    if((await this.wallet(ownerId)).plan==="none"||seats.some(x=>x.ownerId===ownerId&&!x.grandfathered))throw new Error("Subscription already assigned or unavailable");
+    seats.push({ownerId,agentId,grandfathered:false,subscriptionId});this.save();
+  }
+  private spendingNow(ownerId:string):CreditSpending {
+    const day=new Date().toISOString().slice(0,10);const ops=Object.values(this.d.creditOperations??{});
+    const entries=Object.entries(this.d.creditOperations??{});
+    const spentToday=entries.filter(([id,o])=>o.owner===ownerId&&o.delta<0&&o.at.startsWith(day)&&!ops.some(r=>r.refundOf===id)).reduce((n,[,o])=>n-o.delta,0);
+    return {...(this.d.spending?.[ownerId]??{autoSpend:false,dailyLimit:null}),spentToday,resetsAt:new Date(Date.parse(day)+86400000).toISOString()};
+  }
+  async creditSpending(ownerId:string):Promise<CreditSpending>{return this.spendingNow(ownerId);}
+  async setCreditSpending(ownerId:string,autoSpend:boolean,dailyLimit:number|null):Promise<void>{(this.d.spending??={})[ownerId]={autoSpend,dailyLimit};this.save();}
+  async changeCredits(ownerId:string,delta:number,reason:string,ref:string|null,operationId:string,refundOf:string|null=null):Promise<{ok:boolean;credits:number}> {
+    const ops=this.d.creditOperations??={};let w=this.d.wallets.find(x=>x.ownerId===ownerId);
+    if(!w){w={ownerId,plan:"none",credits:0,stripeCustomer:null};this.d.wallets.push(w);}
+    if(ops[operationId]||reason==="purchase"&&Object.values(ops).some(o=>o.owner===ownerId&&o.reason===reason&&o.ref===ref))return {ok:true,credits:w.credits};
+    if(refundOf){const debit=ops[refundOf];if(!debit||debit.owner!==ownerId||debit.delta!==-delta||delta<=0)throw new Error("Invalid refund");if(Object.values(ops).some(o=>o.refundOf===refundOf))return {ok:true,credits:w.credits};}
+    const policy=this.spendingNow(ownerId);
+    if(delta<0&&(!policy.autoSpend||w.credits+delta<0||policy.dailyLimit!==null&&policy.spentToday-delta>policy.dailyLimit))return {ok:false,credits:w.credits};
+    w.credits+=delta;ops[operationId]={owner:ownerId,delta,reason,ref,refundOf,at:new Date().toISOString()};
+    this.d.ledger.push({owner_id:ownerId,delta,reason,ref,at:new Date().toISOString()});this.save();return {ok:true,credits:w.credits};
+  }
   async wallet(ownerId: string): Promise<Wallet> { return this.d.wallets.find((w) => w.ownerId === ownerId) ?? { ownerId, plan: "none", credits: 0, stripeCustomer: null }; }
-  async saveWallet(w: Wallet): Promise<void> { this.d.wallets = [...this.d.wallets.filter((x) => x.ownerId !== w.ownerId), w]; this.save(); }
+  async saveWallet(w: Wallet): Promise<void> { const current=this.d.wallets.find(x=>x.ownerId===w.ownerId);this.d.wallets = [...this.d.wallets.filter((x) => x.ownerId !== w.ownerId), {...w,credits:current?.credits??w.credits}]; this.save(); }
   async ledger(ownerId: string, n = 30) { return this.d.ledger.filter((l) => l.owner_id === ownerId).slice(-n).reverse().map(({ delta, reason, ref, at }) => ({ delta, reason, ref, at })); }
   async credit(ownerId: string, delta: number, reason: string, ref: string | null = null): Promise<void> { this.d.ledger.push({ owner_id: ownerId, delta, reason, ref, at: new Date().toISOString() }); this.dirty = true; }
   async allWallets(): Promise<Wallet[]> { return this.d.wallets; }

@@ -126,7 +126,7 @@ export class BrainRouter implements Brain {
   }
   ownBrainByToken(token: string): OwnBrain | null { for (const b of this.perAgent.values()) if (b instanceof OwnBrain && b.row.token === token) return b; return null; }
   decide(p: Perception, a: AgentState, tier: Tier) { return this.forAgent(a).decide(p, a, tier); }
-  converse(ctx: ConverseContext) { return (this.perAgent.get(ctx.a.id) ?? this.perAgent.get(ctx.b.id) ?? this.hostedFor?.(ctx.a) ?? this.hostedFor?.(ctx.b) ?? this.town).converse(ctx); }
+  converse(ctx: ConverseContext) { return (this.perAgent.get(ctx.a.id) ?? this.hostedFor?.(ctx.a) ?? this.town).converse(ctx); }
   reflect(ctx: ReflectContext) { return this.forAgent(ctx.agent).reflect(ctx); }
   plan(ctx: PlanContext, tier: Tier) { return this.forAgent(ctx.agent).plan(ctx, tier); }
   digest(ctx: DigestContext) { return this.forAgent(ctx.agent).digest(ctx); }

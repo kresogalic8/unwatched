@@ -3,6 +3,8 @@ import type { TownEvent, Paper } from "@unwatched/protocol";
 import type { Town, AgentState, TownSnapshot, AgentSnapshot } from "@unwatched/engine";
 
 export type Plan = "none" | "visitor" | "resident" | "patron";
+export interface CreditSpending { autoSpend: boolean; dailyLimit: number | null; spentToday: number; resetsAt: string }
+export interface SubscriptionCitizen { agentId: string; ownerId: string; grandfathered: boolean; subscriptionId: string | null }
 export interface Wallet { ownerId: string; plan: Plan; credits: number; stripeCustomer: string | null }
 /** What an owner asked to be told by mail, and the last island day the morning digest went out. Both notices are on until turned off. */
 export interface OwnerPrefs { ownerId: string; notifyDigest: boolean; notifyLetters: boolean; lastMailedDay: number | null }
@@ -169,6 +171,7 @@ export class TownStore {
   async deleteOwner(ownerId: string): Promise<void> {
     const waitingDelete=await this.sb.from("waiting_citizens").delete().eq("owner_id",ownerId);
     if(waitingDelete.error)throw new Error("Could not remove private waiting data");
+    for(const table of ["credit_settings","subscription_citizens"]){const {error}=await this.sb.from(table).delete().eq("owner_id",ownerId);if(error)throw new Error("Could not remove private billing settings");}
     await this.sb.from("letters").delete().eq("owner_id", ownerId);
     await this.sb.from("owner_prefs").delete().eq("owner_id", ownerId);
     await this.sb.from("owner_reads").delete().eq("owner_id", ownerId);
@@ -208,13 +211,40 @@ export class TownStore {
     if (error) throw new Error("Could not save brain settings. Please retry.");
   }
 
+  async subscriptionCitizens(): Promise<SubscriptionCitizen[]> {
+    const {data,error}=await this.sb.from("subscription_citizens").select("agent_id,owner_id,grandfathered,subscription_id");
+    if(error)throw new Error("Subscription assignments could not be loaded.");
+    return (data??[]).map(r=>({agentId:r.agent_id,ownerId:r.owner_id,grandfathered:r.grandfathered,subscriptionId:r.subscription_id}));
+  }
+  async subscriptionAvailable(ownerId:string,agentId:string):Promise<boolean>{
+    const {data,error}=await this.sb.rpc("subscription_available",{p_owner:ownerId,p_agent:agentId});
+    if(error)throw new Error("Could not check subscription assignment.");return data===true;
+  }
+  async claimSubscription(ownerId:string,agentId:string,subscriptionId:string|null=null):Promise<void> {
+    const {error}=await this.sb.rpc("claim_subscription_citizen",{p_owner:ownerId,p_agent:agentId,p_subscription:subscriptionId});
+    if(error)throw new Error("Your subscription is already assigned or unavailable. Use your own key or external brain for another citizen.");
+  }
+  async creditSpending(ownerId:string):Promise<CreditSpending> {
+    const {data,error}=await this.sb.rpc("credit_spending",{p_owner:ownerId});
+    if(error)throw new Error("Could not load credit spending controls.");return data as CreditSpending;
+  }
+  async setCreditSpending(ownerId:string,autoSpend:boolean,dailyLimit:number|null):Promise<void> {
+    const {error}=await this.sb.from("credit_settings").upsert({owner_id:ownerId,auto_spend:autoSpend,daily_limit:dailyLimit,updated_at:new Date().toISOString()});
+    if(error)throw new Error("Could not save credit spending controls.");
+  }
+  async changeCredits(ownerId:string,delta:number,reason:string,ref:string|null,operationId:string,refundOf:string|null=null):Promise<{ok:boolean;credits:number}> {
+    const {data,error}=await this.sb.rpc("change_credits",{p_owner:ownerId,p_delta:delta,p_reason:reason,p_ref:ref,p_operation:operationId,p_refund:refundOf});
+    if(error)throw new Error("Credit transaction could not be confirmed.");return data as {ok:boolean;credits:number};
+  }
   async wallet(ownerId: string): Promise<Wallet> {
     const { data } = await this.sb.from("owner_wallets").select("owner_id, plan, credits, stripe_customer").eq("owner_id", ownerId).maybeSingle();
     return data ? { ownerId: data.owner_id, plan: data.plan, credits: data.credits, stripeCustomer: data.stripe_customer } : { ownerId, plan: "none", credits: 0, stripeCustomer: null };
   }
   async saveWallet(w: Wallet): Promise<void> {
-    const { error } = await this.sb.from("owner_wallets").upsert({ owner_id: w.ownerId, plan: w.plan, credits: w.credits, stripe_customer: w.stripeCustomer, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
-    if (error) console.error("wallet save failed:", error.message);
+    const seed = await this.sb.from("owner_wallets").upsert({owner_id:w.ownerId,plan:"none",credits:0},{onConflict:"owner_id",ignoreDuplicates:true});
+    if(seed.error)throw new Error("Wallet could not be initialized.");
+    const { error } = await this.sb.from("owner_wallets").update({plan:w.plan,stripe_customer:w.stripeCustomer,updated_at:new Date().toISOString()}).eq("owner_id",w.ownerId);
+    if (error) throw new Error("Wallet metadata could not be saved.");
   }
   async ledger(ownerId: string, n = 30): Promise<{ delta: number; reason: string; ref: string | null; at: string }[]> {
     const { data } = await this.sb.from("credit_ledger").select("delta, reason, ref, created_at").eq("owner_id", ownerId).order("id", { ascending: false }).limit(n);

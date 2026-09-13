@@ -1,6 +1,6 @@
 import {describe,it,expect,vi} from 'vitest';
 import {BrainRouter} from '../src/brains.ts';
-import {Town,type Brain} from '@unwatched/engine';
+import {Town,type Brain,type ConverseContext} from '@unwatched/engine';
 const failure=async():Promise<never>=>{throw Error('public budget exhausted');};
 const world:Brain={name:'test',decide:failure,converse:failure,reflect:failure,plan:failure,digest:failure,child:failure,writePaper:failure,life:failure,judge:failure};
 const persona={name:'Mira',age:30,origin:'mainland',summary:'worker',want:'work',fear:'hunger',secret:'none',strangers:'polite',advice:'listen',traits:{warmth:.5,pride:.5,caution:.5,honesty:.5,ambition:.5}};
@@ -12,4 +12,13 @@ describe('separate subscriber compute',()=>{
   await router.decide(town.perceive(a),a,1);expect(decide).toHaveBeenCalledTimes(1);
   await expect(router.decide(town.perceive(b),b,1)).rejects.toThrow('public budget exhausted');
  });
+});
+
+it('uses the paying speaker provider rather than the listener personal key',async()=>{
+ const paidConverse=vi.fn(async()=>({lines:[]}));const personalConverse=vi.fn(async()=>({lines:[]}));
+ const router=new BrainRouter(world,()=>{},a=>a.owner==='subscriber'?{...world,converse:paidConverse}:undefined);
+ const town=new Town({seed:7,brain:world});const a=town.addAgent({persona,owner:'subscriber'}),b=town.addAgent({persona,owner:'personal'});
+ router.perAgent.set(b.id,{converse:personalConverse} as never);
+ await router.converse({a,b} as ConverseContext);
+ expect(paidConverse).toHaveBeenCalledTimes(1);expect(personalConverse).not.toHaveBeenCalled();
 });

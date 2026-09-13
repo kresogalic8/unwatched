@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import type { AgentState, Tier } from "@unwatched/engine";
-import type { Store, Wallet, Plan } from "@unwatched/store";
+import type { Store, Wallet, Plan, SubscriptionCitizen, CreditSpending } from "@unwatched/store";
 
 /**
  * What each plan buys per day, per citizen, per month. Provider cost must be measured
@@ -9,7 +10,7 @@ import type { Store, Wallet, Plan } from "@unwatched/store";
  */
 export const PLANS: Record<Plan, { name: string; price: number; tier1: number; tier2: number; reflect: boolean; blurb: string; gets: string[] }> = {
   none:     { name: "No plan",  price: 0,  tier1: 0,   tier2: 0,  reflect: false, blurb: "On habit alone until a plan is bought.", gets: ["Works, eats, sleeps and talks in set phrases", "No thoughts of their own, so no letters answered", "Friends notice"] },
-  visitor:  { name: "Visitor",  price: 3,  tier1: 10,  tier2: 1,  reflect: false, blurb: "Ten thoughts a day. Enough to answer a letter and keep a job.", gets: ["10 thoughts a day, on Haiku 4.5", "1 careful decision a day, on Sonnet 5, so a letter home is possible but rare", "No nightly reflection, unless credits pay for one", "The digest and the paper", "No portrait, and letters are not read aloud"] },
+  visitor:  { name: "Visitor",  price: 3,  tier1: 10,  tier2: 1,  reflect: false, blurb: "Ten thoughts a day. Enough to answer a letter and keep a job.", gets: ["10 thoughts a day, on Haiku 4.5", "1 careful decision a day, on Sonnet 5, so a letter home is possible but rare", "A morning plan; nightly reflection uses extra credits if enabled", "The digest and the paper", "No portrait, and letters are not read aloud"] },
   resident: { name: "Resident", price: 12, tier1: 50,  tier2: 6,  reflect: true,  blurb: "Thinks all day, reflects every night, writes to you at crossroads.", gets: ["50 thoughts a day, on Haiku 4.5", "6 careful decisions a day, on Sonnet 5", "A nightly reflection on Opus 5, and a morning plan", "Writes to you when something is at stake", "Their portrait, and letters read aloud in their voice", "The digest and the paper"] },
   patron:   { name: "Patron",   price: 29, tier1: 120, tier2: 15, reflect: true,  blurb: "Our most capable mind for every careful thought.", gets: ["120 thoughts a day, on Haiku 4.5", "15 careful decisions a day, on Opus 5", "A nightly reflection on Opus 5, and a morning plan", "Writes to you when something is at stake", "Their portrait, and letters read aloud in their voice", "Their book and paintings", "The digest and the paper"] },
 };
@@ -25,6 +26,28 @@ export const LOOKUP = { visitor: "unwatched_visitor_monthly", resident: "unwatch
  * Credits never become coins. There is no path from here into the town's economy.
  */
 export class Billing {
+  private seats: SubscriptionCitizen[] = [];
+  private verifiedSubscriptions = new Map<string,string>();
+  private policies = new Map<string,CreditSpending>();
+  async reloadSeats() { if(this.store)this.seats=await this.store.subscriptionCitizens(); }
+  assignments(ownerId:string) {return this.seats.filter(x=>x.ownerId===ownerId);}
+  async canAssign(ownerId:string,agentId:string) {if(this.store)return this.store.subscriptionAvailable(ownerId,agentId);return this.seats.some(x=>x.ownerId===ownerId&&x.agentId===agentId)||!this.seats.some(x=>x.ownerId===ownerId&&!x.grandfathered);}
+  async claim(ownerId:string,agentId:string) {
+    if(!await this.canAssign(ownerId,agentId))throw new Error("Your plan is already assigned to a citizen. Use your own key or external brain for another citizen.");
+    if(this.store){await this.store.claimSubscription(ownerId,agentId,this.verifiedSubscriptions.get(ownerId)??null);await this.reloadSeats();}
+    else if(!this.seats.some(x=>x.agentId===agentId))this.seats.push({ownerId,agentId,grandfathered:false,subscriptionId:null});
+  }
+  async spending(ownerId:string):Promise<CreditSpending> {
+    if(this.store)return this.store.creditSpending(ownerId);
+    let p=this.policies.get(ownerId);const resetsAt=new Date(new Date().setUTCHours(24,0,0,0)).toISOString();
+    if(!p){p={autoSpend:false,dailyLimit:null,spentToday:0,resetsAt};this.policies.set(ownerId,p);}
+    if(Date.parse(p.resetsAt)<=Date.now()){p.spentToday=0;p.resetsAt=resetsAt;}return {...p};
+  }
+  async setSpending(ownerId:string,autoSpend:boolean,dailyLimit:number|null) {
+    if(this.store)await this.store.setCreditSpending(ownerId,autoSpend,dailyLimit);
+    else this.policies.set(ownerId,{...await this.spending(ownerId),autoSpend,dailyLimit});
+  }
+  async refreshWallet(ownerId:string){if(this.store)this.wallets.set(ownerId,await this.store.wallet(ownerId));return this.wallet(ownerId);}
   private wallets = new Map<string, Wallet>();
   readonly stripe: Stripe | null;
   readonly testMode: boolean;
@@ -38,6 +61,7 @@ export class Billing {
     this.testMode = !this.stripe;
   }
   async load() {
+    await this.reloadSeats();
     if (this.store) for (const w of await this.store.allWallets()) this.wallets.set(w.ownerId, w);
     if (this.stripe) {
       try { const list = await this.stripe.prices.list({ lookup_keys: Object.values(LOOKUP), active: true, limit: 20 }); for (const pr of list.data) if (pr.lookup_key) this.prices.set(pr.lookup_key, pr.id); }
@@ -49,34 +73,42 @@ export class Billing {
   }
   wallet(ownerId: string): Wallet { let w = this.wallets.get(ownerId); if (!w) { w = { ownerId, plan: "none", credits: 0, stripeCustomer: null }; this.wallets.set(ownerId, w); } return w; }
   allowance(ownerId: string) { const p = PLANS[this.wallet(ownerId).plan]; return { tier1Max: p.tier1, tier2Max: p.tier2 }; }
-  applyPlan(a: AgentState) { if (!a.owner || a.brainKind !== "hosted") return; const al = this.allowance(a.owner);
+  planFor(a:AgentState):Plan {return a.owner&&this.seats.some(s=>s.agentId===a.id&&s.ownerId===a.owner)?this.wallet(a.owner).plan:"none";}
+  applyPlan(a: AgentState, verified = false) { if (!a.owner || a.brainKind !== "hosted") return; const plan=verified?this.wallet(a.owner).plan:this.planFor(a);const p=PLANS[plan];const al={tier1Max:p.tier1,tier2Max:p.tier2};
     a.budget.tier1Used ??= a.budget.tier1Max - a.budget.tier1Left;
     a.budget.tier2Used ??= a.budget.tier2Max - a.budget.tier2Left;
     a.budget.tier1Left = Math.max(0, al.tier1Max - a.budget.tier1Used);
     a.budget.tier2Left = Math.max(0, al.tier2Max - a.budget.tier2Used);
     a.budget.tier1Max = al.tier1Max; a.budget.tier2Max = al.tier2Max;
-    a.budget.reflectionIncluded = PLANS[this.wallet(a.owner).plan].reflect;
-    a.budget.planningIncluded = this.wallet(a.owner).plan !== "none"; }
+    a.budget.reflectionIncluded = p.reflect;
+    a.budget.planningIncluded = plan !== "none"; }
 
-  /** The engine asks; we answer from the wallet. */
-  bank = (a: AgentState, tier: Tier): boolean => {
+  /** A durable debit returns its own idempotent refund; it never rewrites a stale balance. */
+  bank = async (a: AgentState, tier: Tier): Promise<false | (() => Promise<void>)> => {
     if (!a.owner) return false;
-    const w = this.wallet(a.owner); const cost = COST[tier];
-    if (w.credits < cost) return false;
-    w.credits -= cost;
-    void this.store?.saveWallet(w); void this.store?.credit(a.owner, -cost, tier === 1 ? "thought" : tier === 2 ? "stakes" : "reflection", a.id);
-    return true;
+    const owner=a.owner,cost=COST[tier],operation=randomUUID();
+    const reason=tier===1?"thought":tier===2?"stakes":"reflection";
+    if(this.store){
+      const debit=await this.store.changeCredits(owner,-cost,reason,a.id,operation);
+      this.wallet(owner).credits=debit.credits;if(!debit.ok)return false;
+      const refundOperation=randomUUID();
+      return async()=>{const result=await this.store!.changeCredits(owner,cost,"failed-thought-refund",a.id,refundOperation,operation);this.wallet(owner).credits=result.credits;};
+    }
+    await this.spending(owner);const p=this.policies.get(owner)!,w=this.wallet(owner);
+    if(!p.autoSpend||w.credits<cost||p.dailyLimit!==null&&p.spentToday+cost>p.dailyLimit)return false;
+    w.credits-=cost;p.spentToday+=cost;this.policies.set(owner,p);let refunded=false;
+    return async()=>{if(refunded)return;refunded=true;w.credits+=cost;const current=this.policies.get(owner);if(current&&current.resetsAt===p.resetsAt)current.spentToday=Math.max(0,current.spentToday-cost);};
   };
 
-  refund = (a: AgentState, tier: Tier): void => {
-    if (!a.owner) return;
-    const w = this.wallet(a.owner); w.credits += COST[tier];
-    void this.store?.saveWallet(w); void this.store?.credit(a.owner, COST[tier], "failed-thought-refund", a.id);
-  };
-
-  async grant(ownerId: string, credits: number, reason: string, ref: string | null = null) { const w = this.wallet(ownerId); w.credits += credits; await this.store?.saveWallet(w); await this.store?.credit(ownerId, credits, reason, ref); return w; }
-  async setPlan(ownerId: string, plan: Plan) { const w = this.wallet(ownerId); if (w.plan !== plan) { w.plan = plan; await this.store?.saveWallet(w); this.onPlan?.(ownerId, plan); } return w; }
-  private async remember(ownerId: string, customer: string | Stripe.Customer | Stripe.DeletedCustomer | null | undefined) { const id = typeof customer === "string" ? customer : customer?.id; if (!id) return; const w = this.wallet(ownerId); if (w.stripeCustomer !== id) { w.stripeCustomer = id; await this.store?.saveWallet(w); } }
+  async grant(ownerId:string,credits:number,reason:string,ref:string|null=null){
+    if(!Number.isSafeInteger(credits)||credits<=0)throw new Error("Invalid credit grant");
+    const w=this.wallet(ownerId);
+    if(this.store){const result=await this.store.changeCredits(ownerId,credits,reason,ref,randomUUID());w.credits=result.credits;}
+    else w.credits+=credits;
+    return w;
+  }
+  async setPlan(ownerId: string, plan: Plan) { const w = this.wallet(ownerId); if (w.plan !== plan) { await this.store?.saveWallet({...w,plan}); w.plan = plan; this.onPlan?.(ownerId, plan); } return w; }
+  private async remember(ownerId: string, customer: string | Stripe.Customer | Stripe.DeletedCustomer | null | undefined) { const id = typeof customer === "string" ? customer : customer?.id; if (!id) return; const w = this.wallet(ownerId); if (w.stripeCustomer !== id) { await this.store?.saveWallet({...w,stripeCustomer:id}); w.stripeCustomer = id; } }
   private ownerOfCustomer(customer: string | null | undefined): string | null { if (!customer) return null; for (const w of this.wallets.values()) if (w.stripeCustomer === customer) return w.ownerId; return null; }
 
   /** Stripe Checkout for a pack, returning the URL to send the owner to. */
@@ -92,23 +124,33 @@ export class Billing {
     });
     return session.url ? { url: session.url } : { error: "Stripe did not give a checkout link" };
   }
-  async boardingReady(ownerId:string):Promise<boolean> {
+  async boardingReady(ownerId:string,agentId?:string):Promise<boolean> {
+    if(agentId&&!await this.canAssign(ownerId,agentId))return false;
     const wallet=this.wallet(ownerId);if(wallet.plan==="none")return false;
     if(!this.stripe)return true; // Local/test mode never charges a card.
     if(!wallet.stripeCustomer)return false;
     const subs=await this.stripe.subscriptions.list({customer:wallet.stripeCustomer,status:"all",limit:100});
-    return subs.data.some(sub=>(sub.status==="active"||sub.status==="trialing")&&this.planOf(sub)===wallet.plan);
+    const match=subs.data.find(sub=>(sub.status==="active"||sub.status==="trialing")&&this.planOf(sub)===wallet.plan);
+    if(match?.id)this.verifiedSubscriptions.set(ownerId,match.id);
+    return !!match;
   }
   async checkoutPlan(ownerId: string, plan: Plan, origin: string, returnPath="/account/credits"): Promise<{ url: string } | { error: string }> {
     if (!this.stripe) return { error: "test mode" };
     if (plan === "none") return { error: "no plan is not bought; it is what is left when one ends" };
     const priceId = this.prices.get(LOOKUP[plan]); if (!priceId) return { error: `no Stripe price configured for ${plan}` };
     const w = this.wallet(ownerId);
+    if(!w.stripeCustomer){const customer=await this.stripe.customers.create({metadata:{owner_id:ownerId}},{idempotencyKey:`unwatched-customer:${ownerId}`});await this.remember(ownerId,customer.id);}
+    const existing=await this.stripe.subscriptions.list({customer:w.stripeCustomer!,status:"all",limit:100});
+    if(existing.data.some(sub=>["active","trialing","past_due","unpaid","incomplete","paused"].includes(sub.status)))return this.portal(ownerId,origin);
+    const pending=await this.stripe.checkout.sessions.list({customer:w.stripeCustomer!,status:"open",limit:100});
+    const same=pending.data.find(x=>x.mode==="subscription"&&x.metadata?.plan===plan);
+    if(same?.url)return {url:same.url};
+    for(const session of pending.data.filter(x=>x.mode==="subscription"))await this.stripe.checkout.sessions.expire(session.id);
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription", success_url: `${origin}${returnPath}?plan=${plan}`, cancel_url: `${origin}${returnPath}?checkout=cancelled`, client_reference_id: ownerId, allow_promotion_codes: true,
       ...(w.stripeCustomer ? { customer: w.stripeCustomer } : {}),
       line_items: [{ price: priceId, quantity: 1 }], metadata: { owner_id: ownerId, plan }, subscription_data: { metadata: { owner_id: ownerId, plan } },
-    });
+    }, {idempotencyKey:`subscription:${ownerId}:${plan}:${new Date().toISOString().slice(0,13)}`});
     return session.url ? { url: session.url } : { error: "Stripe did not give a checkout link" };
   }
   /** Stripe's own page for changing a card, switching or ending a plan, and the invoices. */
@@ -122,7 +164,14 @@ export class Billing {
   planOf(sub: Stripe.Subscription): Plan {
     if (!(sub.status === "active" || sub.status === "trialing" || sub.status === "past_due")) return "none";
     for (const it of sub.items.data) { const k = it.price.lookup_key; for (const plan of ["patron", "resident", "visitor"] as const) if (k === LOOKUP[plan] || it.price.id === this.prices.get(LOOKUP[plan])) return plan; }
-    return (sub.metadata?.plan as Plan) ?? "none";
+    return (["visitor","resident","patron"] as const).find(p=>p===sub.metadata?.plan)??"none";
+  }
+  private async reconcile(ownerId:string) {
+    const customer=this.wallet(ownerId).stripeCustomer;if(!this.stripe||!customer)return;
+    const plans:Plan[]=[];
+    for await(const sub of this.stripe.subscriptions.list({customer,status:"all",limit:100}))plans.push(this.planOf(sub));
+    const plan:Plan=plans.includes("patron")?"patron":plans.includes("resident")?"resident":plans.includes("visitor")?"visitor":"none";
+    await this.setPlan(ownerId,plan);
   }
   /** Webhook: the only place a purchase becomes credits or a plan. */
   async webhook(rawBody: string, signature: string | undefined): Promise<{ ok: boolean; note?: string }> {
@@ -130,12 +179,12 @@ export class Billing {
     const secret = process.env.STRIPE_WEBHOOK_SECRET; if (!secret || !signature) return { ok: false, note: "no webhook secret" };
     let ev: Stripe.Event;
     try { ev = this.stripe.webhooks.constructEvent(rawBody, signature, secret); } catch (e) { return { ok: false, note: (e as Error).message }; }
-    if (this.seen.includes(ev.id)) return { ok: true, note: "seen" }; this.seen.push(ev.id); if (this.seen.length > 2000) this.seen.shift();
+    if (this.seen.includes(ev.id)) return { ok: true, note: "seen" };
     if (ev.type === "checkout.session.completed") {
       const s = ev.data.object; const owner = s.metadata?.owner_id ?? s.client_reference_id; if (!owner) return { ok: true, note: "no owner" };
       await this.remember(owner, s.customer);
       if (s.mode === "payment" && s.payment_status === "paid") await this.grant(owner, Number(s.metadata?.credits ?? 0), "purchase", s.id);
-      if (s.mode === "subscription" && s.metadata?.plan) await this.setPlan(owner, s.metadata.plan as Plan);
+      if (s.mode === "subscription") await this.reconcile(owner);
       this.log(`stripe: ${s.mode} for ${owner}`);
     }
     if (ev.type === "customer.subscription.updated" || ev.type === "customer.subscription.deleted") {
@@ -143,9 +192,10 @@ export class Billing {
       if (!owner) return { ok: true, note: "no owner for subscription" };
       await this.remember(owner, sub.customer);
       const plan = ev.type === "customer.subscription.deleted" ? "none" : this.planOf(sub);
-      await this.setPlan(owner, plan); this.log(`stripe: ${owner} is a ${plan} (${sub.status})`);
+      await this.reconcile(owner); this.log(`stripe: ${owner} is a ${plan} (${sub.status})`);
     }
     if (ev.type === "invoice.payment_failed") { const inv = ev.data.object; const owner = this.ownerOfCustomer(typeof inv.customer === "string" ? inv.customer : inv.customer?.id); this.log(`stripe: payment failed for ${owner ?? "unknown"}`); }
+    this.seen.push(ev.id); if(this.seen.length>2000)this.seen.shift();
     return { ok: true };
   }
 }

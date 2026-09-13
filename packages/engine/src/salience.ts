@@ -9,6 +9,17 @@ export interface SalienceView {
   gathering?: { id: number; what: string } | null;
 }
 
+/** Pace routine hosted thinking against the remaining waking day, never urgent decisions.
+ * The remaining allowance accelerates naturally toward bedtime; no hourly quota is withheld.
+ */
+export function routineReady(a: AgentState, t: number): boolean {
+  if (!a.owner || a.brainKind !== "hosted" || !a.budget.planningIncluded || a.budget.tier1Left <= 0) return true;
+  const minute = ((t % 1440) + 1440) % 1440;
+  const remaining = Math.max(1, 22 * 60 - Math.max(6 * 60, minute));
+  const interval = Math.max(1, Math.floor(remaining / a.budget.tier1Left));
+  return t - Math.max(a.lastThought, a.lastConversation) >= interval;
+}
+
 /**
  * The plan step this minute's thought is about: one whose hour has come, not yet done and not yet missed, and which can be
  * acted on where they stand. A step at a place they never reached does not hold the later steps hostage for its three hours.
@@ -34,12 +45,14 @@ export function salience(a: AgentState, v: SalienceView): { tier: Tier; why: str
   if (v.debtDue && a.debtThoughtDay !== v.day && v.hour >= 7 && v.hour < 22) return { tier: 2, why: "debt due" };
   if (v.gathering && a.gatheringThoughtId !== v.gathering.id) return { tier: 1, why: `gathering: ${v.gathering.what}` };
   if (a.needs.hunger > 0.8 && a.coins > 0 && v.t - a.lastHungerThought >= 120) return { tier: 1, why: "hungry" };
-  if (a.letters.some((l) => !l.read) && v.hour >= 6 && v.hour < 9) return { tier: 1, why: "letter" };
+  if (a.letters.some((l) => !l.read) && v.hour >= 6 && v.hour < 23 && v.t - a.lastThought >= 1) return { tier: 1, why: "letter" };
   if(!a.owner && a.brainKind === "hosted" && v.t-a.lastThought < (v.npcThoughtInterval??0))return null;
+  const routineDue = routineReady(a, v.t);
   const step = dueThought(a, v.hour, v.day);
-  if (step && v.t - a.lastThought >= 3) return { tier: 1, why: `plan: ${step.do}` };
+  if (routineDue && step && v.t - a.lastThought >= 3) return { tier: 1, why: `plan: ${step.do}` };
   if (v.plotHere && a.coins >= 15 && v.t - a.lastThought > 60 && v.hour >= 7 && v.hour < 19) return { tier: 2, why: "standing on land for sale" };
   if (a.coins <= 3 && a.job === null && v.hour >= 8 && v.hour < 18 && v.t - a.lastThought > 90) return { tier: 2, why: "broke" };
+  if (!routineDue) return null;
   if (a.job === null && v.jobsOpenHere > 0 && v.hour >= 6 && v.hour < 18 && v.t - a.lastThought > 45) return { tier: 1, why: "job here" };
   if (a.heard.length > 0 && v.t - a.lastThought > 10) return { tier: 1, why: "spoken to" };
   // attention they chose: what they said they would watch is here, so they think about it

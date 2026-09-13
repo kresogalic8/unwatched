@@ -110,18 +110,18 @@ const telegram = new TelegramLetters({ token: process.env.TELEGRAM_BOT_TOKEN, ch
 } : undefined }, log);
 const billing = new Billing(store, log); await billing.load();
 modelsFor = (a) => {
-  if (a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan !== "none") return billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
+  if (a.owner && a.brainKind === "hosted" && billing.planFor(a) !== "none") return billing.planFor(a) === "patron" ? PATRON_MODELS : null;
   if (DAILY_CEILING_USD > 0 && metrics.today(town.day).cost >= DAILY_CEILING_USD) return { stakes: MODELS.routine, reflect: MODELS.stakes }; // the ceiling: cheaper minds, same seconds
   return !a.owner ? {reflect:MODELS.stakes} : null;
 };
 if (subscriberBrain) {
   subscriberBrain.digestModel = MODELS.stakes;
-  subscriberBrain.modelsFor = (a) => a.owner && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
+  subscriberBrain.modelsFor = (a) => a.owner && billing.planFor(a) === "patron" ? PATRON_MODELS : null;
   subscriberBrain.onFallback = f => metrics.fallback(f);
 }
 if(telegramDb) metrics.onAttempt=(a,kind,outcome,duration,t)=>{void telegramDb.from('cognition_attempts').insert({agent_id:a?.id??null,kind,outcome,duration_ms:duration,island_minute:t,funding:a?.brainKind==='own_key'?'user_key':a?.brainKind==='own_brain'?'external_brain':a?.owner&&billing.wallet(a.owner).plan!=='none'?'subscriber':'world'}).then(({error})=>{if(error)log('Could not persist cognition diagnostic.');});};
-const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.wallet(a.owner).plan === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
-const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, creditRefund: billing.refund, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
+const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.planFor(a) === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
+const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { if(e.kind==="town.of_age"){const grown=town.agents.get(e.actors[0]!);if(grown)billing.applyPlan(grown);} store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
 town.npcThoughtInterval = 15;
 const waitingTown=new Town({seed:SEED,brain:new MockBrain(SEED)});
@@ -544,9 +544,14 @@ app.put("/api/agents/:id/brain", async (c) => {
     const test = await fetch("https://openrouter.ai/api/v1/auth/key", { headers: { Authorization: `Bearer ${row.api_key}` } });
     if (!test.ok) return c.json({ error: "OpenRouter says this key is not valid. Nothing was saved." }, 400);
   }
+  if(row.kind==="hosted"&&!waitingTown.agents.has(a.id)){
+    if(!await billing.boardingReady(owner!,a.id))return c.json({error:"An available subscription is required to switch to hosted thinking."},402);
+    await billing.claim(owner!,a.id);
+  }
   if (store) await store.saveBrain(row);
   brainRows.set(a.id, row); brain.set(a.id, row);
-  a.brainKind = row.kind; a.thinkEvery = row.kind === "own_key" ? row.think_every : null;
+  a.brainKind = row.kind; a.thinkEvery = row.kind === "own_key" ? row.think_every : null;billing.applyPlan(a);
+  if(store&&!waitingTown.agents.has(a.id))await store.snapshot(town);
   return c.json({ ...brainView(a, row), ...(body.data.kind === "own_brain" && !prev?.token ? { token: row.token } : {}) });
 });
 app.post("/api/agents/:id/brain/token", async (c) => {
@@ -560,8 +565,16 @@ app.post("/api/agents/:id/brain/token", async (c) => {
 app.get("/api/plans", (c) => c.json({ plans: PLANS, packs: PACKS, cost: COST, testMode: billing.testMode }));
 app.get("/api/me/wallet", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
-  const w = billing.wallet(owner);
-  return c.json({ plan: w.plan, credits: w.credits, plans: PLANS, packs: PACKS, cost: COST, testMode: billing.testMode, ledger: store ? await store.ledger(owner) : [] });
+  const w = await billing.refreshWallet(owner);
+  c.header("Cache-Control","private, no-store");
+  return c.json({ spending:await billing.spending(owner), assignments:billing.assignments(owner), allowanceReset:"Island midnight · Europe/Zagreb", plan: w.plan, credits: w.credits, plans: PLANS, packs: PACKS, cost: COST, testMode: billing.testMode, ledger: store ? await store.ledger(owner) : [] });
+});
+app.put("/api/me/credit-spending",async(c)=>{
+  const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);
+  const body=z.object({autoSpend:z.boolean(),dailyLimit:z.number().int().min(0).max(100000).nullable()}).safeParse(await c.req.json());
+  if(!body.success)return c.json({error:"Choose a whole-number credit limit or no limit."},400);
+  await billing.setSpending(owner,body.data.autoSpend,body.data.dailyLimit);
+  return c.json(await billing.spending(owner));
 });
 app.post("/api/me/plan", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
@@ -693,15 +706,15 @@ app.post("/api/agents/:id/activate",async(c)=>{
  if(boardingLocks.has(owner!))return c.json({error:"Activation is already being checked."},409);
  boardingLocks.add(owner!);
  try{
-  if(a.brainKind==="hosted"){if(!await billing.boardingReady(owner!))return c.json({error:"Activate a subscription first."},402);}
+  if(a.brainKind==="hosted"){if(!await billing.boardingReady(owner!,a.id))return c.json({error:"Activate an available subscription first. A plan supports one citizen."},402);}
   else if(a.brainKind==="own_key"){const row=brainRows.get(a.id);if(!row?.api_key||!row.models||!row.daily_cap_usd)return c.json({error:"Configure a key and positive daily cap first."},400);try{await verifyBoardingKey(row.api_key,row.models);}catch(e){return c.json({error:(e as Error).message},400);}}
   else {const b=brain.perAgent.get(a.id);if(!(b instanceof OwnBrain)||!await b.verify(waitingTown.perceive(a)))return c.json({error:"Connect your process and answer its test perception before returning."},400);}
   if(ticking||worldTransition)return c.json({error:"The world is finishing a tick. Your brain is ready; retry in a moment."},409);
   worldTransition=true;
   try{
    const preview=new Town({seed:SEED,brain:new MockBrain(SEED)});preview.restore({...waitingTown.snapshot(),agents:waitingTown.snapshot().agents.filter(x=>x.id===a.id)});
-   const ready=preview.agents.get(a.id)!;ready.location="harbor";ready.asleep=false;ready.job=null;ready.plan=null;ready.budget.tier1Used=0;ready.budget.tier2Used=0;billing.applyPlan(ready);
-   if(store)await store.resumeCitizen(preview,a.id);
+   const ready=preview.agents.get(a.id)!;ready.location="harbor";ready.asleep=false;ready.job=null;ready.plan=null;ready.budget.tier1Used=0;ready.budget.tier2Used=0;billing.applyPlan(ready,true);
+   if(store){await store.resumeCitizen(preview,a.id);await billing.reloadSeats();if(ready.brainKind==="hosted")await billing.claim(owner!,a.id);}else if(ready.brainKind==="hosted")await billing.claim(owner!,a.id);
    waitingTown.agents.delete(a.id);town.agents.set(a.id,ready);
    town.emit("agent.arrive",[a.id],"harbor",`${a.persona.name} returned to the island with their brain activated.`,0.5);
    if(store)await store.snapshot(town);
@@ -719,12 +732,12 @@ app.post("/api/board", async (c) => {
     const raw=await c.req.json().catch(()=>({}));
     const adopt=z.object({adopt:z.string()}).safeParse(raw);
     if(adopt.success){
-      if(!await billing.boardingReady(owner))return c.json({error:"Activate a hosted plan before adopting a citizen."},402);
+      if(!await billing.boardingReady(owner,town.agents.has(adopt.data.adopt)?adopt.data.adopt:`ag_adopt_${adopt.data.adopt}`))return c.json({error:"An available hosted subscription is required for adoption. One plan supports one citizen."},402);
       const grown=town.agents.get(adopt.data.adopt);
-      if(grown&&!grown.owner&&grown.persona.origin.startsWith("born on the island")){grown.owner=owner;billing.applyPlan(grown);if(store)await store.snapshot(town);return c.json({id:grown.id,arrived:town.clock(),adopted:true});}
+      if(grown&&!grown.owner&&grown.persona.origin.startsWith("born on the island")){await billing.claim(owner,grown.id);grown.owner=owner;billing.applyPlan(grown);if(store)await store.snapshot(town);return c.json({id:grown.id,arrived:town.clock(),adopted:true});}
       const child=town.children.find(x=>x.id===adopt.data.adopt&&!x.adoptedBy);
       if(!child)return c.json({error:"No such available child."},404);
-      child.adoptedBy=owner;if(store)await store.snapshot(town);return c.json({id:child.id,child:true,ofAgeIn:Math.max(0,town.ageOfMajority-(town.day-child.bornDay))});
+      await billing.claim(owner,`ag_adopt_${child.id}`);child.adoptedBy=owner;if(store)await store.snapshot(town);return c.json({id:child.id,child:true,ofAgeIn:Math.max(0,town.ageOfMajority-(town.day-child.bornDay))});
     }
     const body=z.object({requestId:z.string().uuid(),persona:Persona,appearance:z.record(z.string(),z.unknown()).optional(),instructions:z.string().max(4000).optional(),brain:z.enum(["hosted","own_key","own_brain"]).default("hosted"),town:z.string().optional(),apiKey:z.string().min(8).max(512).optional(),models:z.object({routine:z.string().min(1).max(200),stakes:z.string().min(1).max(200),reflect:z.string().min(1).max(200)}).optional(),dailyCapUsd:z.number().positive().max(100).optional(),ticket:z.string().uuid().optional()}).safeParse(raw);
     if(!body.success)return c.json({error:"Complete the boarding form and choose a working brain."},400);
@@ -735,7 +748,7 @@ app.post("/api/board", async (c) => {
     if(!town.boatRunning)return c.json({error:"The boat is not running. Your draft is saved; try again when it resumes."},503);
     let row:BrainRow|null=null;let external:ReturnType<BoardingConnections["ready"]>=null;
     if(data.brain==="hosted"){
-      if(!await billing.boardingReady(owner))return c.json({error:"An active subscription must be confirmed before boarding. Check Credits & plan; your character is still a draft."},402);
+      if(!await billing.boardingReady(owner,id))return c.json({error:"Your plan must be active and available for this citizen. Each subscription supports one citizen; use your own key or external brain for another."},402);
     } else if(data.brain==="own_key"){
       if(!data.apiKey||!data.models||!data.dailyCapUsd)return c.json({error:"Enter a key, models and a positive daily cap before boarding."},400);
       try{await verifyBoardingKey(data.apiKey,data.models);}catch(e){return c.json({error:(e as Error).message},400);}
@@ -748,9 +761,9 @@ app.post("/api/board", async (c) => {
     const staged=new Town({seed:SEED,brain:new MockBrain(SEED)});staged.t=town.t;staged.day=town.day;
     const prepared=staged.addAgent({persona:data.persona,owner,funded:true},id);
     prepared.appearance=data.appearance??null;prepared.instructions=data.instructions??"";
-    prepared.brainKind=data.brain;prepared.thinkEvery=data.brain==="own_key"?5:null;billing.applyPlan(prepared);
+    prepared.brainKind=data.brain;prepared.thinkEvery=data.brain==="own_key"?5:null;billing.applyPlan(prepared,true);
     if(worldTransition)return c.json({error:"The island is updating. Your draft is safe; retry shortly."},409);
-    if(store)await store.admitCitizen(staged,id,row);
+    if(store){await store.admitCitizen(staged,id,row);await billing.reloadSeats();if(data.brain==="hosted")await billing.claim(owner,id);}else if(data.brain==="hosted")await billing.claim(owner,id);
     if(row){brainRows.set(id,row);if(external)brain.perAgent.set(id,external.brain);else brain.set(id,row);}
     const a=town.addAgent({persona:data.persona,owner,funded:true},id);Object.assign(a,prepared);
     if(store)await store.snapshot(town);
