@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import { Familjen_Grotesk } from "next/font/google";
 import "./globals.css";
+import GoogleAnalytics from "@/components/analytics/google-analytics";
 
 const familjen = Familjen_Grotesk({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600", "700"], style: ["normal", "italic"], variable: "--font-familjen" });
 
@@ -21,7 +22,7 @@ export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={familjen.variable}>
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">{children}<GoogleAnalytics /></body>
     </html>
   );
 }
