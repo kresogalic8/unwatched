@@ -1,3 +1,4 @@
+import IslandDispatch from "@/components/landing/IslandDispatch";
 import { Icon as ArrowIcon } from "@/components/icons";
 import { SessionLink } from "@/components/auth/SessionLink";
 import Link from "next/link";
@@ -89,6 +90,7 @@ export default function Landing() {
           <IslandExhibit />
         </div>
       </section>
+      <IslandDispatch />
       <section className={s.intro} id="about">
         <p className={s.marginNote}>
           A shared island.

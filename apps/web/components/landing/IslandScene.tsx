@@ -5,20 +5,22 @@ import * as THREE from "three";
 /** A small illustrative diorama using the actual harbor atlas, not a fake live feed. */
 export default function IslandScene({
   night,
+  focus,
   motion,
   onReady,
   onUnavailable,
 }: {
   night: boolean;
+  focus: number;
   motion: boolean;
   onReady: (ready: boolean) => void;
   onUnavailable: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const wake = useRef<() => void>(() => {});
-  const state = useRef({ night, motion, onReady, onUnavailable });
-  state.current = { night, motion, onReady, onUnavailable };
-  useEffect(() => wake.current(), [night, motion]);
+  const state = useRef({ night, focus, motion, onReady, onUnavailable });
+  state.current = { night, focus, motion, onReady, onUnavailable };
+  useEffect(() => wake.current(), [night, focus, motion]);
   useEffect(() => {
     const el = host.current;
     if (!el) return;
@@ -200,7 +202,8 @@ export default function IslandScene({
         h = el.clientHeight;
       if (!w || !h) return;
       renderer.setSize(w, h);
-      const view = w < 500 ? 6.5 : 6.3;
+      // Keep the full shoreline in frame on narrow phones.
+      const view = Math.max(6.3, 9.5 * h / w);
       camera.left = (-view * w) / h / 2;
       camera.right = (view * w) / h / 2;
       camera.top = view / 2;
@@ -254,6 +257,13 @@ export default function IslandScene({
         8 + (state.current.motion ? target.y : 0),
         0.05,
       );
+      const stops = [[0, 0, 1], [-2.05, .95, 1.35], [.8, .75, 1.4], [2.3, -.8, 1.35]];
+      const [x, z, zoom] = stops[state.current.focus] ?? stops[0]!;
+      const easing = state.current.motion ? .065 : 1;
+      island.position.x = THREE.MathUtils.lerp(island.position.x, -x! * .6, easing);
+      island.position.z = THREE.MathUtils.lerp(island.position.z, -z! * .6, easing);
+      camera.zoom = THREE.MathUtils.lerp(camera.zoom, zoom!, easing);
+      camera.updateProjectionMatrix();
       camera.lookAt(0, 0.15, 0);
       renderer.render(scene, camera);
       if (state.current.motion || Math.abs(darkness - goal) > 0.001)

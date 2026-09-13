@@ -50,10 +50,11 @@ export function LandingMotion() {
 export function IslandExhibit() {
   const [night, setNight] = useState(false);
   const [ready, setReady] = useState(false);
-  const [enabled, setEnabled] = useState(false);
+  const [stop, setStop] = useState(0);
   const [unavailable, setUnavailable] = useState(false);
   const motion = useMotionAllowed();
   return (
+    <div className={s.islandExhibit}>
     <figure className={s.island}>
       <div
         className={s.islandStage}
@@ -81,30 +82,18 @@ export function IslandExhibit() {
             priority
           />
         </div>
-        {enabled && (
+        {!unavailable && (
           <Island
             night={night}
+            focus={stop}
             motion={motion}
             onReady={setReady}
-            onUnavailable={() => setUnavailable(true)}
+            onUnavailable={() => { setReady(false); setUnavailable(true); }}
           />
         )}
       </div>
       <figcaption className={s.islandCaption}>
-        <button
-          className={s.enableScene}
-          type="button"
-          disabled={enabled}
-          onClick={() => setEnabled(true)}
-        >
-          {unavailable
-            ? "3D unavailable. Showing artwork."
-            : ready
-              ? "3D active. Move your pointer."
-              : enabled
-                ? "Opening the miniature…"
-                : <>Explore the miniature in 3D <Icon name="arrowUpRight" size={16} /></>}
-        </button>
+        <span className={s.sceneStatus} aria-live="polite">{unavailable ? "Island artwork · 3D unavailable" : ready ? "3D miniature · choose a stop" : "Opening the miniature…"}</span>
         <div
           className={s.dayControls}
           role="group"
@@ -127,6 +116,18 @@ export function IslandExhibit() {
         </div>
       </figcaption>
     </figure>
+    <div className={s.tour}>
+      <div className={s.tourStops} role="group" aria-label="Tour the miniature">
+        {["The island", "The harbor", "The bakery", "The lighthouse"].map((name, i) => <button key={name} type="button" aria-pressed={stop === i} onClick={() => setStop(i)}>{name}</button>)}
+      </div>
+      <p className={s.tourStory} aria-live="polite">{[
+        "A miniature of the places where their lives unfold. The living world is one click away.",
+        "Every life here starts with an arrival. A new face, a suitcase, and no script to follow.",
+        "Bread needs flour. Work needs hands. Even a small bakery gives strangers reasons to meet.",
+        "At the edge of the island, the lights come on. Try Night to see the town after dark.",
+      ][stop]}</p>
+    </div>
+    </div>
   );
 }
 
