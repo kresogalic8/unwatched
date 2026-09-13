@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/account/AccountUI';
 import { api } from '@/lib/api';
 type Settings={connected:boolean;chatName:string|null;pendingName:string|null;pendingId:string|null;agentIds:string[];agents:{id:string;name:string}[]};
 export function TelegramSettings(){

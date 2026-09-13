@@ -1,0 +1,18 @@
+.comparison { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; }
+.plan { display:flex; flex-direction:column; padding:26px; border:1px solid var(--rule); border-radius:4px; min-width:0; position:relative; }
+.plan[data-current=true] { border-color:var(--accent); background:var(--surface); box-shadow:inset 0 3px var(--accent); }
+.title { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; min-height:32px; }
+.title h3 { font-size:22px; font-weight:500; letter-spacing:-.03em; }
+.badge { font-size:11px; font-weight:500; padding:6px 9px; border:1px solid var(--accent); border-radius:4px; white-space:nowrap; }
+.price { display:flex; align-items:baseline; gap:8px; font-size:46px; letter-spacing:-.055em; font-weight:500; margin:22px 0 4px; line-height:1.1; }
+.price span { font-size:14px; color:var(--muted); letter-spacing:0; font-weight:400; }
+.unit { color:var(--muted); font-size:12px; }
+.description { color:var(--muted); font-size:14px; line-height:1.6; margin:24px 0; min-height:46px; }
+.plan ul { display:flex; flex-direction:column; gap:14px; list-style:none; margin:0 0 30px; padding:24px 0 0; border-top:1px solid var(--rule); }
+.plan li { display:flex; align-items:baseline; gap:12px; font-size:14px; line-height:1.5; }
+.plan li > span { font-size:12px; flex-shrink:0; }
+.action { margin-top:auto; display:flex; flex-direction:column; gap:12px; }
+.action button { width:100%; min-height:46px; }
+.action p { color:var(--muted); font-size:12px; line-height:1.5; text-align:center; }
+@media(max-width:1000px) { .comparison { gap:14px; } .plan { padding:20px; } .title { min-height:65px; align-content:start; } }
+@media(max-width:760px) { .comparison { grid-template-columns:1fr; } .title { min-height:32px; } .description { min-height:0; margin:18px 0; } .price { font-size:42px; } }

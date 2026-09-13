@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, type Clock } from "@/lib/api";
+import { useSessionState } from "@/components/auth/SessionLink";
 import { currentOwner, rememberedAgent } from "@/lib/auth";
 import { MobileTabs } from "./MobileTabs";
 import { Icon, type IconName } from "./icons";
@@ -50,23 +51,28 @@ export function Logo({ size = 30, dark = false }: { size?: number; dark?: boolea
   return <svg width={size} height={size} viewBox="0 0 200 200" aria-hidden="true" style={{ display: "block", color: dark ? "#F7F6F3" : "var(--color-kelp)" }}><path d="M44 96 V44 H96 M104 44 H156 V96 M44 104 V156 H96" fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="square" /><circle cx="168" cy="168" r="15" fill="#E4572E" /></svg>;
 }
 export function Wordmark({ size = 21, dark = false }: { size?: number; dark?: boolean }) {
-  return <Link href="/" className="flex items-center gap-2.5"><Logo size={size * 1.4} dark={dark} /><span className="display" style={{ fontSize: size * 1.05, fontWeight: 600, letterSpacing: "-0.03em", whiteSpace: "nowrap", color: dark ? "#F7F6F3" : "var(--color-kelp)" }}>unwatched</span></Link>;
+  return <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}><Logo size={size * 1.4} dark={dark} /><span className="display" style={{ fontSize: size * 1.05, fontWeight: 600, letterSpacing: "-0.03em", whiteSpace: "nowrap", color: dark ? "#F7F6F3" : "var(--color-kelp)" }}>unwatched</span></Link>;
 }
 
 const TABS: [string, string, IconName][] = [["Digest", "/digest", "digest"], ["Letters", "/letters", "letter"], ["People", "/people", "people"], ["Town", "/town", "town"], ["Gazette", "/gazette", "gazette"], ["Library", "/library", "book"]];
 export function TopBar() {
+  const sessionState = useSessionState();
   const path = usePathname();
   const [c, setC] = useState<Clock | null>(null);
   const [me, setMe] = useState<{ name: string; sub: string } | null>(null);
   useEffect(() => {
     void api<Clock>("/api/town").then(setC).catch(() => {});
+    let active = true;
+    setMe(null);
+    if (sessionState !== "signed-in") return;
     void (async () => {
-      const o = await currentOwner(); if (!o) return;
+      const o = await currentOwner(); if (!o || !active) return;
       const mine = await api<{ id: string; name: string; budget: { tier1Left: number } }[]>("/api/me/agents").catch(() => []);
       const rem = rememberedAgent(); const a = mine.find((x) => x.id === rem) ?? mine[0];
-      setMe(a ? { name: a.name, sub: `${a.budget.tier1Left} thoughts left today` } : { name: o.email ?? o.id, sub: "no agent on the island" });
-    })();
-  }, [path]);
+      if (active) setMe(a ? { name: a.name, sub: `${a.budget.tier1Left} thoughts left today` } : { name: o.email ?? o.id, sub: "no agent on the island" });
+    })().catch(() => {});
+    return () => { active = false; };
+  }, [path, sessionState]);
   return (
     <div className="flex items-center justify-between h-14 shrink-0">
       <div className="flex items-center gap-8">
@@ -79,7 +85,7 @@ export function TopBar() {
         {c && <div className="text-drift hidden md:block">Day {c.day} · {String(c.hour).padStart(2, "0")}:{String(c.minute % 60).padStart(2, "0")} · {c.weather}{typeof c.temperatureC === "number" ? ` · ${Math.round(c.temperatureC)}°` : ""}{c.place ? ` · live sky, ${c.place}` : ""}</div>}
         <Link href="/account" className="flex items-center gap-2.5 bg-shell rounded-full py-1 pr-3.5 pl-1">
           <div className="w-9 h-9 rounded-full bg-glass text-teal flex items-center justify-center display font-bold">{me?.name?.[0] ?? "?"}</div>
-          <div className="leading-tight hidden sm:block"><div className="font-bold">{me?.name ?? "Sign in"}</div><div className="text-xs text-drift">{me?.sub ?? "at the harbor office"}</div></div>
+          <div className="leading-tight hidden sm:block"><div className="font-bold">{me?.name ?? (sessionState === "signed-out" ? "Sign in" : "Account")}</div><div className="text-xs text-drift">{me?.sub ?? "at the harbor office"}</div></div>
         </Link>
       </div>
     </div>

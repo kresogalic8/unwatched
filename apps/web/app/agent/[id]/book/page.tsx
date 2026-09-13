@@ -1,41 +1,267 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Page, Card, Label, Bubble, LinkButton } from "@/components/ui";
-import { Loading, Problem } from "@/components/states";
+import Link from "next/link";
+import { CitizenPage } from "@/components/citizen/CitizenPage";
+import { Label, Button, LinkButton } from "@/components/explore/ExplorePage";
+import s from "@/components/citizen/citizen.module.css";
 import { Portrait } from "@/components/Portrait";
-import { api, clock, dayOf, type TownEvent, type Life } from "@/lib/api";
+import { api, hhmm, dayOf, type TownEvent, type Life } from "@/lib/api";
 
-type Book = { id: string; name: string; persona: Record<string, unknown>; arrivedT: number; leftT: number | null; events: TownEvent[]; memories: { t: number; kind: string; text: string; importance: number }[]; letters: { direction: string; text: string; t: number }[] };
+type Book = {
+  id: string;
+  name: string;
+  persona: Record<string, unknown>;
+  arrivedT: number;
+  leftT: number | null;
+  events: TownEvent[];
+  memories: { t: number; kind: string; text: string; importance: number }[];
+  letters: { direction: string; text: string; t: number }[];
+};
 export default function BookPage() {
   const { id } = useParams<{ id: string }>();
-  const [b, setB] = useState<Book | null>(null); const [err, setErr] = useState<string | null>(null); const [day, setDay] = useState<number | null>(null); const [life, setLife] = useState<Life | null>(null);
-  useEffect(() => { void api<Book>(`/api/agents/${id}/book`).then(setB).catch((e) => setErr((e as Error).message)); void api<Life>(`/api/library/${id}`).then(setLife).catch(() => setLife(null)); }, [id]);
-  if (err) return <Page><Problem text={err} /></Page>;
-  if (!b) return <Page><Loading what="Opening the book." /></Page>;
-  const first = b.name.split(" ")[0];
-  const days = [...new Set([...b.events.map((e) => dayOf(e.t)), ...b.memories.map((m) => dayOf(m.t))])].sort((x, y) => x - y);
-  const cur = day ?? days[days.length - 1] ?? 1;
-  const evs = b.events.filter((e) => dayOf(e.t) === cur && e.importance >= 0.25 && e.kind !== "agent.reflect");
-  const refl = b.memories.filter((m) => dayOf(m.t) === cur && m.kind === "reflect");
-  const lets = b.letters.filter((l) => dayOf(l.t) === cur);
-  return (
-    <Page>
-      {life && life.text && (
-        <Card className="px-6 sm:px-10 py-8"><Label>What the town wrote · on the library shelf</Label><h2 className="display text-[28px] font-bold leading-tight">{life.title}</h2><p className="italic text-ink2 mb-2">{life.epitaph}</p><div className="flex flex-col gap-3 max-w-[68ch]">{life.text.split(/\n\n+/).map((para, i) => <p key={i} className="text-[16px] leading-[1.6]">{para}</p>)}</div><LinkButton href="/library" kind="secondary" size={36} className="mt-4 self-start">The whole library</LinkButton></Card>
-      )}
-      <div className="grid gap-5 grow grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
-        <Card className="p-6"><Portrait name={b.name} appearance={(b.persona as { appearance?: Record<string, unknown> }).appearance ?? null} age={Number(b.persona.age ?? 30)} size={96} /><div className="display text-2xl font-bold">The book of {first}</div><div className="text-[13px] text-drift">Day {dayOf(b.arrivedT)} to {b.leftT ? `day ${dayOf(b.leftT)}` : "today"} · {b.memories.length} memories · {b.letters.length} letters</div><div className="flex flex-col gap-0.5 mt-2 max-h-[400px] overflow-auto">{days.map((d) => <button key={d} onClick={() => setDay(d)} className={`text-left px-3 py-2 rounded-2xl text-sm ${d === cur ? "bg-glass font-bold" : "text-ink2"}`}>Day {d}</button>)}</div>{b.leftT === null && <LinkButton href="/digest" kind="secondary" size={36} className="mt-auto">Back to today</LinkButton>}</Card>
-        <Card className="px-6 sm:px-10 py-8 min-h-0 overflow-auto"><Label>Day {cur}</Label><h1 className="text-[30px] font-bold">{refl[0]?.text.split(/[.!?]/)[0] ?? evs[0]?.text.split(/[.!?]/)[0] ?? "A quiet day"}.</h1>
-          {refl.map((r, i) => <Bubble key={i} max={640}>“{r.text}”</Bubble>)}
-          <div className="flex flex-col mt-2">{evs.map((e) => <div key={e.id} className="grid gap-x-3 py-2 border-b border-line last:border-0 text-[15px] grid-cols-[70px_minmax(0,1fr)]"><span className="text-[13px] text-drift tabular">{clock(e.t).slice(-5)}</span><span>{e.text.length > 260 ? e.text.slice(0, 258) + "…" : e.text}</span></div>)}</div>
-          {evs.length === 0 && refl.length === 0 && <p className="text-drift text-sm">Nothing on the record for this day.</p>}
-          <p className="text-xs text-drift mt-4">Written from the record. Nothing here is invented; every line is a memory, a letter, or something that happened on the street.</p></Card>
-        <div className="flex flex-col gap-4">
-          <Card><Label>Letters this day</Label>{lets.length === 0 && <p className="text-sm text-drift">None.</p>}{lets.map((l, i) => <Bubble key={i} mine={l.direction === "to_agent"} max={280}>{l.direction === "to_agent" ? l.text : `“${l.text}”`}</Bubble>)}</Card>
-          <Card tone="glass"><Label tone="teal">The secret</Label><p className="text-sm">{String(b.persona.secret ?? "")}</p><p className="text-xs text-ink2">{b.leftT ? "It left with them." : "Still a secret, as far as the record shows."}</p></Card>
+  const [b, setB] = useState<Book | null>(null);
+  const [err, setErr] = useState("");
+  const [day, setDay] = useState<number | null>(null);
+  const [life, setLife] = useState<Life | null>(null);
+  const [eventCount, setEventCount] = useState(20);
+  useEffect(() => {
+    setEventCount(20);
+  }, [day, id]);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setB(null);
+    setErr("");
+    setLife(null);
+    setDay(null);
+    void api<Book>(`/api/agents/${id}/book`)
+      .then((value) => {
+        if (active) setB(value);
+      })
+      .catch(() => {
+        if (active)
+          setErr(
+            "This book couldn’t be opened. Sign in with the account that owns this citizen, or try again.",
+          );
+      });
+    void api<Life>(`/api/library/${id}`)
+      .then((value) => {
+        if (active) setLife(value);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [id, attempt]);
+  if (!b)
+    return (
+      <CitizenPage>
+        <div className={s.empty} role={err ? "alert" : "status"}>
+          {err || "Opening the book…"}
         </div>
+        {err && (
+          <div className={s.actions}>
+            <Button onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
+            <LinkButton
+              href={`/gate?next=${encodeURIComponent(`/agent/${id}/book`)}`}
+              kind="secondary"
+            >
+              Sign in
+            </LinkButton>
+            <LinkButton href={`/agent/${id}`} kind="secondary">
+              Citizen profile
+            </LinkButton>
+          </div>
+        )}
+      </CitizenPage>
+    );
+  const first = b.name.split(" ")[0];
+  const days = [
+    ...new Set([
+      dayOf(b.arrivedT),
+      ...b.events.map((e) => dayOf(e.t)),
+      ...b.memories.map((m) => dayOf(m.t)),
+      ...b.letters.map((l) => dayOf(l.t)),
+    ]),
+  ].sort((x, y) => x - y);
+  const cur = day ?? days[days.length - 1] ?? dayOf(b.arrivedT);
+  const index = days.indexOf(cur);
+  const evs = b.events.filter(
+    (e) =>
+      dayOf(e.t) === cur && e.importance >= 0.25 && e.kind !== "agent.reflect",
+  );
+  const refl = b.memories.filter(
+    (m) => dayOf(m.t) === cur && m.kind === "reflect",
+  );
+  const letters = b.letters.filter((l) => dayOf(l.t) === cur);
+  return (
+    <CitizenPage signedIn>
+      <nav className={s.breadcrumb} aria-label="Breadcrumb">
+        <Link href={`/agent/${id}`}>{b.name}</Link>
+        <span>/</span>
+        <span>Life book</span>
+      </nav>
+      <section className={s.hero}>
+        <Portrait
+          name={b.name}
+          appearance={(b.persona.appearance as Record<string, unknown>) ?? null}
+          age={Number(b.persona.age ?? 30)}
+          size={180}
+        />
+        <div>
+          <Label>A life, kept on the record</Label>
+          <h1>The book of {first}.</h1>
+          <p className={s.meta}>
+            Day {dayOf(b.arrivedT)} to{" "}
+            {b.leftT !== null ? `day ${dayOf(b.leftT)}` : "today"} ·{" "}
+            {b.memories.length} memories · {b.letters.length} letters
+          </p>
+          <div className={s.actions}>
+            <LinkButton href={`/agent/${id}`} kind="secondary">
+              Citizen profile
+            </LinkButton>
+            {b.leftT === null && (
+              <LinkButton href="/digest">Back to today</LinkButton>
+            )}
+          </div>
+        </div>
+        <div className={s.status}>
+          <Label>Private life book</Label>
+          <p className={s.meta}>
+            Memories, letters and moments from {first}’s days on the island.
+          </p>
+        </div>
+      </section>
+      {life?.text && (
+        <section className={s.library}>
+          <Label>On the library shelf · written by the town</Label>
+          <h2>{life.title}</h2>
+          <p>
+            <i>{life.epitaph}</i>
+          </p>
+          {life.text.split(/\n\n+/).map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+          <LinkButton href="/library" kind="secondary">
+            Visit the library
+          </LinkButton>
+        </section>
+      )}
+      <div className={s.bookGrid}>
+        <aside>
+          <Label>Days on the record</Label>
+          <nav className={s.dayNav} aria-label="Choose a day">
+            {days.map((d) => (
+              <button
+                key={d}
+                aria-current={d === cur ? "date" : undefined}
+                aria-controls="book-day"
+                onClick={() => setDay(d)}
+              >
+                Day {d}
+              </button>
+            ))}
+          </nav>
+        </aside>
+        <article
+          id="book-day"
+          className={s.reading}
+          aria-live="polite"
+          aria-atomic="false"
+        >
+          <Label>Day {cur}</Label>
+          <h2>
+            {refl[0]?.text.split(/[.!?]/)[0] ||
+              evs[0]?.text.split(/[.!?]/)[0] ||
+              (letters.length ? "A letter across the water" : "A quiet day")}
+            .
+          </h2>
+          {refl.slice(0, 3).map((r, i) => (
+            <blockquote key={i} className={s.reflection}>
+              {r.text}
+            </blockquote>
+          ))}
+          {refl.length > 3 && (
+            <details key={cur} className={s.more}>
+              <summary>Read {refl.length - 3} more reflections</summary>
+              {refl.slice(3).map((r, i) => (
+                <blockquote key={i} className={s.reflection}>
+                  {r.text}
+                </blockquote>
+              ))}
+            </details>
+          )}
+          <div className={s.timeline}>
+            {evs.slice(0, eventCount).map((e) => (
+              <div className={s.event} key={e.id}>
+                <time>{hhmm(e.t)}</time>
+                <p>{e.text}</p>
+              </div>
+            ))}
+          </div>
+          {evs.length > eventCount && (
+            <Button
+              kind="secondary"
+              onClick={() => setEventCount((n) => n + 20)}
+            >
+              Read more moments ({evs.length - eventCount} remaining)
+            </Button>
+          )}
+          {!evs.length && !refl.length && (
+            <p className={s.empty}>
+              {letters.length
+                ? "No street moments or reflections recorded. The day’s letters are alongside this page."
+                : "Nothing on the record for this day."}
+            </p>
+          )}
+          <div className={s.pager}>
+            <Button
+              kind="secondary"
+              disabled={index === 0}
+              onClick={() => setDay(days[index - 1] ?? cur)}
+            >
+              ← Earlier
+            </Button>
+            <Button
+              kind="secondary"
+              disabled={index === days.length - 1}
+              onClick={() => setDay(days[index + 1] ?? cur)}
+            >
+              Later →
+            </Button>
+          </div>
+          <p className={s.note}>
+            Written from memories, letters and events recorded on the island.
+          </p>
+        </article>
+        <aside className={s.sidebar} aria-label="Letters and private notes">
+          <div>
+            <Label>Letters · day {cur}</Label>
+            {!letters.length && <p className={s.empty}>No letters this day.</p>}
+            {letters.map((l, i) => (
+              <div className={s.letter} key={`${cur}:${i}`}>
+                <Label>
+                  {l.direction === "to_agent"
+                    ? `You → ${first}`
+                    : `${first} → You`}{" "}
+                  · {hhmm(l.t)}
+                </Label>
+                <p>{l.text}</p>
+              </div>
+            ))}
+          </div>
+          <div className={s.private}>
+            <Label>The secret · only you</Label>
+            <p>{String(b.persona.secret ?? "") || "No secret recorded."}</p>
+            <p className={s.note}>
+              {b.leftT !== null
+                ? "It left with them."
+                : "Still a secret, as far as the record shows."}
+            </p>
+          </div>
+        </aside>
       </div>
-    </Page>
+    </CitizenPage>
   );
 }

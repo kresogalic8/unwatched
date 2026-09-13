@@ -20,7 +20,8 @@ function Count({ n, size = "md" }: { n: number | null; size?: "sm" | "md" }) {
  */
 export async function GitHubStars({ variant = "button" }: { variant?: "compact" | "hero" | "button" }) {
   const n = await stars();
-  const label = n === null ? "Unwatched on GitHub" : `Unwatched on GitHub, ${n} ${n === 1 ? "star" : "stars"}`;
+  const visibleLabel = variant === "compact" ? "GitHub" : "Star on GitHub";
+  const label = n === null ? `${visibleLabel}: Unwatched` : `${visibleLabel}: Unwatched, ${n} ${n === 1 ? "star" : "stars"}`;
   const outline = "rounded-[8px] border-[1.5px] border-[rgba(247,246,243,0.3)] text-kelp font-bold inline-flex items-center hover:border-kelp hover:bg-[rgba(247,246,243,0.06)] active:translate-y-px transition-colors";
   if (variant === "compact") return <a href={GITHUB_URL} className={`h-9 pl-3 pr-3 gap-2 text-[15px] ${outline}`} aria-label={label}><Mark size={16} />GitHub<Count n={n} size="sm" /></a>;
   if (variant === "hero") return <a href={GITHUB_URL} className={`h-[56px] px-6 gap-2.5 text-[17px] ${outline}`} aria-label={label}><Mark size={20} />Star on GitHub<Count n={n} /></a>;

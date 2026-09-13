@@ -15,7 +15,7 @@ export function ProjectDetails({ project, site, stock, demo = false }: { demo?: 
     <details><summary className="cursor-pointer text-teal">Who contributed</summary><ul className="mt-2 space-y-1">{project.members.filter(m=>m.coins || m.help || m.labor).map(m=><li key={m.id}>{demo ? <span>{m.name ?? m.id}</span> : <a href={`/agent/${m.id}`} className="underline">{m.name ?? m.id}</a>} · {m.coins} coins · {m.labor} mornings{m.help ? " · volunteering" : ""}</li>)}</ul></details>
   </div>;
 }
-export function CommunityProjects({ demo = false }: { demo?: boolean }) {
+export function CommunityProjects({ demo = false, embedded = false }: { demo?: boolean; embedded?: boolean }) {
   const [events,setEvents] = useState<TownEvent[]>([]);
   const [places,setPlaces]=useState<ProjectPlace[]|null>(null),[error,setError]=useState(false);
   useEffect(()=>{
@@ -23,7 +23,7 @@ export function CommunityProjects({ demo = false }: { demo?: boolean }) {
     void refresh();const interval=setInterval(()=>{if(document.visibilityState==="visible")void refresh();},15000);
     return()=>{live=false;clearInterval(interval);};
   },[demo]);
-  return <section className="max-w-[1240px] mx-auto px-5 pt-10 pb-4" aria-labelledby="shared-projects-title">
+  return <section className={embedded ? "w-full pb-4" : "max-w-[1240px] mx-auto px-5 pt-10 pb-4"} aria-labelledby="shared-projects-title">
     <p className="label text-teal">{demo ? "Scripted engine scenario · no live model · not the live island" : "Decided by the citizens"}</p><h2 id="shared-projects-title" className="display text-3xl mt-2">What they are building together</h2>
     <p className="mt-3 max-w-2xl text-ink2">A neighbor proposes a garden. Others bring coins and mornings of work. What grows here depends on who turns up.</p>
     {error && <p role="status" className="mt-4 text-ink2">Could not refresh the island’s projects. Retrying shortly.</p>}

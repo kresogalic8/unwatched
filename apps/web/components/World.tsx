@@ -19,6 +19,7 @@ import { Particles } from "./world/particles";
 import { drawGround, drawRoads, segmentsOf, keepOffRoads, Wear } from "./world/terrain";
 import { Interior, type InteriorPerson } from "./Interior";
 import { Portrait } from "./Portrait";
+import townStyle from "./town/town.module.css";
 
 /**
  * The island, drawn by PixiJS from the live event stream, in the Tide style.
@@ -77,7 +78,8 @@ function lookSvg(hash: string): Promise<string | null> {
 
 type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Citizen; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
-export function World({ mineId, onSelect, view, effects = true }: { mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean }) {
+export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
+export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot }: { mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; onSnapshot?: (snapshot: WorldSnapshot) => void }) {
   const host = useRef<HTMLDivElement>(null);
   const cameraControl = useRef<((action: "in" | "out" | "reset") => void) | null>(null);
   const [labels, setLabels] = useState<{ id: string; name: string; x: number; y: number; mine: boolean; shown: boolean; bubble?: string }[]>([]);
@@ -243,7 +245,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
         const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(0, p.site ? 22 : 6); t.zIndex = 100000; g.addChild(t);
         g.position.set(p.x, p.y);
         g.eventMode = "static"; g.cursor = "pointer"; const bounds=g.getLocalBounds(); g.hitArea=new Rectangle(bounds.x-8,bounds.y-8,bounds.width+16,bounds.height+16);
-        g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); setPlaceInfo({ community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
+        g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); onSelect(null); setPlaceInfo({ community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
       };
       for (const p of places.values()) drawPlace(p);
       const decor = keepOffRoads(decorFor([...places.values()]), segs);
@@ -364,7 +366,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           const g = new Container();
           const rig = new Citizen(aged(lookFor(a.name, a.appearance as Partial<Look> | null), a.age)); rig.scale.set(0.82); rig.age(a.age); rig.trade(a.job); rig.hold(a.carrying ?? null); g.addChild(rig);
           g.eventMode = "static"; g.cursor = "pointer"; g.hitArea = { contains: (x: number, y: number) => x > -18 && x < 18 && y > -66 && y < 0 } as never;
-          g.on("pointertap", () => { if (performance.now() >= suppressSelectUntil) onSelect(agents.current.get(a.id) ?? null); });
+          g.on("pointertap", () => { if (performance.now() >= suppressSelectUntil) { setPlaceInfo(null); onSelect(agents.current.get(a.id) ?? null); } });
           g.on("pointerover", () => { hoverRef.current = a.id; }); g.on("pointerout", () => { if (hoverRef.current === a.id) hoverRef.current = null; });
           scene.addChild(g);
           const seat = seatOf.current.get(a.location) ?? 0; seatOf.current.set(a.location, (seat + 1) % 10);
@@ -681,21 +683,23 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
         perfMark("end");
       });
     })().catch(() => { if(alive) setLoadError(true); });
-    return () => { alive = false; cameraControl.current = null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); seatOf.current.clear(); };
+    return () => { alive = false; cameraControl.current = null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineId]);
+
+  useEffect(() => { onSnapshot?.({ clock, feed, citizens: [...agents.current.values()], ready, error: loadError }); }, [clock, feed, ready, loadError, onSnapshot]);
 
   useEffect(() => { camera.current.follow = mineId; camera.current.hand = null; }, [mineId]);
   const z = camera.current.zoom;
   const showLabels = view === "street" || z > 0.6;
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-[28px] bg-glass">
+    <div className={`absolute inset-0 overflow-hidden rounded-[28px] bg-glass ${observer ? townStyle.world : ""}`}>
       <div ref={host} className="absolute inset-0" />
       {!ready && <div className="absolute inset-0 flex flex-col gap-3 items-center justify-center text-teal font-bold">{loadError ? <>The island could not be loaded.<button className="underline" onClick={()=>window.location.reload()}>Try again</button></> : "Crossing to the island…"}</div>}
       <div className="absolute inset-0 pointer-events-none crossfade" style={{ background: "radial-gradient(ellipse at center, rgba(30,42,43,0) 55%, rgba(30,42,43,0.22) 100%)", opacity: view === "map" ? 0.5 : view === "cinema" ? 1 : 0.7 }} />
-      <button hidden={cleanUi} onClick={() => { const a = ambienceRef.current; if (!a) return; if (sound) { void a.disable(); setSound(false); } else { void a.enable().then(() => setSound(true)); } }} className="absolute right-3 top-3 sm:right-6 sm:top-6 h-9 px-3.5 rounded-full bg-shell text-teal text-[13px] font-bold pointer-events-auto transition-colors" aria-pressed={sound}>{sound ? "Sound on" : "Sound off"}</button>
-      {ready && view === "street" && !cleanUi && !placeInfo && <div role="group" aria-label="Camera controls" className="absolute right-3 top-16 sm:right-6 sm:top-20 flex flex-col rounded-2xl bg-shell text-teal shadow-sm overflow-hidden">
+      <button data-world-control="sound" hidden={cleanUi} onClick={() => { const a = ambienceRef.current; if (!a) return; if (sound) { void a.disable(); setSound(false); } else { void a.enable().then(() => setSound(true)); } }} className="absolute right-3 top-3 sm:right-6 sm:top-6 h-9 px-3.5 rounded-full bg-shell text-teal text-[13px] font-bold pointer-events-auto transition-colors" aria-pressed={sound}>{sound ? "Sound on" : "Sound off"}</button>
+      {ready && view === "street" && !cleanUi && !placeInfo && <div data-world-control="camera" role="group" aria-label="Camera controls" className="absolute right-3 top-16 sm:right-6 sm:top-20 flex flex-col rounded-2xl bg-shell text-teal shadow-sm overflow-hidden">
         <button aria-label="Zoom in" title="Zoom in" onClick={() => cameraControl.current?.("in")} className="w-11 h-11 text-2xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">+</button>
         <button aria-label="Zoom out" title="Zoom out" onClick={() => cameraControl.current?.("out")} className="w-11 h-11 text-2xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">−</button>
         <button aria-label="Recenter camera" title="Recenter camera" onClick={() => cameraControl.current?.("reset")} className="w-11 h-11 text-xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">⌖</button>
@@ -709,12 +713,12 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
           </div>
         ))}
       </div>
-      {mini && !cleanUi && <svg className="absolute right-3 bottom-3 sm:right-6 sm:bottom-6 hidden sm:block rounded-2xl bg-shell/90 pointer-events-none" width={180} height={Math.round(180 * mini.h / mini.w)} viewBox={`0 0 ${mini.w} ${mini.h}`} aria-hidden>
+      {mini && !cleanUi && <svg data-world-control="mini" className="absolute right-3 bottom-3 sm:right-6 sm:bottom-6 hidden sm:block rounded-2xl bg-shell/90 pointer-events-none" width={180} height={Math.round(180 * mini.h / mini.w)} viewBox={`0 0 ${mini.w} ${mini.h}`} aria-hidden>
         {mini.places.filter((p) => p.kind !== "public" && p.kind !== "wild").map((p) => <circle key={p.id} cx={p.x} cy={p.y} r={p.kind === "plot" ? 22 : 34} fill={p.kind === "plot" ? "#B9CFC8" : "#1F5F5B"} opacity={0.55} />)}
         {mini.people.map((pp, i) => <circle key={i} cx={pp.x} cy={pp.y} r={pp.mine ? 30 : 16} fill={pp.mine ? "#E8735A" : "#1E2A2B"} />)}
         <rect x={mini.view.x} y={mini.view.y} width={mini.view.w} height={mini.view.h} fill="none" stroke="#1F5F5B" strokeWidth={18} rx={40} />
       </svg>}
-      {placeInfo && <div className="absolute right-3 top-14 sm:right-6 sm:top-16 w-[min(320px,calc(100%-24px))] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
+      {placeInfo && !cleanUi && <div data-world-control="place" className="absolute right-3 top-14 sm:right-6 sm:top-16 w-[min(320px,calc(100%-24px))] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
         <div className="flex justify-between items-baseline gap-2"><div><div className="label">{placeInfo.district}</div><div className="display text-[20px] font-semibold">{placeInfo.name}</div></div><button onClick={() => setPlaceInfo(null)} className="text-sm text-drift">Close</button></div>
         {!placeInfo.community && placeInfo.kind !== "plot" && placeInfo.kind !== "wild" && <Interior kind={placeInfo.kind} sprite={placeInfo.sprite} hour={clock?.hour ?? 12} people={placeInfo.people} />}
         {placeInfo.community && <ProjectDetails project={placeInfo.community} site={placeInfo.site} stock={placeInfo.stock} />}
@@ -724,7 +728,7 @@ export function World({ mineId, onSelect, view, effects = true }: { mineId: stri
         {placeInfo.kind === "plot" && !placeInfo.site && !placeInfo.community && <div className="text-sm text-ink2">Empty land. A house costs 15 coins and six mornings; a shop 30 and ten.</div>}
         <div className="text-sm">{placeInfo.people.length === 0 ? <span className="text-drift">Nobody here right now.</span> : placeInfo.people.map((pp) => <div key={pp.name} className="flex items-center gap-2 py-0.5"><Portrait name={pp.name} appearance={pp.appearance} age={pp.age ?? 30} size={26} /><span>{pp.name}{pp.asleep ? ", asleep" : pp.job ? `, ${pp.job}` : ""}</span></div>)}</div>
       </div>}
-      <div hidden={cleanUi} className="absolute left-3 bottom-3 sm:left-6 sm:bottom-6 bg-shell rounded-card p-3 sm:p-4 w-[calc(100%-24px)] sm:w-[330px] flex flex-col gap-1.5 pointer-events-auto max-h-[38%] sm:max-h-none overflow-hidden">
+      <div hidden={cleanUi || observer} className="absolute left-3 bottom-3 sm:left-6 sm:bottom-6 bg-shell rounded-card p-3 sm:p-4 w-[calc(100%-24px)] sm:w-[330px] flex flex-col gap-1.5 pointer-events-auto max-h-[38%] sm:max-h-none overflow-hidden">
         <div className="label">Just now{clock ? ` · day ${clock.day} ${String(clock.hour).padStart(2, "0")}:${String(clock.minute % 60).padStart(2, "0")} · ${clock.weather}${typeof clock.temperatureC === "number" ? ` · ${Math.round(clock.temperatureC)}°` : ""}` : ""}</div>
         {feed.slice(0, 6).map((e) => <div key={e.id} className="grid gap-x-2.5 items-center" style={{ gridTemplateColumns: "44px 14px 1fr" }}><span className="text-[12px] text-drift tabular">{String(Math.floor((e.t % 1440) / 60)).padStart(2, "0")}:{String(e.t % 60).padStart(2, "0")}</span><span className="rounded-full" style={{ width: e.importance >= 0.45 ? 10 : 7, height: e.importance >= 0.45 ? 10 : 7, background: e.importance >= 0.45 ? "#E8735A" : "#1F5F5B" }} /><span className={`text-[13px] leading-tight line-clamp-2 ${e.importance >= 0.45 ? "font-semibold" : ""}`}>{e.text}</span></div>)}
         {feed.length === 0 && <div className="text-sm text-drift">A quiet minute on the island.</div>}

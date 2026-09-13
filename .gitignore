@@ -15,3 +15,6 @@ apps/web/public/sound/*.wav
 .next
 apps/headless/out-or
 apps/headless/out-mock
+
+# Generated local email previews
+/artifacts/email-preview/

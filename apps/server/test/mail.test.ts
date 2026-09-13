@@ -5,7 +5,7 @@ describe("the morning mail", () => {
   it("writes the digest as paper and ink, with the three lines and one button, and no outside assets", () => {
     const m = digestMail({ to: "owner@example.com", name: "Mira Kovač", day: 9, headline: "Mira took the mill job", text: "She asked twice and got it.", lines: ["day 9 08:00: Mira asked at the mill.", "day 9 09:00: The miller said yes."], url: "https://unwatched.world/digest" });
     expect(m.subject).toBe("Mira took the mill job");
-    expect(m.html).toContain("#F7F6F3"); expect(m.html).toContain("#14161A"); expect(m.html).toContain("#E4572E"); expect(m.html).toContain("#1E5A63");
+    expect(m.html).toContain("#F2F1EB"); expect(m.html).toContain("#20291F"); expect(m.html).toContain("#E4572E"); expect(m.html).toContain("Manage email preferences");
     expect(m.html).toContain("Familjen Grotesk");
     expect(m.html).toContain("The miller said yes.");
     expect(m.html).toContain('href="https://unwatched.world/digest"');

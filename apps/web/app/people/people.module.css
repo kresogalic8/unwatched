@@ -1,0 +1,31 @@
+.hero { display:flex; flex-direction:column; gap:18px; }
+.hero h1 { font-size:clamp(38px,4.5vw,64px); font-weight:500; letter-spacing:-.055em; line-height:1.05; }
+.hero p { color:var(--muted); font-size:18px; max-width:55ch; line-height:1.6; }
+.layout { display:grid; grid-template-columns:350px minmax(0,1fr); gap:7%; }
+.sectionHeading { display:flex; justify-content:space-between; gap:16px; align-items:baseline; }
+.sectionHeading h2 { font-size:22px; font-weight:500; }
+.sectionHeading > span { color:var(--muted); font-size:14px; }
+.muted { font-size:14px; color:var(--muted); line-height:1.65; }
+.directory > p { margin:12px 0 24px; }
+.list { display:flex; flex-direction:column; }
+.list button { display:flex; align-items:center; gap:16px; padding:18px 12px; border-top:1px solid var(--rule); text-align:left; transition:background .2s; }
+.list button:hover { background:var(--surface); }
+.list button[aria-pressed=true] { background:var(--surface); box-shadow:inset 2px 0 var(--accent); }
+.list button > span:nth-child(2) { flex:1; }
+.list strong { font-size:15px; font-weight:500; display:block; }
+.list small { color:var(--muted); font-size:12px; display:block; margin-top:5px; }
+.initial { width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--rule); border-radius:50%; font-size:16px; }
+.detail { border-left:1px solid var(--rule); padding-left:36px; display:flex; flex-direction:column; align-items:flex-start; gap:20px; min-width:0; }
+.detail h2 { font-size:38px; font-weight:500; letter-spacing:-.04em; }
+.trust { width:100%; padding:24px 0; border-block:1px solid var(--rule); display:flex; flex-direction:column; gap:12px; }
+.trust strong { font-size:26px; font-weight:500; text-transform:capitalize; }
+.trust p,.opinion p { font-size:14px; color:var(--muted); line-height:1.7; }
+.trust meter { width:100%; max-width:300px; height:8px; appearance:none; background:var(--surface); border-radius:4px; }
+.trust meter::-webkit-meter-bar { background:var(--surface); border:none; }
+.trust meter::-webkit-meter-optimum-value { background:var(--accent); }
+.trust meter::-moz-meter-bar { background:var(--accent); }
+.opinion { display:flex; flex-direction:column; gap:16px; padding:8px 0; }
+.opinion blockquote { font-size:23px; line-height:1.6; letter-spacing:-.02em; }
+@media(max-width:760px) { .layout { grid-template-columns:1fr; gap:32px; } .detail { padding:28px 0 0; border-left:0; border-top:1px solid var(--rule); } .detail h2 { font-size:32px; } }
+.list { max-height:640px; overflow-y:auto; padding:6px; margin-inline:-6px; }
+@media(max-width:760px) { .list { max-height:300px; } }

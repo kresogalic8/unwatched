@@ -20,7 +20,7 @@ export async function currentOwner(): Promise<{ id: string; email?: string } | n
 }
 /** A dev name travels in a header, which only carries Latin-1, so it becomes a plain slug: "Mira Kovač" is "mira-kovac". */
 export function devName(name: string): string { return name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "visitor"; }
-export async function signInDev(name: string) { localStorage.setItem("ft.owner", devName(name)); }
-export async function signOut() { if (supabase) await supabase.auth.signOut(); try { localStorage.removeItem("ft.owner"); localStorage.removeItem("ft.agent"); } catch {} try { for (const k of Object.keys(sessionStorage)) if (k.startsWith("ft.since.")) sessionStorage.removeItem(k); sessionStorage.removeItem("ft.nudge"); } catch {} }
+export async function signInDev(name: string) { localStorage.setItem("ft.owner", devName(name)); window.dispatchEvent(new Event("unwatched-auth-change")); }
+export async function signOut() { if (supabase) await supabase.auth.signOut(); try { localStorage.removeItem("ft.owner"); localStorage.removeItem("ft.agent"); } catch {} try { for (const k of Object.keys(sessionStorage)) if (k.startsWith("ft.since.")) sessionStorage.removeItem(k); sessionStorage.removeItem("ft.nudge"); } catch {} window.dispatchEvent(new Event("unwatched-auth-change")); }
 export function rememberAgent(id: string) { try { localStorage.setItem("ft.agent", id); } catch {} }
 export function rememberedAgent(): string | null { try { return localStorage.getItem("ft.agent"); } catch { return null; } }

@@ -1,0 +1,26 @@
+.hero { display:flex; flex-direction:column; gap:18px; }
+.hero h1 { font-size:clamp(38px,4.5vw,64px); line-height:1.05; letter-spacing:-.055em; font-weight:500; }
+.hero > p { color:var(--muted); font-size:18px; }
+.layout { display:grid; grid-template-columns:minmax(0,1fr) 350px; gap:7%; align-items:start; }
+.correspondence { min-width:0; display:flex; flex-direction:column; gap:28px; }
+.recipient { display:flex; justify-content:space-between; align-items:center; gap:16px; border-block:1px solid var(--rule); padding:20px 0; }
+.thread { display:flex; flex-direction:column; gap:24px; min-width:0; }
+.empty { padding:32px 0 40px; display:flex; flex-direction:column; gap:16px; color:var(--muted); font-size:15px; line-height:1.7; max-width:58ch; align-items:flex-start; }
+.empty h2 { color:var(--ink); font-size:26px; font-weight:500; letter-spacing:-.03em; }
+.empty a { text-decoration:underline; }
+.sentLetter,.receivedLetter { padding:22px 26px; line-height:1.75; font-size:16px; white-space:pre-wrap; overflow-wrap:anywhere; max-width:90%; }
+.sentLetter { background:var(--surface); border-radius:4px; }
+.receivedLetter { border-left:2px solid var(--accent); }
+.composer { border-top:1px solid var(--rule); padding-top:24px; display:flex; flex-direction:column; gap:14px; }
+.composer > label { font-size:18px; font-weight:500; }
+.input { width:100%; display:block; min-height:150px; padding:16px; background:var(--surface); color:var(--ink); border:1px solid var(--rule); border-radius:4px; font-size:15px; line-height:1.65; resize:vertical; }
+.input::placeholder { color:var(--muted); opacity:1; }
+.input:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.composerActions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
+.sidebar { border-left:1px solid var(--rule); padding-left:28px; min-width:0; }
+.label { font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); }
+@media(max-width:1050px) { .layout { grid-template-columns:minmax(0,1fr) 300px; gap:32px; } .sidebar { padding-left:24px; } }
+@media(max-width:760px) { .layout { grid-template-columns:1fr; gap:40px; } .sidebar { padding:28px 0 0; border-left:0; border-top:1px solid var(--rule); } .recipient { align-items:flex-start; } .recipient > div { align-items:flex-start; } .recipient :global(.display) { font-size:20px; } .hero h1 { font-size:42px; } .sentLetter,.receivedLetter { max-width:95%; padding:18px; } .composerActions > button { width:100%; } }
+.sidebar section > div:first-child { flex-wrap:wrap; gap:8px 16px; }
+.sidebar section > div:first-child > span { max-width:100%; }
+.input:focus-visible { box-shadow:none; }
