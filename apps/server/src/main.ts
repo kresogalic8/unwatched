@@ -1,3 +1,4 @@
+import { DigestCache } from "./digest-cache.ts";
 import { BoardingConnections, verifyBoardingKey } from "./boarding.ts";
 import { adminResolver, backofficeRoutes } from "./backoffice.ts";
 import { configureDeliveryLog } from "./delivery-log.ts";
@@ -94,6 +95,12 @@ const telegramDb = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE
 configureDeliveryLog(telegramDb);
 // Retry content is private and retained only for the provider's deduplication window.
 if(telegramDb) setInterval(()=>{void telegramDb.from('delivery_jobs').update({payload:{},status:'expired'}).in('status',['failed','sending','pending']).lt('created_at',new Date(Date.now()-24*3600000).toISOString()).then(()=>{});},3600000).unref();
+if(telegramDb) {
+ const recordUsage=(funding:string)=>(u:import("@unwatched/cognition").ProviderUsage)=>{void telegramDb.from("provider_usage").insert({agent_id:u.agentId,funding,kind:u.kind,model:u.model,prompt_tokens:u.promptTokens,completion_tokens:u.completionTokens,cached_tokens:u.cachedTokens,cost_usd:u.costUsd}).then(({error})=>{if(error)log("Provider usage persistence failed");});};
+ if(townBrain instanceof OpenRouterBrain)townBrain.onUsage=recordUsage("world");
+ if(subscriberBrain)subscriberBrain.onUsage=recordUsage("subscriber");
+ router.onUsage=recordUsage("user_key");
+}
 const adminOf = adminResolver(telegramDb);
 const selfServeTelegram = !!(telegramDb && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_USERNAME && process.env.TELEGRAM_WEBHOOK_SECRET);
 const telegram = new TelegramLetters({ token: process.env.TELEGRAM_BOT_TOKEN, chat:process.env.TELEGRAM_CHAT_ID, owner:process.env.TELEGRAM_OWNER_ID, agent:process.env.TELEGRAM_AGENT_ID, resolve: selfServeTelegram && telegramDb ? async (owner, agent) => {
@@ -105,9 +112,10 @@ const billing = new Billing(store, log); await billing.load();
 modelsFor = (a) => {
   if (a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan !== "none") return billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
   if (DAILY_CEILING_USD > 0 && metrics.today(town.day).cost >= DAILY_CEILING_USD) return { stakes: MODELS.routine, reflect: MODELS.stakes }; // the ceiling: cheaper minds, same seconds
-  return a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
+  return !a.owner ? {reflect:MODELS.stakes} : null;
 };
 if (subscriberBrain) {
+  subscriberBrain.digestModel = MODELS.stakes;
   subscriberBrain.modelsFor = (a) => a.owner && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
   subscriberBrain.onFallback = f => metrics.fallback(f);
 }
@@ -115,6 +123,7 @@ if(telegramDb) metrics.onAttempt=(a,kind,outcome,duration,t)=>{void telegramDb.f
 const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.wallet(a.owner).plan === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
 const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, creditRefund: billing.refund, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
+town.npcThoughtInterval = 15;
 const waitingTown=new Town({seed:SEED,brain:new MockBrain(SEED)});
 function detachCitizen(a:AgentState){
  town.agents.delete(a.id);
@@ -363,14 +372,15 @@ app.get("/api/agents/:id", async (c) => {
   return c.json(owns(a, owner) ? ownerAgent(town, a) : publicAgent(town, a));
 });
 /** The written digest is one model call; it is remembered for the sim hour so a page refresh costs nothing. */
-const digestCache = new Map<string, { key: string; text: string; headline: string }>();
-async function writtenDigest(a: AgentState, since: number): Promise<{ text: string; headline: string } | null> {
-  if (a.owner && billing.wallet(a.owner).plan === "none") return null; // no plan, no mind: the owner still gets the record, written by nobody
-  const key = `${town.day}:${town.hour}:${since}`;
-  const hit = digestCache.get(a.id); if (hit && hit.key === key) return hit;
-  const ctx = town.digestContext(a.id, since); if (!ctx) return null;
-  try { const w = await brain.digest(ctx); const v = { key, ...w }; digestCache.set(a.id, v); return v; }
-  catch (err) { log(`digest failed for ${a.persona.name}: ${(err as Error).message}`); return null; }
+const digestCache = new DigestCache<{text:string;headline:string}>();
+async function writtenDigest(a: AgentState, since: number, explicitRange=false): Promise<{ text: string; headline: string } | null> {
+  if (a.owner && billing.wallet(a.owner).plan === "none") return null;
+  // Reading updates lastDigestT: that cursor must not invalidate the same hour's generated digest.
+  const key = `${a.id}:${town.day}:${town.hour}:${explicitRange?since:"latest"}`;
+  return digestCache.get(key,async()=>{
+    const ctx = town.digestContext(a.id, since); if (!ctx) throw new Error("No digest context");
+    return brain.digest(ctx);
+  },a.id);
 }
 /** An intent is the owner's to read, not the town's. Public streams carry the deed, never the why. */
 function publicEvent(e: TownEvent): TownEvent { if (!e.payload || !("because" in e.payload)) return e; const { because: _b, ...rest } = e.payload; const { payload: _p, ...base } = e; return { ...base, ...(Object.keys(rest).length ? { payload: rest } : {}) } as TownEvent; }
@@ -384,7 +394,7 @@ app.get("/api/agents/:id/digest", async (c) => {
   const read = mine ? await readOf(owner!, a.id) : null;
   const since = sinceFor(a, askedT ?? read?.lastDigestT ?? null);
   const d = town.digest(a.id, since);
-  const written = mine ? await writtenDigest(a, since) : null;
+  const written = mine ? await writtenDigest(a, since, askedT !== null) : null;
   if (!mine) d.items = d.items.map(publicEvent);
   if (read && (read.lastDigestT ?? -1) < town.t) void saveRead({ ...read, lastDigestT: town.t }).catch((err: Error) => log(`read mark failed: ${err.message}`)); // opening the digest is reading it
   return c.json({ ...d, written, since, now: town.t, readAt: read?.lastDigestT ?? null, agent: mine ? ownerAgent(town, a) : publicAgent(town, a), letters: mine ? town.events.filter((e) => e.kind === "agent.letter" && e.actors[0] === a.id && e.t >= since).map((e) => ({ t: e.t, text: String(e.payload?.text ?? e.text) })) : [] });

@@ -1,6 +1,7 @@
 import type { AgentState, Tier } from "./types.ts";
 
 export interface SalienceView {
+  npcThoughtInterval?: number;
   hour: number; t: number; day: number; nearby: AgentState[]; jobsOpenHere: number; plotHere?: boolean; watched?: string | null;
   /** coins owed by them or to them fall due today */
   debtDue?: boolean;
@@ -34,6 +35,7 @@ export function salience(a: AgentState, v: SalienceView): { tier: Tier; why: str
   if (v.gathering && a.gatheringThoughtId !== v.gathering.id) return { tier: 1, why: `gathering: ${v.gathering.what}` };
   if (a.needs.hunger > 0.8 && a.coins > 0 && v.t - a.lastHungerThought >= 120) return { tier: 1, why: "hungry" };
   if (a.letters.some((l) => !l.read) && v.hour >= 6 && v.hour < 9) return { tier: 1, why: "letter" };
+  if(!a.owner && a.brainKind === "hosted" && v.t-a.lastThought < (v.npcThoughtInterval??0))return null;
   const step = dueThought(a, v.hour, v.day);
   if (step && v.t - a.lastThought >= 3) return { tier: 1, why: `plan: ${step.do}` };
   if (v.plotHere && a.coins >= 15 && v.t - a.lastThought > 60 && v.hour >= 7 && v.hour < 19) return { tier: 2, why: "standing on land for sale" };

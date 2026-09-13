@@ -4,6 +4,8 @@ import type { AgentState, Brain, ConverseContext, PaperContext, ReflectContext, 
 import { MockBrain } from "./mock.ts";
 import { WORLD, personaBlock, decidePrompt, conversePrompt, reflectPrompt, paperSystem, paperPrompt, lifeSystem, lifePrompt, judgeSystem, judgePrompt, planPrompt, digestSystem, digestPrompt, childSystem, childPrompt, depthSystem, depthPrompt } from "./prompts.ts";
 
+export interface ProviderUsage { agentId: string | null; kind: CallKind; model: string; promptTokens: number; completionTokens: number; cachedTokens: number; costUsd: number | null; }
+
 export interface OpenRouterBrainOptions {
   /** Production must not deliver mock output as a paid model response. */
   allowFallback?: boolean;
@@ -88,6 +90,7 @@ export class OpenRouterBrain implements Brain {
   private log: (l: string) => void;
   private fallback = new MockBrain(13);
   private providerCost: number | null = 0;
+  onUsage: ((usage: ProviderUsage) => void) | null = null;
   private spent = { calls: 0, prompt: 0, completion: 0 };
   private timeoutMs: number; private reflectTimeoutMs: number;
 
@@ -115,10 +118,13 @@ export class OpenRouterBrain implements Brain {
   modelsFor: ((a: AgentState) => Partial<Models> | null) | null = null;
   /** The island itself, in words, the same for every citizen: places, work, the calendar. Set by the server; part of the shared cached prefix. */
   primer = "";
+  /** Reading summaries need not inherit a Patron's careful-decision upgrade. */
+  digestModel: string | null = null;
   /** Which model a call goes to, for a citizen or for the town. A hook that throws is a hook that said nothing. */
   private pick(kind: CallKind, a: AgentState | null, slot?: Slot) {
     let o: Partial<Models> | null = null;
     try { o = this.modelsFor?.(a ?? TOWN) ?? null; } catch (err) { this.log(`warn: modelsFor threw for ${kind}: ${(err as Error).message}`); }
+    if(kind === "digest" && this.digestModel)return {model:this.digestModel,slot:"stakes" as const};
     return chooseModel(kind, this.models, o, slot);
   }
   /**
@@ -129,10 +135,11 @@ export class OpenRouterBrain implements Brain {
   private cachePersona(a: AgentState) { return a.thinkEvery !== null && a.thinkEvery !== undefined && a.thinkEvery <= 5; }
   private stood<T extends object>(kind: CallKind, model: string, out: T): T { if (!this.allowFallback) throw new Error(`Model unavailable: ${kind} (${model}); no synthetic response delivered`); this.log(`warn: fallback stood in for ${kind} (${model})`); return markFallback(out); }
 
-  private async post(body: unknown, model: string, name: CallKind, slot: Slot): Promise<{ text: string } | null> {
+  private async post(body: unknown, model: string, name: CallKind, slot: Slot, agentId: string | null): Promise<{ text: string } | null> {
     if (Date.now() < this.blockedUntil) throw new Error("Provider unavailable; retry after cooldown");
     const ms = slot === "reflect" ? this.reflectTimeoutMs : this.timeoutMs;
     for (let attempt = 0; attempt < 2; attempt++) {
+      if (Date.now() < this.blockedUntil) throw new Error("Provider unavailable; retry after cooldown");
       // the whole attempt is inside the try: the deadline aborts the body as well as the headers, so an answer that arrives half-read must fall back like any other
       try {
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -142,20 +149,21 @@ export class OpenRouterBrain implements Brain {
           signal: AbortSignal.timeout(ms),
         });
         if (res.status === 429 || res.status >= 500) { this.log(`openrouter ${res.status}; ${attempt === 0 ? "retrying" : "falling back"}`); if (attempt === 1) { this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; } await new Promise((r) => setTimeout(r, 1500)); continue; }
-        if (!res.ok) { if ([401, 402, 403, 429].includes(res.status)) this.blockedUntil = Date.now() + 300000; const msg = (await res.text()).slice(0, 600); this.log(`openrouter ${res.status}: ${msg}`); this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; }
+        if (!res.ok) { const msg = (await res.text()).slice(0, 600); if ([401, 402, 403].includes(res.status)) this.blockedUntil = Date.now() + (/daily limit/i.test(msg)?3600000:300000); this.log(`openrouter ${res.status}: ${msg}`); this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; }
         const data = await res.json() as { choices?: { message?: { content?: string } }[]; usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
         if (typeof data.usage?.cost === "number" && this.providerCost !== null) this.providerCost += data.usage.cost; else this.providerCost = null;
+        try { this.onUsage?.({agentId,kind:name,model,promptTokens:data.usage?.prompt_tokens??0,completionTokens:data.usage?.completion_tokens??0,cachedTokens:data.usage?.prompt_tokens_details?.cached_tokens??0,costUsd:typeof data.usage?.cost === "number" ? data.usage.cost : null}); } catch { this.log("Provider usage reporting failed"); }
         this.spent.calls++; this.spent.prompt += data.usage?.prompt_tokens ?? 0; this.spent.completion += data.usage?.completion_tokens ?? 0; this.cached += data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
         return { text: data.choices?.[0]?.message?.content ?? "" };
       } catch (err) {
         const why = (err as Error).name === "TimeoutError" || (err as Error).name === "AbortError" ? `no answer in ${Math.round(ms / 1000)}s` : `no usable answer: ${(err as Error).message}`;
-        this.log(`openrouter ${why}; ${attempt === 0 ? "retrying" : "falling back"}`); if (attempt === 1) this.onFallback?.({ what: name, model, reason: why }); continue;
+        this.log(`openrouter ${why}; not replaying an uncertain request`); this.onFallback?.({ what: name, model, reason: why }); return null;
       }
     }
     return null;
   }
 
-  private async call<T>(name: CallKind, model: string, slot: Slot, system: { shared: string; own?: string; cacheOwn?: boolean }, user: string, schema: z.ZodType<T>, maxTokens: number): Promise<T | null> {
+  private async call<T>(name: CallKind, model: string, slot: Slot, system: { shared: string; own?: string; cacheOwn?: boolean }, user: string, schema: z.ZodType<T>, maxTokens: number, agentId: string | null = null): Promise<T | null> {
     // Providers behind OpenRouter accept a subset of JSON Schema: no regex patterns, no defaults, anyOf not oneOf.
     // The schema goes in the request as a strict format and in the system prompt as belt and braces.
     const jsonSchema = wantsStrict(model) ? strictSchema(cleanSchema(z.toJSONSchema(schema))) : cleanSchema(z.toJSONSchema(schema));
@@ -168,7 +176,7 @@ export class OpenRouterBrain implements Brain {
     ] }, { role: "user", content: user }];
     const body = { model, max_tokens: maxTokens, messages, response_format: { type: "json_schema", json_schema: { name, strict: true, schema: jsonSchema } } };
     for (let attempt = 0; attempt < 2; attempt++) {
-      const got = await this.post(body, model, name, slot); if (!got) return null;
+      const got = await this.post(body, model, name, slot, agentId); if (!got) return null;
       const text = got.text;
       let raw: unknown;
       try { raw = JSON.parse(text.trim().replace(/^```json\s*|```$/g, "")); }
@@ -186,31 +194,31 @@ export class OpenRouterBrain implements Brain {
 
   async decide(p: Perception, a: AgentState, tier: Tier): Promise<ActionProposal> {
     const { model, slot } = this.pick("action_proposal", a, tier >= 2 ? "stakes" : "routine");
-    const out = await this.call("action_proposal", model, slot, { shared: WORLD, own: personaBlock(a), cacheOwn: this.cachePersona(a) }, decidePrompt(p), ActionProposal, 1024);
+    const out = await this.call("action_proposal", model, slot, { shared: WORLD, own: personaBlock(a), cacheOwn: this.cachePersona(a) }, decidePrompt(p), ActionProposal, 1024, a.id);
     return out ?? this.stood("action_proposal", model, await this.fallback.decide(p, a, tier));
   }
   async converse(ctx: ConverseContext): Promise<Dialogue> {
     const { model, slot } = this.pick("dialogue", ctx.a);
-    const out = await this.call("dialogue", model, slot, { shared: WORLD, own: conversePrompt.system(ctx) }, conversePrompt.user(ctx), Dialogue, 1500);
+    const out = await this.call("dialogue", model, slot, { shared: WORLD, own: conversePrompt.system(ctx) }, conversePrompt.user(ctx), Dialogue, 1500, ctx.a.id);
     return out ?? this.stood("dialogue", model, await this.fallback.converse(ctx));
   }
   async reflect(ctx: ReflectContext): Promise<Reflection> {
     // a quiet night (nothing of importance happened, says the engine) is thought through on the middle mind, briefly; the prompt is the same
     const quiet = ctx.agent.budget?.reflectionIncluded !== true && (ctx as { quiet?: boolean }).quiet === true;
     const { model, slot } = this.pick("reflection", ctx.agent, quiet ? "stakes" : "reflect");
-    const out = await this.call("reflection", model, slot, { shared: WORLD, own: personaBlock(ctx.agent), cacheOwn: this.cachePersona(ctx.agent) }, reflectPrompt(ctx), Reflection, quiet ? 900 : 2000);
+    const out = await this.call("reflection", model, slot, { shared: WORLD, own: personaBlock(ctx.agent), cacheOwn: this.cachePersona(ctx.agent) }, reflectPrompt(ctx), Reflection, quiet ? 900 : 2000, ctx.agent.id);
     return out ?? this.stood("reflection", model, await this.fallback.reflect(ctx));
   }
   async plan(ctx: PlanContext, tier: Tier): Promise<DayPlan> {
     const { model, slot } = this.pick("day_plan", ctx.agent, tier >= 2 ? "stakes" : "routine");
-    const out = await this.call("day_plan", model, slot, { shared: WORLD, own: personaBlock(ctx.agent), cacheOwn: this.cachePersona(ctx.agent) }, planPrompt(ctx), DayPlan, 1200);
+    const out = await this.call("day_plan", model, slot, { shared: WORLD, own: personaBlock(ctx.agent), cacheOwn: this.cachePersona(ctx.agent) }, planPrompt(ctx), DayPlan, 1200, ctx.agent.id);
     return out ?? this.stood("day_plan", model, await this.fallback.plan(ctx, tier));
   }
   /** The depth a person has beyond the sheet, written once by the strongest mind and kept with them. */
   async enrich(p: Persona, island: string): Promise<PersonaDepth | null> { const { model, slot } = this.pick("persona_depth", null); return this.call("persona_depth", model, slot, { shared: depthSystem }, depthPrompt(p, island), PersonaDepth, 900); }
   async digest(ctx: DigestContext): Promise<DigestText> {
     const { model, slot } = this.pick("digest", ctx.agent); // the owner's reading is the product: the middle mind writes it
-    const out = await this.call("digest", model, slot, { shared: digestSystem }, digestPrompt(ctx), DigestText, 700);
+    const out = await this.call("digest", model, slot, { shared: digestSystem }, digestPrompt(ctx), DigestText, 700, ctx.agent.id);
     return out ?? this.stood("digest", model, await this.fallback.digest(ctx));
   }
   async child(ctx: ChildContext): Promise<Persona> {
@@ -225,7 +233,7 @@ export class OpenRouterBrain implements Brain {
   }
   async judge(ctx: JudgeContext): Promise<Judgement> {
     const { model, slot } = this.pick("judgement", ctx.agent);
-    const out = await this.call("judgement", model, slot, { shared: judgeSystem }, judgePrompt(ctx), Judgement, 400);
+    const out = await this.call("judgement", model, slot, { shared: judgeSystem }, judgePrompt(ctx), Judgement, 400, ctx.agent.id);
     return out ?? this.stood("judgement", model, await this.fallback.judge(ctx));
   }
   async life(ctx: LifeContext): Promise<LifeText> {

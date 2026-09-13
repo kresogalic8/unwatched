@@ -130,14 +130,14 @@ describe("repairing an answer", () => {
 });
 
 describe("the deadline", () => {
-  it("gives up on a call that never answers, retries once, then falls back", async () => {
+  it("does not replay a timed-out request that may already have been billed", async () => {
     const seen: AbortSignal[] = [];
     vi.stubGlobal("fetch", vi.fn((_url: string, init: { signal: AbortSignal }) => new Promise((_, reject) => { seen.push(init.signal); init.signal.addEventListener("abort", () => reject(init.signal.reason)); })));
     const lines: string[] = [];
     const b = new OpenRouterBrain({ apiKey: "k", ...models, timeoutMs: 30, reflectTimeoutMs: 30, log: (l) => lines.push(l) });
     const out = await b.judge({ agent: citizen("ada"), what: "whistle", withName: null, place: "square", placeKind: "square", hour: 9, weather: "fair", nearby: [], inventory: [], coins: 0, stock: [] } as JudgeContext);
-    expect(seen).toHaveLength(2); expect(isFromFallback(out)).toBe(true);
-    expect(lines[0]).toBe("openrouter no answer in 0s; retrying"); expect(lines[1]).toBe("openrouter no answer in 0s; falling back");
+    expect(seen).toHaveLength(1); expect(isFromFallback(out)).toBe(true);
+    expect(lines[0]).toBe("openrouter no answer in 0s; not replaying an uncertain request");
   });
 });
 
@@ -158,7 +158,7 @@ describe("an answer that arrives broken", () => {
     const out = await b.judge({ agent: citizen("ada"), ...judgeCtx } as JudgeContext);
     expect(isFromFallback(out)).toBe(true);
     expect(falls).toEqual(["no answer in 0s"]);
-    expect(lines[0]).toBe("openrouter no answer in 0s; retrying");
+    expect(lines[0]).toBe("openrouter no answer in 0s; not replaying an uncertain request");
   });
   it("an answer with nothing in it is simply asked again, with no empty turn a provider would refuse", async () => {
     const bodies: { messages: { role: string; content: unknown }[] }[] = [];
@@ -192,4 +192,33 @@ describe('paid service integrity', () => {
     await expect(b.reflect(ctx(citizen('ada')))).rejects.toThrow('cooldown');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('provider cost attribution',()=>{
+ it('reports each billable response including schema repair, with its citizen and actual cost',async()=>{
+  const fetch=vi.fn().mockImplementationOnce(async()=>new Response(JSON.stringify({choices:[{message:{content:'not json'}}],usage:{prompt_tokens:100,completion_tokens:10,cost:0.001}}))).mockImplementationOnce(async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({text:'A calm day.',headline:'Calm'})}}],usage:{prompt_tokens:120,completion_tokens:20,cost:0.002,prompt_tokens_details:{cached_tokens:80}}})));
+  vi.stubGlobal('fetch',fetch);const b=new OpenRouterBrain({apiKey:'test',...models});const usage:unknown[]=[];b.onUsage=u=>usage.push(u);
+  await b.digest({agent:citizen('patron'),name:'Patron',day:1,daysAway:1,events:[],plan:null,letter:null,people:[],coins:0,job:null,home:null,reflection:null,intentions:[],projects:[],trust:[]} as DigestContext);
+  expect(usage).toEqual([expect.objectContaining({agentId:'patron',kind:'digest',model:'sonnet',costUsd:.001}),expect.objectContaining({agentId:'patron',costUsd:.002,cachedTokens:80})]);
+ });
+ it('keeps unknown provider costs unknown',async()=>{
+  fakeFetch([{text:'A day.',headline:'Day'}]);const b=new OpenRouterBrain({apiKey:'test',...models});const usage=vi.fn();b.onUsage=usage;
+  await b.digest({agent:citizen('a'),name:'A',day:1,daysAway:1,events:[],plan:null,letter:null,people:[],coins:0,job:null,home:null,reflection:null,intentions:[],projects:[],trust:[]} as DigestContext);
+  expect(usage).toHaveBeenCalledWith(expect.objectContaining({costUsd:null}));
+ });
+ it('uses a reading model without downgrading paid reflections',async()=>{
+  const {bodies}=fakeFetch([{text:'A day.',headline:'Day'},{summary:'Quiet.',insights:[],opinions:[],intentions:[],letter_to_owner:null}]);
+  const b=new OpenRouterBrain({apiKey:'test',...models});b.modelsFor=()=>({stakes:'opus',reflect:'opus'});b.digestModel='sonnet';
+  const a=citizen('patron');a.budget={tier1Max:120,tier1Left:120,tier2Max:15,tier2Left:15,reflectionIncluded:true};
+  await b.digest({agent:a,name:'A',day:1,daysAway:1,events:[],plan:null,letter:null,people:[],coins:0,job:null,home:null,reflection:null,intentions:[],projects:[],trust:[]} as DigestContext);
+  await b.reflect({agent:a,day:1,dayMemories:[],keyMemories:[],relationships:[],unreadLetters:[],plan:null,projects:[],beliefs:[],watch:[],quiet:true});
+  expect(bodies.map(x=>x.model)).toEqual(['sonnet','opus']);
+ });
+ it('does not retry an exhausted daily key every five minutes',async()=>{
+  let now=1000;const time=vi.spyOn(Date,'now').mockImplementation(()=>now);const fetch=vi.fn(async()=>new Response('Key limit exceeded (daily limit)',{status:403}));vi.stubGlobal('fetch',fetch);
+  try{
+   const b=new OpenRouterBrain({apiKey:'test',...models,allowFallback:false});const ctx={agent:citizen('a'),name:'A',day:1,daysAway:1,events:[],plan:null,letter:null,people:[],coins:0,job:null,home:null,reflection:null,intentions:[],projects:[],trust:[]} as DigestContext;
+   await expect(b.digest(ctx)).rejects.toThrow();now+=10*60000;await expect(b.digest(ctx)).rejects.toThrow('cooldown');expect(fetch).toHaveBeenCalledTimes(1);
+  }finally{time.mockRestore();}
+ });
 });

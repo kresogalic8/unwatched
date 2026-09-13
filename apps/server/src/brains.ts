@@ -16,9 +16,10 @@ export class OwnKeyBrain implements Brain {
   private inner: OpenRouterBrain;
   private last = { calls: 0, prompt: 0, completion: 0 };
   spentToday = 0; day = 0;
-  constructor(readonly row: BrainRow, log: (l: string) => void) {
+  constructor(readonly row: BrainRow, log: (l: string) => void, onUsage?: (u:import("@unwatched/cognition").ProviderUsage)=>void) {
     const m = row.models ?? { routine: "anthropic/claude-haiku-4.5", stakes: "anthropic/claude-sonnet-5", reflect: "anthropic/claude-opus-5" };
     this.inner = new OpenRouterBrain({ apiKey: row.api_key ?? "", routine: m.routine, stakes: m.stakes, reflect: m.reflect, log });
+    this.inner.onUsage=onUsage??null;
   }
   private meter(model: string) { const u = this.inner.usage(); this.spentToday += costOf(model, u.prompt - this.last.prompt, u.completion - this.last.completion); this.last = u; }
   private capped(day: number) { if (day !== this.day) { this.day = day; this.spentToday = 0; } return this.row.daily_cap_usd !== null && this.spentToday >= this.row.daily_cap_usd; }
@@ -111,6 +112,7 @@ export class OwnBrain implements Brain {
 
 /** One brain per agent, the town's brain for everyone else. The engine sees a single Brain. */
 export class BrainRouter implements Brain {
+  onUsage: ((u:import("@unwatched/cognition").ProviderUsage)=>void) | null = null;
   readonly name: string;
   readonly perAgent = new Map<string, OwnKeyBrain | OwnBrain>();
   onBad: ((text: string) => void) | null = null;
@@ -119,7 +121,7 @@ export class BrainRouter implements Brain {
   set(agentId: string, row: BrainRow | null): void {
     this.perAgent.delete(agentId);
     if (!row || row.kind === "hosted") return;
-    if (row.kind === "own_key" && row.api_key) this.perAgent.set(agentId, new OwnKeyBrain(row, this.log));
+    if (row.kind === "own_key" && row.api_key) this.perAgent.set(agentId, new OwnKeyBrain(row, this.log, u=>this.onUsage?.(u)));
     if (row.kind === "own_brain") { const b = new OwnBrain(row, this.log); b.onBad = this.onBad; this.perAgent.set(agentId, b); }
   }
   ownBrainByToken(token: string): OwnBrain | null { for (const b of this.perAgent.values()) if (b instanceof OwnBrain && b.row.token === token) return b; return null; }

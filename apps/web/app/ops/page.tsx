@@ -114,6 +114,7 @@ export default function OpsRoom() {
   const [checking, setChecking] = useState(true);
   const [d, setD] = useState<Ops | null>(null);
   const [overview, setOverview] = useState<Row>({});
+  const [providerUsage,setProviderUsage]=useState<Row[]>([]);
   const [population,setPopulation]=useState<Row[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
@@ -144,6 +145,7 @@ export default function OpsRoom() {
       let nextPopulation:Row[]|undefined;let nextRows:Row[]|undefined;let nextOps:Ops|undefined;let meta:Row|undefined;let nextCount:number|undefined;let nextMembers:Row[]|undefined;
       if (["Overview","Usage","Operations"].includes(tab)) {
         [nextOps,meta,nextPopulation]=await Promise.all([api<Ops>("/api/ops"),api<Row>("/api/backoffice/overview"),api<Row[]>("/api/backoffice/citizens")]);
+        if(tab==="Usage")setProviderUsage(await api<Row[]>("/api/backoffice/provider-usage"));
         if(tab==="Operations")nextRows=await api<Row[]>("/api/backoffice/audit");
       } else if(tab==="Users") {const v=await api<{users:Row[];count:number}>(`/api/backoffice/users?q=${encodeURIComponent(search)}&page=${page}`);nextRows=v.users;nextCount=v.count;}
       else if(tab==="Citizens")nextRows=await api<Row[]>("/api/backoffice/citizens");
@@ -349,6 +351,11 @@ export default function OpsRoom() {
                 </>
               ) : (
                 <>
+                  <section className={s.panel}>
+                    <h2>Provider spend · last 24 hours</h2>
+                    <p className={s.muted}>Actual USD reported by the provider, recorded since cost tracking was enabled. Missing costs are unknown, not zero. Thought allowances are counts, not dollars. External brains are billed outside Unwatched.</p>
+                    <Table rows={providerUsage.map(r=>({...r,citizen:population.find(a=>a.id===r.agent_id)?.name??r.agent_id??"World services",cost_usd:r.cost_usd==null?"Unknown":`$${Number(r.cost_usd).toFixed(4)}`}))} columns={["citizen","funding","calls","cost_usd","unknown_cost_calls","prompt_tokens","completion_tokens","cached_tokens"]}/>
+                  </section>
                   <section className={s.panel}>
                     <h2>Calls per island hour · day {d.clock.day}</h2>
                     <div

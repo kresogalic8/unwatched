@@ -52,6 +52,8 @@ const WEATHERS = ["clear", "clear", "clear", "rain", "rain", "wind", "fog", "sto
 const OUTDOOR_WORK = new Set(["fishhouse", "fields", "orchard", "quarry", "pinewood", "sawpit"]);
 
 export class Town {
+  /** Minimum interval for routine NPC thoughts only; paid entitlements and urgent decisions are unaffected. */
+  npcThoughtInterval = 0;
   private retryAt = new Map<string, number>();
   private creditRefund: ((agent: AgentState, tier: Tier) => void) | undefined;
   readonly rng: Rng;
@@ -320,7 +322,7 @@ export class Town {
       const nearby = this.nearby(a);
       for (const b of nearby) { if (!a.seenToday.includes(b.id)) a.seenToday.push(b.id); this.rel(a, b.id).lastPlace = b.location; }
       const gathering = this.gatheringAhead(a);
-      const s = this.brain.name === "none" || this.paused || (this.retryAt.get(a.id) ?? 0) > this.t ? null : salience(a, { hour: this.hour, t: this.t, day: this.day, nearby, jobsOpenHere: this.openJobsAt(here.id).length, plotHere: here.kind === "plot" && !here.site, watched: this.watched(a, here, nearby), debtDue: a.debtThoughtDay !== this.day && this.debtDueToday(a), gathering });
+      const s = this.brain.name === "none" || this.paused || (this.retryAt.get(a.id) ?? 0) > this.t ? null : salience(a, { npcThoughtInterval:this.npcThoughtInterval, hour: this.hour, t: this.t, day: this.day, nearby, jobsOpenHere: this.openJobsAt(here.id).length, plotHere: here.kind === "plot" && !here.site, watched: this.watched(a, here, nearby), debtDue: a.debtThoughtDay !== this.day && this.debtDueToday(a), gathering });
       const refund = s ? this.reserve(a, s.tier) : null;
       if (s && refund) { thinkers.push({ a, tier: s.tier, why: s.why, refund }); }
       else {

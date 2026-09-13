@@ -186,6 +186,11 @@ export function backofficeRoutes(o: {
   app.get("/backoffice/session", async (c) =>
     c.json(await o.adminOf(c.req.raw)),
   );
+  app.get("/backoffice/provider-usage",async(c)=>{
+    const {data,error}=await db.rpc("provider_usage_summary");
+    if(error)return c.json({error:"Provider usage is unavailable"},503);
+    return c.json(data??[]);
+  });
   app.get("/backoffice/overview", (c) => c.json(o.overview()));
   app.get("/backoffice/citizens", (c) => c.json(o.citizens()));
   app.get("/backoffice/citizens/:id", async (c) => {
