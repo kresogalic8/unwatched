@@ -382,11 +382,26 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) wear.step(f.place, place); f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
       const refreshPlaces = async () => { try { const t = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock)) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
-      poll = setInterval(() => { void fetch(`${API}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => { for (const a of list) ensure(a); }).catch(() => {}); void refreshPlaces(); }, 30000);
+      // Full population snapshots are authoritative, including citizens who were moved off island.
+      const syncPopulation = (list: PublicAgent[]) => {
+        if (!Array.isArray(list)) return;
+        const present = new Set(list.map(a => a.id));
+        let removed = false;
+        for (const id of agents.current.keys()) if (!present.has(id)) {
+          agents.current.delete(id); bubbles.current.delete(id); dialogue.delete(id);
+          if (hoverRef.current === id) hoverRef.current = null;
+          const f = figs.current.get(id);
+          if (f && !f.boarding) { releaseSeat(f); f.g.destroy({children:true}); figs.current.delete(id); }
+          removed = true;
+        }
+        for (const a of list) ensure(a);
+        if (removed) setFeed(feed => [...feed]);
+      };
+      poll = setInterval(() => { void fetch(`${API}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
       ws = new WebSocket(WS);
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data as string) as { type: string; agents?: PublicAgent[]; recent?: TownEvent[]; event?: TownEvent; clock?: Clock };
-        if (msg.type === "hello") { for (const a of msg.agents ?? []) ensure(a); setFeed((msg.recent ?? []).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move").slice(-12).reverse()); if (msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; } setReady(true); }
+        if (msg.type === "hello") { if(msg.agents)syncPopulation(msg.agents); setFeed((msg.recent ?? []).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move").slice(-12).reverse()); if (msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; } setReady(true); }
         if (msg.type === "clock" && msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; }
         if (msg.type === "event" && msg.event) {
           const e = msg.event;
