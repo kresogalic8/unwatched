@@ -183,6 +183,11 @@ export class TownStore {
     if (error) { console.error("brains read failed:", error.message); return []; }
     return ((data ?? []) as BrainRow[]).filter((r) => ids.has(r.agent_id));
   }
+  async admitCitizen(staged: Town, id: string, brain: BrainRow|null): Promise<void> {
+    const a=staged.agents.get(id);if(!a)throw new Error("Missing staged citizen");
+    const {error}=await this.sb.rpc("admit_citizen",{p_agent:{...this.agentRow(a),brain:a.brainKind},p_brain:brain});
+    if(error)throw new Error("Could not save boarding. Your draft is safe; please retry.");
+  }
   async saveBrain(row: BrainRow): Promise<void> {
     const { error } = await this.sb.from("agent_brains").upsert({ ...row, town_id: this.townId }, { onConflict: "agent_id" });
     if (error) console.error("brain save failed:", error.message);

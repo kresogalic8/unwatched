@@ -92,13 +92,20 @@ export class Billing {
     });
     return session.url ? { url: session.url } : { error: "Stripe did not give a checkout link" };
   }
-  async checkoutPlan(ownerId: string, plan: Plan, origin: string): Promise<{ url: string } | { error: string }> {
+  async boardingReady(ownerId:string):Promise<boolean> {
+    const wallet=this.wallet(ownerId);if(wallet.plan==="none")return false;
+    if(!this.stripe)return true; // Local/test mode never charges a card.
+    if(!wallet.stripeCustomer)return false;
+    const subs=await this.stripe.subscriptions.list({customer:wallet.stripeCustomer,status:"all",limit:100});
+    return subs.data.some(sub=>(sub.status==="active"||sub.status==="trialing")&&this.planOf(sub)===wallet.plan);
+  }
+  async checkoutPlan(ownerId: string, plan: Plan, origin: string, returnPath="/account/credits"): Promise<{ url: string } | { error: string }> {
     if (!this.stripe) return { error: "test mode" };
     if (plan === "none") return { error: "no plan is not bought; it is what is left when one ends" };
     const priceId = this.prices.get(LOOKUP[plan]); if (!priceId) return { error: `no Stripe price configured for ${plan}` };
     const w = this.wallet(ownerId);
     const session = await this.stripe.checkout.sessions.create({
-      mode: "subscription", success_url: `${origin}/account/credits?plan=${plan}`, cancel_url: `${origin}/account/credits`, client_reference_id: ownerId, allow_promotion_codes: true,
+      mode: "subscription", success_url: `${origin}${returnPath}?plan=${plan}`, cancel_url: `${origin}${returnPath}?checkout=cancelled`, client_reference_id: ownerId, allow_promotion_codes: true,
       ...(w.stripeCustomer ? { customer: w.stripeCustomer } : {}),
       line_items: [{ price: priceId, quantity: 1 }], metadata: { owner_id: ownerId, plan }, subscription_data: { metadata: { owner_id: ownerId, plan } },
     });

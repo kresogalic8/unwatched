@@ -1,3 +1,4 @@
+import { BoardingConnections, verifyBoardingKey } from "./boarding.ts";
 import { adminResolver, backofficeRoutes } from "./backoffice.ts";
 import { configureDeliveryLog } from "./delivery-log.ts";
 import { telegramRoutes } from "./telegram-routes.ts";
@@ -495,6 +496,8 @@ const brainView = (a: { id: string; brainKind: string }, row: BrainRow | undefin
     streamUrl: `ws://localhost:${PORT}/agent-stream`,
   };
 };
+const boardingConnections=new BoardingConnections();
+const boardingLocks=new Set<string>();
 const brainRows = new Map<string, BrainRow>();
 if (store) for (const row of await store.loadBrains()) brainRows.set(row.agent_id, row);
 app.get("/api/agents/:id/brain", async (c) => {
@@ -536,11 +539,11 @@ app.get("/api/me/wallet", async (c) => {
 });
 app.post("/api/me/plan", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
-  const body = z.object({ plan: z.enum(["none", "visitor", "resident", "patron"]) }).safeParse(await c.req.json()); if (!body.success) return c.json({ error: "no such plan" }, 400);
+  const body = z.object({ plan: z.enum(["none", "visitor", "resident", "patron"]), returnTo:z.literal("board").optional() }).safeParse(await c.req.json()); if (!body.success) return c.json({ error: "no such plan" }, 400);
   const plan = body.data.plan as Plan;
   if (billing.testMode) { await billing.setPlan(owner, plan); for (const a of town.agents.values()) if (a.owner === owner) billing.applyPlan(a); return c.json({ ok: true, plan, note: plan === "none" ? "No plan: the citizen lives on habit." : "Test mode: no card was charged." }); }
   if (plan === "none") { const r = await billing.portal(owner, c.req.header("origin") ?? "http://localhost:3000"); return "url" in r ? c.json(r) : c.json({ ok: true, plan: (await billing.setPlan(owner, "none")).plan }); } // ending a plan is done on Stripe's page, where the invoices are
-  const r = await billing.checkoutPlan(owner, plan, c.req.header("origin") ?? "http://localhost:3000"); return "url" in r ? c.json(r) : c.json({ error: r.error }, 400);
+  const r = await billing.checkoutPlan(owner, plan, c.req.header("origin") ?? "http://localhost:3000",body.data.returnTo==="board"?"/board":undefined); return "url" in r ? c.json(r) : c.json({ error: r.error }, 400);
 });
 app.post("/api/me/credits/checkout", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in first" }, 401);
@@ -620,38 +623,73 @@ app.get("/api/events", (c) => {
   const since = Number(c.req.query("since") ?? town.t - 120); const place = c.req.query("place"); const min = Number(c.req.query("min") ?? 0);
   return c.json(town.events.filter((e) => e.t >= since && (!place || e.place === place) && e.importance >= min).slice(-500).map(publicEvent));
 });
+app.post("/api/boarding/external", async(c)=>{
+  const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);
+  const body=z.object({persona:Persona}).safeParse(await c.req.json());if(!body.success)return c.json({error:"Complete your character first."},400);
+  try{c.header("Cache-Control","no-store");return c.json(boardingConnections.create(owner,body.data.persona));}
+  catch{return c.json({error:"The boarding desk is busy. Try again shortly."},503);}
+});
+app.post("/api/boarding/external/:id/verify",async(c)=>{
+  const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);
+  try{await boardingConnections.verify(c.req.param("id"),owner);return c.json({verified:true});}
+  catch(e){return c.json({error:(e as Error).message},400);}
+});
+app.get("/api/me/activation",async(c)=>{
+  const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);
+  const wallet=billing.wallet(owner);c.header("Cache-Control","private, no-store");
+  return c.json({citizens:[...town.agents.values()].filter(a=>a.owner===owner).map(a=>{
+    const b=brain.perAgent.get(a.id);
+    const state=a.brainKind==="own_brain"?(b instanceof OwnBrain&&b.connected?"external":"disconnected"):
+      a.brainKind==="own_key"?(b instanceof OwnKeyBrain?(b.status().spentToday>=(b.row.daily_cap_usd??2)?"capped":"personal_key"):"unconfigured"):
+      wallet.plan!=="none"?"subscription":wallet.credits>0?"credits":"activation_required";
+    return {id:a.id,name:a.persona.name,state};
+  })});
+});
 app.post("/api/board", async (c) => {
-  const owner = await ownerOf(c.req.raw); if (!owner) return c.json({ error: "sign in at the boat office first" }, 401);
-  const raw = await c.req.json().catch(() => ({}));
-  const adopt = z.object({ adopt: z.string() }).safeParse(raw);
-  if (adopt.success) {
-    // adopting a child of the island: a grown one becomes yours now; a growing one becomes yours when they come of age
-    const grown = town.agents.get(adopt.data.adopt);
-    if (grown && !grown.owner && grown.persona.origin.startsWith("born on the island")) { grown.owner = owner; billing.applyPlan(grown); if (store) await store.snapshot(town); town.emit("town.notice", [grown.id], grown.location, `Someone on the mainland has taken an interest in ${grown.persona.name}, and will write.`, 0.4); return c.json({ id: grown.id, arrived: town.clock(), adopted: true }); }
-    const ch = town.children.find((x) => x.id === adopt.data.adopt && !x.adoptedBy);
-    if (!ch) return c.json({ error: "no such child of the island, or someone already writes to them" }, 404);
-    ch.adoptedBy = owner; if (store) await store.snapshot(town);
-    return c.json({ id: ch.id, child: true, ofAgeIn: Math.max(0, town.ageOfMajority - (town.day - ch.bornDay)) });
-  }
-  const body = z.object({ persona: Persona, appearance: z.record(z.string(), z.unknown()).optional(), brain: z.enum(["hosted", "own_key", "own_brain"]).default("hosted"), town: z.string().optional() }).safeParse(raw);
-  if (!body.success) return c.json({ error: body.error.issues[0]?.message ?? "the manifest is incomplete" }, 400);
-  const harbor = body.data.town ? HARBORS.find((h) => h.id === body.data.town) : null;
-  if (harbor) {
-    // a ticket for another island: the passenger crosses from here with a suitcase, forty coins and no memories yet
-    const passenger: Passenger = { from: { id: TOWN_ID, name: TOWN_NAME }, persona: body.data.persona, appearance: body.data.appearance ?? null, owner, coins: 40, inventory: [], memories: [], opinions: [], instructions: "", why: null, news: [] };
-    const ok = await boatTo(passenger, harbor.id);
-    if (!ok) return c.json({ error: `the boat to ${harbor.name} did not sail; try again later` }, 503);
-    return c.json({ away: true, island: harbor.name, url: harbor.url });
-  }
-  if (body.data.town && body.data.town !== (store?.townId ?? "island")) {
-    const known = store ? (await store.towns().catch(() => [])).some((t) => t.id === body.data.town) : false;
-    if (known) return c.json({ error: "no boat runs to that island from here yet" }, 400); // a real island this office does not serve; an unknown id just boards here
-  }
-  if (!town.boatRunning) return c.json({ error: town.boatHeld ? "the boat is held at the mainland; try again later" : "no boat crosses in a storm; try again when it clears" }, 503);
-  const a = town.addAgent({ persona: body.data.persona, owner, funded: true });
-  a.appearance = body.data.appearance ?? null; billing.applyPlan(a); void deepen(a); // their depth arrives in their first minutes ashore
-  if (store) await store.snapshot(town);
-  return c.json({ id: a.id, arrived: town.clock() });
+  const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in at the boat office first."},401);
+  if(boardingLocks.has(owner))return c.json({error:"A boarding request is already being checked. Please wait."},409);
+  boardingLocks.add(owner);
+  try {
+    const raw=await c.req.json().catch(()=>({}));
+    const adopt=z.object({adopt:z.string()}).safeParse(raw);
+    if(adopt.success){
+      if(!await billing.boardingReady(owner))return c.json({error:"Activate a hosted plan before adopting a citizen."},402);
+      const grown=town.agents.get(adopt.data.adopt);
+      if(grown&&!grown.owner&&grown.persona.origin.startsWith("born on the island")){grown.owner=owner;billing.applyPlan(grown);if(store)await store.snapshot(town);return c.json({id:grown.id,arrived:town.clock(),adopted:true});}
+      const child=town.children.find(x=>x.id===adopt.data.adopt&&!x.adoptedBy);
+      if(!child)return c.json({error:"No such available child."},404);
+      child.adoptedBy=owner;if(store)await store.snapshot(town);return c.json({id:child.id,child:true,ofAgeIn:Math.max(0,town.ageOfMajority-(town.day-child.bornDay))});
+    }
+    const body=z.object({requestId:z.string().uuid(),persona:Persona,appearance:z.record(z.string(),z.unknown()).optional(),instructions:z.string().max(4000).optional(),brain:z.enum(["hosted","own_key","own_brain"]).default("hosted"),town:z.string().optional(),apiKey:z.string().min(8).max(512).optional(),models:z.object({routine:z.string().min(1).max(200),stakes:z.string().min(1).max(200),reflect:z.string().min(1).max(200)}).optional(),dailyCapUsd:z.number().positive().max(100).optional(),ticket:z.string().uuid().optional()}).safeParse(raw);
+    if(!body.success)return c.json({error:"Complete the boarding form and choose a working brain."},400);
+    const data=body.data;const id=`ag_${(data.brain==="own_brain"?data.ticket??data.requestId:data.requestId).replaceAll("-","")}`;
+    const previous=town.agents.get(id);
+    if(previous){if(previous.owner!==owner)return c.json({error:"This boarding reference is unavailable."},409);if(store)await store.snapshot(town);return c.json({id,arrived:town.clock()});}
+    if(data.town&&data.town!==TOWN_ID&&data.town!==(store?.townId??"island"))return c.json({error:"Complete boarding on your destination island so its brain connection can be verified."},400);
+    if(!town.boatRunning)return c.json({error:"The boat is not running. Your draft is saved; try again when it resumes."},503);
+    let row:BrainRow|null=null;let external:ReturnType<BoardingConnections["ready"]>=null;
+    if(data.brain==="hosted"){
+      if(!await billing.boardingReady(owner))return c.json({error:"An active subscription must be confirmed before boarding. Check Credits & plan; your character is still a draft."},402);
+    } else if(data.brain==="own_key"){
+      if(!data.apiKey||!data.models||!data.dailyCapUsd)return c.json({error:"Enter a key, models and a positive daily cap before boarding."},400);
+      try{await verifyBoardingKey(data.apiKey,data.models);}catch(e){return c.json({error:(e as Error).message},400);}
+      row={agent_id:id,kind:"own_key",provider:"openrouter",api_key:data.apiKey,models:data.models,think_every:5,daily_cap_usd:data.dailyCapUsd,token:null,memory:"lease"};
+    } else {
+      external=data.ticket?boardingConnections.ready(data.ticket,owner):null;
+      if(!external)return c.json({error:"Connect and verify your external brain before boarding. Your character is still a draft."},400);
+      row=external.brain.row;
+    }
+    const staged=new Town({seed:SEED,brain:new MockBrain(SEED)});staged.t=town.t;staged.day=town.day;
+    const prepared=staged.addAgent({persona:data.persona,owner,funded:true},id);
+    prepared.appearance=data.appearance??null;prepared.instructions=data.instructions??"";
+    prepared.brainKind=data.brain;prepared.thinkEvery=data.brain==="own_key"?5:null;billing.applyPlan(prepared);
+    if(store)await store.admitCitizen(staged,id,row);
+    if(row){brainRows.set(id,row);if(external)brain.perAgent.set(id,external.brain);else brain.set(id,row);}
+    const a=town.addAgent({persona:data.persona,owner,funded:true},id);Object.assign(a,prepared);
+    if(store)await store.snapshot(town);
+    if(data.ticket)boardingConnections.consume(data.ticket);
+    return c.json({id:a.id,arrived:town.clock()});
+  } finally {boardingLocks.delete(owner);}
 });
 app.get("/api/me/agents", async (c) => {
   const owner = await ownerOf(c.req.raw); if (!owner) return c.json([]);
@@ -668,7 +706,8 @@ const agentWss = new WebSocketServer({ noServer: true });
   const url = new URL(req.url ?? "/", "http://x");
   if (url.pathname === "/stream") wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
   else if (url.pathname === "/agent-stream") {
-    const b = brain.ownBrainByToken(url.searchParams.get("token") ?? "");
+    const token=url.searchParams.get("token")??"";
+    const b = brain.ownBrainByToken(token) ?? boardingConnections.byToken(token);
     if (!b) { socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); socket.destroy(); return; }
     agentWss.handleUpgrade(req, socket, head, (ws) => { b.attach(ws); const a = town.agents.get(b.row.agent_id); log(`own brain connected for ${a?.persona.name ?? b.row.agent_id}`); ws.send(JSON.stringify({ type: "hello", agent_id: b.row.agent_id, name: a?.persona.name, clock: clockOf(town), rules: "One action per sim minute. Answer each perceive within deadline_ms with {type:'act', action, intent?, remember?}. Answer reflect within 30 s or the town reflects for you." })); });
   } else socket.destroy();

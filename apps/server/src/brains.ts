@@ -74,6 +74,11 @@ export class OwnBrain implements Brain {
     });
   }
 
+  async verify(p: Perception): Promise<boolean> {
+    const got=await this.ask({...p,deadline_ms:8000},8000);
+    return !!got && ActionProposalSchema.safeParse(got).success;
+  }
+
   async decide(p: Perception, _a: AgentState, _tier: Tier): Promise<ActionProposal> {
     const got = await this.ask({ ...p }, p.deadline_ms);
     const parsed = got ? ActionProposalSchema.safeParse(got) : null;

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ActivationNotice } from "@/components/account/ActivationNotice";
 import { ExploreHeader, LinkButton } from "@/components/explore/ExplorePage";
 import theme from "@/components/explore/explore.module.css";
 import s from "./digest.module.css";
@@ -20,6 +21,7 @@ export function DigestLayout({
         Skip to content
       </a>
       <ExploreHeader />
+      <ActivationNotice />
       <div className={s.accountNav}>
         <nav aria-label="Your island">
           <Link href="/digest" aria-current={active === "digest" ? "page" : undefined}>
