@@ -6,12 +6,17 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.13.0] - 2026-09-13
+### Added
+
 - Emerging desires: citizens can form, reconsider, set aside or report fulfillment of lasting wants during existing nightly reflection, citing personal experience records validated by the engine.
 - Compact desire context in planning and decisions, with optional action-to-desire links and recorded accepted/rejected outcomes. No assigned careers, quests or guaranteed outcomes.
 - A private “What they want now” section in the owner digest with reasons, bounded revision history, experience records and action attempts.
 - Backward-compatible optional external-brain fields and persisted desire state; existing snapshots start without invented desires. No database migration or additional model calls.
-
-### Changed
 
 ### Fixed
 
@@ -317,7 +322,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/kresogalic8/unwatched/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/kresogalic8/unwatched/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/kresogalic8/unwatched/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/kresogalic8/unwatched/compare/v0.10.1...v0.10.2
