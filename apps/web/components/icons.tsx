@@ -1,6 +1,8 @@
 "use client";
 /** Forty icons, one hand. 24-unit grid, 2-unit padding, stroke only, currentColor. Lifted from the Icons artboard. */
 export const ICONS = {
+  arrowUpRight: "M6 18L18 6 M6 6h12v12",
+  arrowUp: "M12 20V4 M5 11l7-7 7 7",
   boat: "M3 15h18l-2 4H5z M6 15v-4h12v4 M9 11V8h6v3 M12 8V5",
   digest: "M4 6h16 M4 12h10 M4 18h7",
   letter: "M4 6h16v12H4z M4 7l8 6 8-6",

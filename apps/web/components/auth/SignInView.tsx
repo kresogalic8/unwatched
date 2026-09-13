@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -45,7 +46,7 @@ export function SignInView({
       <header className={s.header}>
         <Wordmark size={23} />
         <Link className={s.back} href="/">
-          Back to the island <span aria-hidden="true">↗</span>
+          Back to the island <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
         </Link>
       </header>
       <div className={s.layout}>
@@ -119,7 +120,7 @@ export function SignInView({
                   later.
                 </p>
                 <Link className={s.secondary} href="/town">
-                  Watch the town <span aria-hidden="true">↗</span>
+                  Watch the town <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
                 </Link>
               </div>
             ) : sent ? (
@@ -133,7 +134,7 @@ export function SignInView({
                   Open the link in the same browser where you requested it. If the email hasn’t arrived, check your spam folder.
                 </p>
                 <button className={s.secondary} type="button" onClick={onReset}>
-                  Use a different email <span aria-hidden="true">↗</span>
+                  Use a different email <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
                 </button>
                 <p className={s.smallNote}>
                   This page will continue when your sign-in completes in this
@@ -190,7 +191,7 @@ export function SignInView({
                           ? "Send sign-in link"
                           : "Open the gate"}
                     </span>
-                    <span aria-hidden="true">{busy ? "…" : "↗"}</span>
+                    <span aria-hidden="true">{busy ? "…" : <ArrowIcon name="arrowUpRight" size={20}/>}</span>
                   </button>
                 </form>
                 <p className={s.formNote}>

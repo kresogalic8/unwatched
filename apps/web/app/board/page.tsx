@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -109,7 +110,7 @@ export default function Board() {
 
   return (
     <main className={`${theme.page} ${s.page}`}>
-      <header className={s.header}><Wordmark size={24} /><Link href="/" className={s.exit}>Back to the island <span aria-hidden="true">↗</span></Link></header>
+      <header className={s.header}><Wordmark size={24} /><Link href="/" className={s.exit}>Back to the island <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span></Link></header>
       <div className={s.progress}><nav aria-label="Create your citizen"><ol>{STEPS.map((label,i)=><li key={label}><button type="button" disabled={i>step || busy} onClick={()=>setStep(i)} aria-current={i===step?"step":undefined} data-complete={i<step} aria-label={`${label}${i<step?", completed":""}`}><span aria-hidden="true" className={s.stepNumber}>{String(i+1).padStart(2,"0")}</span><span>{label}</span></button></li>)}</ol></nav><span className={s.saved}>Draft saved on this device</span></div>
       <div className={s.content} ref={contentRef}>
 

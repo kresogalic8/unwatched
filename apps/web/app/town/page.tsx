@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -274,7 +275,7 @@ export default function Town() {
                             {p.job ?? "Finding their way"}
                           </small>
                         </span>
-                        <span aria-hidden="true">↗</span>
+                        <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
                       </button>
                     ))}
                   {!snapshot.citizens.length && (

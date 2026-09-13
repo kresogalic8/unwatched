@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { currentOwner, supabase } from "@/lib/auth";
@@ -35,7 +36,7 @@ export function SessionLink({ className }: { className?: string }) {
       href={state === "signed-out" ? "/gate" : "/account"}
     >
       {state === "signed-out" ? "Sign in" : "Account"}{" "}
-      <span aria-hidden="true">↗</span>
+      <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
     </Link>
   );
 }

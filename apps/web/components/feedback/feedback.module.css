@@ -117,3 +117,8 @@
     right: 12px;
   }
 }
+.entry { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+@media (max-width: 639px) {
+  .entry { right: 12px; bottom: max(14px, env(safe-area-inset-bottom)); width: 44px; height: 44px; padding: 10px; border-radius: 50%; }
+  .entryLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}

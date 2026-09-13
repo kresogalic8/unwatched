@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -245,7 +246,7 @@ export default function DigestPage() {
                 let {first} keep thinking until midnight; nothing is lost either
                 way, and the first thought back covers what was missed.{" "}
                 <LinkButton href="/account/credits">
-                  Buy credits <span aria-hidden="true">↗</span>
+                  Buy credits <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
                 </LinkButton>
               </div>
             </div>
@@ -321,7 +322,7 @@ export default function DigestPage() {
                 </LinkButton>
                 {canWrite === 0 && (
                   <Link href="/account/credits" className={s.textAction}>
-                    Change the plan <span aria-hidden="true">↗</span>
+                    Change the plan <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
                   </Link>
                 )}
               </div>

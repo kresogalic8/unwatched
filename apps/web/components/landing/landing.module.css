@@ -1225,3 +1225,35 @@
     display: none;
   }
 }
+
+/* SVG actions keep their shape on iOS instead of becoming emoji. */
+.textLink svg, .primary svg, .enableScene svg, .worldLinks svg, .footer svg {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.swipeHint, .citizenControls { display: none; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.citizenStage { touch-action: pan-y; }
+.citizenStage:focus-visible, .citizenControls button:focus-visible { outline: 2px solid var(--accent, #e4572e); outline-offset: 4px; }
+@media (max-width: 639px) {
+  .citizens { margin: 24px 0 0; }
+  .swipeHint { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .swipeHint span { font-size: 11px; opacity: .75; }
+  .citizenStage { height: 276px; overflow: hidden; cursor: grab; border-bottom: 1px solid var(--rule); }
+  .citizenStage:active { cursor: grabbing; }
+  .citizenButtons { display: block; margin-top: 16px; }
+  .citizenButtons button { display: none; }
+  .citizenButtons button[aria-pressed="true"] { display: flex; width: 100%; padding: 0; background: transparent; gap: 6px; font-size: 14px; }
+  .citizenButtons strong { font-size: 25px; font-weight: 500; letter-spacing: -.035em; }
+  .citizenControls { display: flex; align-items: center; justify-content: space-between; max-width: 250px; margin: 16px auto 0; }
+  .citizenControls > button { display: grid; place-items: center; width: 44px; height: 44px; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 50%; }
+  .citizenControls > button:hover { background: var(--paper); }
+  .citizenDots { display: flex; }
+  .citizenDots button { display: grid; place-items: center; width: 32px; height: 44px; padding: 0; background: transparent; border: 0; }
+  .citizenDots span { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .4; transition: width .2s, opacity .2s; }
+  .citizenDots button[aria-pressed="true"] span { width: 19px; border-radius: 8px; background: #e4572e; opacity: 1; }
+  .citizenStory { min-height: 84px; padding: 0 8px; margin-top: 16px; font-size: 15px; line-height: 1.6; }
+  .peopleFoot .textLink { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .citizenDots span { transition: none; } }

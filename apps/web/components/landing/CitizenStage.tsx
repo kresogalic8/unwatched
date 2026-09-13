@@ -96,22 +96,24 @@ export default function CitizenStage({
       });
       const ground = new Graphics();
       group.addChildAt(ground, 0);
-      const resize = () => {
+      let offset=state.current.selected;
+      const layout = (render = true) => {
         const w = el.clientWidth,
           h = el.clientHeight;
-        a.renderer.resize(w, h);
+        const mobile=window.matchMedia("(max-width: 639px)").matches;
         ground.clear();
         citizens.forEach((c, i) => {
-          const x = (w * (i + 0.5)) / 4;
-          const scale = Math.min(h / 108, w / 390);
+          const x = mobile ? w / 2 + (((i-offset+2)%4+4)%4-2)*w : (w * (i + 0.5)) / 4;
+          const scale = mobile ? Math.min(h / 105, w / 135) : Math.min(h / 108, w / 390);
           c.scale.set(scale);
           c.position.set(x, h * 0.88);
           ground
-            .ellipse(x, h * 0.89, w / 14, 8)
+            .ellipse(x, h * 0.89, mobile ? Math.min(w / 5, 70) : w / 14, mobile ? 10 : 8)
             .fill({ color: 0x747d60, alpha: 0.12 });
         });
-        a.render();
+        if(render)a.render();
       };
+      const resize=()=>{a.renderer.resize(el.clientWidth,el.clientHeight);layout();};
       resize();
       ro = new ResizeObserver(resize);
       ro.observe(el);
@@ -122,6 +124,8 @@ export default function CitizenStage({
       a.ticker.add((ticker) => {
         const { selected: active, motion: moving } = state.current;
         if (moving) time += ticker.deltaMS / 1000;
+        const delta=((active-offset+2)%4+4)%4-2;
+        if(Math.abs(delta)>0.001){offset=moving?offset+delta*Math.min(1,ticker.deltaMS/90):active;layout(false);}
         if (active !== previous || moving !== previousMotion) {
           citizens.forEach((c, i) =>
             c.setPose(moving && i === active ? "greet" : "idle"),
@@ -133,6 +137,7 @@ export default function CitizenStage({
       });
       let inView = true;
       refresh.current = () => {
+        if(!state.current.motion){offset=state.current.selected;layout();}
         if (inView && !document.hidden && state.current.motion) a.start();
         else {
           a.stop();

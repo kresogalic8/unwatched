@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/icons";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import s from "./landing.module.css";
@@ -102,7 +103,7 @@ export function IslandExhibit() {
               ? "3D active. Move your pointer."
               : enabled
                 ? "Opening the miniature…"
-                : "Explore the miniature in 3D ↗"}
+                : <>Explore the miniature in 3D <Icon name="arrowUpRight" size={16} /></>}
         </button>
         <div
           className={s.dayControls}
@@ -157,6 +158,8 @@ const citizens = [
 ];
 export function CitizenExhibit() {
   const [selected, setSelected] = useState(0);
+  const gesture = useRef<{x:number;y:number}|null>(null);
+  const selectRelative=(step:number)=>setSelected(value=>(value+step+citizens.length)%citizens.length);
   const [visible, setVisible] = useState(false);
   const [failed, setFailed] = useState(false);
   const host = useRef<HTMLDivElement>(null);
@@ -175,11 +178,17 @@ export function CitizenExhibit() {
     return () => io.disconnect();
   }, []);
   return (
-    <div className={s.citizens} ref={host}>
+    <div className={s.citizens} ref={host} role="region" aria-roledescription="carousel" aria-label="Meet the personalities">
+      <p className={s.swipeHint}>A personality. A whole new story. <span>Swipe to meet them</span></p>
       <div
         className={s.citizenStage}
         role="img"
-        aria-label="Four sample citizens, drawn with the same character rig used in town"
+        aria-label={`${citizens[selected]!.name}, drawn with the same character rig used in town`}
+        tabIndex={0}
+        onKeyDown={e=>{if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();selectRelative(e.key==="ArrowRight"?1:-1);}if(e.key==="Home"){e.preventDefault();setSelected(0);}if(e.key==="End"){e.preventDefault();setSelected(citizens.length-1);}}}
+        onPointerDown={e=>{if(e.pointerType==="mouse"&&e.button!==0)return;gesture.current={x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId);}}
+        onPointerCancel={()=>{gesture.current=null;}}
+        onPointerUp={e=>{const start=gesture.current;gesture.current=null;if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.3)selectRelative(dx<0?1:-1);}}
       >
         {!visible || failed ? (
           <div className={s.citizenFallback}>
@@ -212,7 +221,13 @@ export function CitizenExhibit() {
           </button>
         ))}
       </div>
-      <div className={s.citizenStory} aria-live="polite">
+      <div className={s.citizenControls}>
+        <button type="button" aria-label="Previous personality" onClick={()=>selectRelative(-1)}><Icon name="back" size={20}/></button>
+        <div className={s.citizenDots} role="group" aria-label="Choose a personality">{citizens.map((c,i)=><button key={c.name} type="button" aria-label={`Show ${c.name.toLowerCase()}`} aria-pressed={selected===i} onClick={()=>setSelected(i)}><span/></button>)}</div>
+        <button type="button" aria-label="Next personality" onClick={()=>selectRelative(1)}><Icon name="chevron" size={20}/></button>
+      </div>
+      <div className={s.citizenStory} aria-live="polite" aria-atomic="true">
+        <span className={s.srOnly}>{citizens[selected]!.name}. </span>
         {citizens[selected]!.story}
       </div>
     </div>

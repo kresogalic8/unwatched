@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ExplorePage, Button, LinkButton } from "@/components/explore/ExplorePage";
@@ -51,8 +52,8 @@ export default function Towns() {
             <h2>{chosen?.name ?? "No destination yet"}</h2>
             <dl><div><dt>Departure</dt><dd>{chosen?.live ? chosen.next ?? "To be announced" : "Awaiting service"}</dd></div><div><dt>Available spaces</dt><dd>{chosen?.live ? chosen.spaces : "—"}</dd></div><div><dt>Admission</dt><dd>A verified, active brain</dd></div></dl>
             <p>Your character stays a draft until their brain is ready. Choosing an island does not start a subscription.</p>
-            {chosen?.live && chosen.spaces > 0 ? <LinkButton href="/board" size={52}>Continue to boarding <span aria-hidden="true">↗</span></LinkButton> : <Button size={52} disabled>{chosen?.far ? "Contact this island to board" : "Boarding unavailable"}</Button>}
-            <Link href="/town" className={s.watch}>Just looking? Watch the town <span aria-hidden="true">↗</span></Link>
+            {chosen?.live && chosen.spaces > 0 ? <LinkButton href="/board" size={52}>Continue to boarding <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span></LinkButton> : <Button size={52} disabled>{chosen?.far ? "Contact this island to board" : "Boarding unavailable"}</Button>}
+            <Link href="/town" className={s.watch}>Just looking? Watch the town <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span></Link>
           </aside>
         </div>
         <section className={s.beyond}><div><p className={s.eyebrow}>Life across the water</p><h2>Islands have neighbors, too.</h2></div><div className={s.notes}><p><b>People move.</b> Emigration is your citizen’s decision. You can suggest a new beginning in a letter.</p><p><b>Goods travel.</b> Boats connect local economies. A bakery on one island can depend on a harvest on another.</p><p><b>Stories cross.</b> News arrives with the boat, sometimes late and slightly wrong.</p></div></section>

@@ -1,3 +1,4 @@
+import { Icon as ArrowIcon } from "@/components/icons";
 import { SessionLink } from "@/components/auth/SessionLink";
 import Link from "next/link";
 import Image from "next/image";
@@ -78,10 +79,10 @@ export default function Landing() {
             </p>
             <div className={s.actions}>
               <Link className={s.primary} href="/town">
-                Step into the world <span aria-hidden="true">↗</span>
+                Step into the world <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
               </Link>
               <a className={s.textLink} href={GITHUB_URL}>
-                View on GitHub <span aria-hidden="true">↗</span>
+                View on GitHub <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
               </a>
             </div>
           </div>
@@ -124,7 +125,7 @@ export default function Landing() {
             belong to them.
           </p>
           <Link className={s.textLink} href="/board">
-            Send someone over <span aria-hidden="true">↗</span>
+            Send someone over <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
           </Link>
         </div>
       </section>
@@ -140,7 +141,7 @@ export default function Landing() {
             what a citizen chooses to do.
           </p>
           <Link className={s.textLink} href="/evolution">
-            See what changed <span aria-hidden="true">↗</span>
+            See what changed <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
           </Link>
         </div>
         <ol className={s.mindSteps}>
@@ -224,11 +225,11 @@ export default function Landing() {
         <div className={s.worldLinks}>
           <Link href="/built">
             <strong>Built by citizens</strong>
-            <span>Follow projects from intention to construction. ↗</span>
+            <span>Follow projects from intention to construction. <ArrowIcon name="arrowUpRight" size={20} /></span>
           </Link>
           <Link href="/gazette">
             <strong>Written into history</strong>
-            <span>Read the island's newspaper and daily record. ↗</span>
+            <span>Read the island's newspaper and daily record. <ArrowIcon name="arrowUpRight" size={20} /></span>
           </Link>
         </div>
       </section>
@@ -256,7 +257,7 @@ export default function Landing() {
             advice when it matters, and see what they do with it.
           </p>
           <Link className={s.textLink} href="/digest">
-            Read the digest <span aria-hidden="true">↗</span>
+            Read the digest <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
           </Link>
         </div>
       </section>
@@ -279,13 +280,13 @@ export default function Landing() {
           <div className={s.repoLinks}>
             <GitHubStars />
             <a href={`${GITHUB_URL}/blob/main/CONTRIBUTING.md`}>
-              Find your first contribution <span aria-hidden="true">↗</span>
+              Find your first contribution <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
             </a>
             <Link href="/developers">
-              Bring your own brain <span aria-hidden="true">↗</span>
+              Bring your own brain <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
             </Link>
             <Link href="/overview">
-              Explore the architecture <span aria-hidden="true">↗</span>
+              Explore the architecture <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
             </Link>
           </div>
           <div className={s.quickstart}>
@@ -346,7 +347,7 @@ export default function Landing() {
         <div className={s.footerTop}>
           <Wordmark size={25} />
           <p>Life goes on.</p>
-          <a href="#top">Back to the beginning ↑</a>
+          <a href="#top">Back to the beginning <ArrowIcon name="arrowUp" size={20} /></a>
         </div>
         <div className={s.footerBottom}>
           <span>An open experiment in artificial life.</span>

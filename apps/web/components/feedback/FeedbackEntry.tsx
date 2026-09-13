@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import s from "./feedback.module.css";
@@ -11,7 +12,7 @@ export function FeedbackEntry() {
       href={`/feedback?from=${encodeURIComponent(path)}`}
       aria-label="Give feedback or report a problem"
     >
-      Feedback <span aria-hidden="true">↗</span>
+      <span className={s.entryLabel}>Feedback</span><ArrowIcon name="letter" size={20} />
     </Link>
   );
 }

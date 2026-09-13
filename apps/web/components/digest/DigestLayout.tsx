@@ -1,4 +1,5 @@
 "use client";
+import { Icon as ArrowIcon } from "@/components/icons";
 import Link from "next/link";
 import { ActivationNotice } from "@/components/account/ActivationNotice";
 import { ExploreHeader, LinkButton } from "@/components/explore/ExplorePage";
@@ -32,7 +33,7 @@ export function DigestLayout({
           <Link href="/town">Town</Link><Link href="/feedback">Feedback</Link>
         </nav>
         <Link href="/account">
-          {name ?? "Your account"} <span aria-hidden="true">↗</span>
+          {name ?? "Your account"} <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
         </Link>
       </div>
       <div id="digest-content" className={s.content}>
