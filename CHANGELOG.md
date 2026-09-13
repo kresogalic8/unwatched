@@ -6,9 +6,14 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
-- Optional Telegram delivery of an explicitly paired agent's letters to its owner, with ownership checks, plain-text messages and secret-safe failure reporting.
-
 ### Changed
+
+### Fixed
+
+## [0.11.0] - 2026-09-13
+### Added
+
+- Optional Telegram delivery of an explicitly paired agent's letters to its owner, with ownership checks, plain-text messages and secret-safe failure reporting.
 
 ### Fixed
 
@@ -296,7 +301,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/kresogalic8/unwatched/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/kresogalic8/unwatched/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/kresogalic8/unwatched/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/kresogalic8/unwatched/compare/v0.9.0...v0.10.0
