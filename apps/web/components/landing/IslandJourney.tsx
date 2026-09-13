@@ -6,6 +6,7 @@ import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { refreshScrollLayout } from "./refreshScrollLayout";
 import { Icon } from "../icons";
 import { useMotionAllowed } from "./Experience";
 import { GITHUB_URL } from "@/lib/site";
@@ -36,7 +37,7 @@ export default function IslandJourney() {
     gsap.set(panels.slice(1), { autoAlpha: 0, y: 50 });
     const timeline = gsap.timeline({ scrollTrigger: {
       trigger: root, start: "top top", end: () => `+=${innerHeight * (innerWidth < 640 ? 2 : 2.5)}`,
-      pin: true, scrub: .8, anticipatePin: 1, invalidateOnRefresh: true,
+      pin: true, scrub: .8, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 20,
     } });
     timeline.to(progress, { current: 1, duration: 3, ease: "none" }, 0)
       .to(meter, { scaleX: 1, duration: 3, ease: "none" }, 0)
@@ -46,6 +47,7 @@ export default function IslandJourney() {
       .to(panels[2]!, { autoAlpha: 1, y: 0, duration: .5 }, 2.05);
     return () => { progress.current = 0; };
   }, { scope: host, dependencies: [cinematic], revertOnUpdate: true });
+  useEffect(() => { refreshScrollLayout(); return refreshScrollLayout; }, [cinematic]);
 
   return <section ref={host} className={s.journey} data-cinematic={cinematic} aria-label="A day on an island with a life of its own">
     <div className={s.world} role="img" aria-label="A three-dimensional island moving from daylight to night as you scroll">

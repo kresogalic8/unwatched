@@ -6,6 +6,7 @@ import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { refreshScrollLayout } from "./refreshScrollLayout";
 import { useMotionAllowed } from "./Experience";
 import { Icon } from "../icons";
 import s from "./life-story.module.css";
@@ -26,8 +27,9 @@ export default function LifeStory() {
   useGSAP(() => {
     if (!cinematic || !host.current) return;
     const clock = { moment: 0 };
-    gsap.to(clock, { moment: 3.999, ease: "none", onUpdate: () => setPhase(Math.min(3, Math.floor(clock.moment))), scrollTrigger: { trigger: host.current, start: "top top", end: () => `+=${innerHeight * 2.2}`, scrub: .55, pin: true, anticipatePin: 1, invalidateOnRefresh: true } });
+    gsap.to(clock, { moment: 3.999, ease: "none", onUpdate: () => setPhase(Math.min(3, Math.floor(clock.moment))), scrollTrigger: { trigger: host.current, start: "top top", end: () => `+=${innerHeight * 2.2}`, scrub: .55, pin: true, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 10 } });
   }, { scope: host, dependencies: [cinematic], revertOnUpdate: true });
+  useEffect(() => { refreshScrollLayout(); return refreshScrollLayout; }, [cinematic]);
   const chapter = chapters[phase]!;
   return <section id="a-life" ref={host} className={s.story} data-phase={phase} data-cinematic={cinematic} aria-labelledby="life-story-title">
     <header className={s.header}><h2 id="life-story-title">One person.<br /><span>Thirty days.</span></h2><p>One possible life.<br /><strong>Illustrative story · not a live citizen.</strong></p></header>
