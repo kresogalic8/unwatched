@@ -3,10 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icons";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import s from "./landing.module.css";
 
-const Island = dynamic(() => import("./IslandScene"), { ssr: false });
 const Citizens = dynamic(() => import("./CitizenStage"), { ssr: false });
 
 export function useMotionAllowed() {
@@ -45,90 +43,6 @@ export function LandingMotion() {
     return () => observer.disconnect();
   }, []);
   return enabled ? <ScrollEffects /> : null;
-}
-
-export function IslandExhibit() {
-  const [night, setNight] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [stop, setStop] = useState(0);
-  const [unavailable, setUnavailable] = useState(false);
-  const motion = useMotionAllowed();
-  return (
-    <div className={s.islandExhibit}>
-    <figure className={s.island}>
-      <div
-        className={s.islandStage}
-        role="img"
-        aria-label={`An interactive miniature of the island in ${night ? "moonlight" : "daylight"}, built with the world's own artwork`}
-      >
-        <div
-          className={s.islandPoster}
-          style={{ visibility: ready ? "hidden" : "visible" }}
-        >
-          <Image
-            className={s.lightPoster}
-            src={`/landing/island-light-${night ? "night" : "day"}.jpg`}
-            fill
-            sizes="(max-width: 639px) 100vw, 70vw"
-            alt=""
-            priority
-          />
-          <Image
-            className={s.darkPoster}
-            src={`/landing/island-dark-${night ? "night" : "day"}.jpg`}
-            fill
-            sizes="(max-width: 639px) 100vw, 70vw"
-            alt=""
-            priority
-          />
-        </div>
-        {!unavailable && (
-          <Island
-            night={night}
-            focus={stop}
-            motion={motion}
-            onReady={setReady}
-            onUnavailable={() => { setReady(false); setUnavailable(true); }}
-          />
-        )}
-      </div>
-      <figcaption className={s.islandCaption}>
-        <span className={s.sceneStatus} aria-live="polite">{unavailable ? "Island artwork · 3D unavailable" : ready ? "3D miniature · choose a stop" : "Opening the miniature…"}</span>
-        <div
-          className={s.dayControls}
-          role="group"
-          aria-label="Island lighting"
-        >
-          <button
-            type="button"
-            aria-pressed={!night}
-            onClick={() => setNight(false)}
-          >
-            Day
-          </button>
-          <button
-            type="button"
-            aria-pressed={night}
-            onClick={() => setNight(true)}
-          >
-            Night
-          </button>
-        </div>
-      </figcaption>
-    </figure>
-    <div className={s.tour}>
-      <div className={s.tourStops} role="group" aria-label="Tour the miniature">
-        {["The island", "The harbor", "The bakery", "The lighthouse"].map((name, i) => <button key={name} type="button" aria-pressed={stop === i} onClick={() => setStop(i)}>{name}</button>)}
-      </div>
-      <p className={s.tourStory} aria-live="polite">{[
-        "A miniature of the places where their lives unfold. The living world is one click away.",
-        "Every life here starts with an arrival. A new face, a suitcase, and no script to follow.",
-        "Bread needs flour. Work needs hands. Even a small bakery gives strangers reasons to meet.",
-        "At the edge of the island, the lights come on. Try Night to see the town after dark.",
-      ][stop]}</p>
-    </div>
-    </div>
-  );
 }
 
 const citizens = [
@@ -179,8 +93,8 @@ export function CitizenExhibit() {
     return () => io.disconnect();
   }, []);
   return (
-    <div className={s.citizens} ref={host} role="region" aria-roledescription="carousel" aria-label="Meet the personalities">
-      <p className={s.swipeHint}>A personality. A whole new story. <span>Swipe to meet them</span></p>
+    <div className={s.citizens} data-animate={motion} ref={host} role="region" aria-roledescription="carousel" aria-label="Meet the personalities">
+      <p className={s.personalityHint}><span>Four personalities. Four possible beginnings.</span><span className={s.desktopHint}>Choose a name to meet them <Icon name="chevron" size={16} /></span><span className={s.swipeHint}>Swipe or use the arrows to meet them</span></p>
       <div
         className={s.citizenStage}
         role="img"
@@ -219,6 +133,7 @@ export function CitizenExhibit() {
           >
             <strong>{c.name}</strong>
             <span>{c.note}</span>
+            <span className={s.personalityAction} aria-hidden="true">{selected === i ? "Now meeting" : "Meet them"}<Icon name={selected === i ? "check" : "arrowUpRight"} size={16} /></span>
           </button>
         ))}
       </div>
@@ -228,8 +143,7 @@ export function CitizenExhibit() {
         <button type="button" aria-label="Next personality" onClick={()=>selectRelative(1)}><Icon name="chevron" size={20}/></button>
       </div>
       <div className={s.citizenStory} aria-live="polite" aria-atomic="true">
-        <span className={s.srOnly}>{citizens[selected]!.name}. </span>
-        {citizens[selected]!.story}
+        <p key={selected} className={s.storyReveal}><span className={s.srOnly}>{citizens[selected]!.name}. </span>{citizens[selected]!.story}</p>
       </div>
     </div>
   );

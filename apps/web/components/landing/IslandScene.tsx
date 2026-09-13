@@ -6,20 +6,22 @@ import * as THREE from "three";
 export default function IslandScene({
   night,
   focus,
+  journey,
   motion,
   onReady,
   onUnavailable,
 }: {
   night: boolean;
   focus: number;
+  journey?: { current: number };
   motion: boolean;
   onReady: (ready: boolean) => void;
   onUnavailable: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const wake = useRef<() => void>(() => {});
-  const state = useRef({ night, focus, motion, onReady, onUnavailable });
-  state.current = { night, focus, motion, onReady, onUnavailable };
+  const state = useRef({ night, focus, journey, motion, onReady, onUnavailable });
+  state.current = { night, focus, journey, motion, onReady, onUnavailable };
   useEffect(() => wake.current(), [night, focus, motion]);
   useEffect(() => {
     const el = host.current;
@@ -185,6 +187,31 @@ export default function IslandScene({
         },
       );
     }
+    const beamGeometry = new THREE.ConeGeometry(.85, 5, 24, 1, true);
+    beamGeometry.translate(0, -2.5, 0);
+    beamGeometry.rotateZ(Math.PI / 2);
+    const beamMaterial = new THREE.MeshBasicMaterial({ color: 0xffe8b2, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+    beam.position.set(2.3, 1.65, -.8);
+    island.add(beam);
+    resources.push(beamGeometry, beamMaterial);
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(60 * 3);
+    for (let i = 0; i < 60; i++) {
+      starPositions[i * 3] = Math.sin(i * 127.1);
+      starPositions[i * 3 + 1] = .4 + (Math.sin(i * 311.7) * .5 + .5) * .58;
+      starPositions[i * 3 + 2] = .99;
+    }
+    starGeometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.ShaderMaterial({
+      uniforms: { uNight: { value: 0 } }, transparent: true, depthWrite: false,
+      vertexShader: "void main(){gl_Position=vec4(position,1.);gl_PointSize=2.;}",
+      fragmentShader: "uniform float uNight;void main(){float a=1.-smoothstep(.1,.5,length(gl_PointCoord-.5));gl_FragColor=vec4(.96,.91,.8,a*uNight*.6);}",
+    });
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    stars.frustumCulled = false;
+    scene.add(stars);
+    resources.push(starGeometry, starMaterial);
     const target = new THREE.Vector2();
     const pointer = (event: PointerEvent) => {
       const box = el.getBoundingClientRect();
@@ -229,12 +256,19 @@ export default function IslandScene({
       const dt = Math.min((now - previous) / 1000, 0.05);
       previous = now;
       if (state.current.motion) time += dt;
-      const goal = state.current.night ? 1 : 0;
+      const travel = state.current.journey?.current ?? 0;
+      const goal = state.current.journey ? THREE.MathUtils.smoothstep(travel, .48, .85) : state.current.night ? 1 : 0;
       darkness = state.current.motion
         ? THREE.MathUtils.lerp(darkness, goal, 0.08)
         : goal;
+      beamMaterial.opacity = darkness * .045;
+      beam.rotation.y = time * .18;
+      starMaterial.uniforms.uNight!.value = darkness;
       waterMat.uniforms.uTime!.value = time;
       waterMat.uniforms.uNight!.value = darkness;
+      ambient.intensity = 2.4 - darkness * .7;
+      sun.color.setRGB(1 - darkness * .45, .9 - darkness * .22, .74 + darkness * .26);
+      sun.intensity = 2 - darkness * .9;
       grass.color.copy(dayGrass).lerp(nightGrass, darkness);
       sand.color.copy(daySand).lerp(nightSand, darkness);
       sprites.forEach((mat) =>
@@ -249,16 +283,18 @@ export default function IslandScene({
       });
       island.rotation.y = THREE.MathUtils.lerp(
         island.rotation.y,
-        state.current.motion ? target.x : 0,
+        state.current.journey ? -.12 + travel * .55 + (state.current.motion ? target.x * .3 : 0) : state.current.motion ? target.x : 0,
         0.04,
       );
       camera.position.y = THREE.MathUtils.lerp(
         camera.position.y,
-        8 + (state.current.motion ? target.y : 0),
+        8 - travel * 1.2 + (state.current.motion ? target.y : 0),
         0.05,
       );
       const stops = [[0, 0, 1], [-2.05, .95, 1.35], [.8, .75, 1.4], [2.3, -.8, 1.35]];
-      const [x, z, zoom] = stops[state.current.focus] ?? stops[0]!;
+      const [x, z, zoom] = state.current.journey
+        ? [Math.sin(travel * Math.PI) * .7, -.25 + travel * .7, 1 + Math.sin(travel * Math.PI) * .32]
+        : stops[state.current.focus] ?? stops[0]!;
       const easing = state.current.motion ? .065 : 1;
       island.position.x = THREE.MathUtils.lerp(island.position.x, -x! * .6, easing);
       island.position.z = THREE.MathUtils.lerp(island.position.z, -z! * .6, easing);

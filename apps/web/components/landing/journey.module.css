@@ -1,0 +1,56 @@
+.journey { position: relative; isolation: isolate; min-height: 820px; background: #18221d; color: #f2f1e7; overflow: clip; }
+.world { position: absolute; inset: 0 -35% 0 -5%; pointer-events: none; }
+.poster { object-fit: contain; mix-blend-mode: lighten; }
+.veil { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, #18221d 1%, #18221dd9 24%, transparent 60%); z-index: 1; }
+.topline { position: absolute; top: 110px; left: 48px; right: 48px; display: flex; justify-content: space-between; gap: 24px; font-size: 10px; letter-spacing: .11em; color: #b6bfae; z-index: 2; }
+.chapters { position: relative; z-index: 2; padding: 180px 48px 145px; max-width: 670px; }
+.chapter { margin-bottom: 60px; }
+.kicker { font-size: 11px; letter-spacing: .1em; color: #ed7651; margin: 0 0 24px !important; }
+.journey .chapter h1, .journey .chapter h2 { font-size: clamp(60px, 6.2vw, 102px); line-height: .94; letter-spacing: -.06em; font-weight: 500; margin: 0; }
+.chapter em { font-style: normal; color: #b8c2ad; }
+.journey .copy { margin: 25px 0 0; max-width: 310px; color: #c3cbbf; font-size: 16px; line-height: 1.55; }
+.bottomline { position: absolute; left: 48px; right: 48px; bottom: 80px; display: flex; justify-content: space-between; align-items: center; gap: 24px; z-index: 3; }
+.links { display: flex; align-items: center; gap: 26px; }
+.enter { display: inline-flex; gap: 25px; align-items: center; min-height: 52px; background: #e4572e; color: #18221d; padding: 16px 20px; border-radius: 3px; font-size: 15px; font-weight: 600; }
+.enter:hover { background: #ef7048; }
+.source { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: #f2f1e7; }
+.source:hover { color: #ed7651; }
+.scroll { display: inline-flex; gap: 20px; align-items: center; color: #b6bfae; font-size: 10px; letter-spacing: .08em; }
+.scroll span { font-size: 24px; }
+.track { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: #414c41; z-index: 3; }
+.track > div { height: 100%; background: #e87852; transform: scaleX(0); transform-origin: left center; }
+.journey[data-cinematic="true"] { height: 100svh; min-height: 650px; }
+.journey[data-cinematic="true"] .chapters { height: 100%; }
+.journey[data-cinematic="true"] .chapter { position: absolute; top: max(175px, 19vh); left: 48px; right: 0; margin: 0; }
+.journey[data-cinematic="false"] .world { bottom: auto; height: 820px; }
+.journey[data-cinematic="false"] { height: 100svh; min-height: 650px; }
+.journey[data-cinematic="false"] .chapter:not(:first-child) { display: none; }
+.journey a:focus-visible { outline: 2px solid #f18b66; outline-offset: 5px; }
+@media (min-width: 1600px) { .chapters { padding-left: max(48px, calc((100vw - 1400px)/2)); } .journey[data-cinematic="true"] .chapter { left: max(48px, calc((100vw - 1400px)/2)); } }
+@media (max-width: 767px) {
+  .coordinate { display: none; }
+  .topline { top: 100px; left: 22px; right: 22px; font-size: 9px; }
+  .journey[data-cinematic="true"] { min-height: 650px; }
+  .world { inset: 28% -25% 3% -20%; }
+  .veil { background: linear-gradient(180deg, #18221d 0%, #18221dc9 30%, transparent 58%, #18221d33 78%, #18221d 100%); }
+  .chapters { padding: 140px 22px 140px; max-width: none; }
+  .journey[data-cinematic="true"] .chapter { top: 140px; left: 22px; right: 22px; }
+  .journey .chapter h1, .journey .chapter h2 { font-size: clamp(46px, 9vw, 68px); line-height: .98; }
+  .chapter h1 > br:first-of-type { display: none; }
+  .kicker { font-size: 10px; margin-bottom: 16px !important; }
+  .journey .copy { font-size: 14px; max-width: 300px; margin-top: 16px; line-height: 1.45; }
+  .bottomline { left: 22px; right: 22px; bottom: 70px; flex-direction: column; align-items: stretch; gap: 20px; }
+  .links { justify-content: space-between; gap: 15px; }
+  .enter { font-size: 12px; padding: 13px; gap: 10px; }
+  .source { font-size: 11px; gap: 5px; }
+  .scroll { justify-content: space-between; font-size: 9px; order: -1; }
+  .journey[data-cinematic="false"] .world { height: 640px; top: 180px; }
+  .journey[data-cinematic="false"] .chapter:first-child { margin-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .track { display: none; } }
+
+@media (max-width: 360px) {
+  .journey .chapter h1, .journey .chapter h2 { font-size: 38px; }
+  .journey .copy { font-size: 13px; }
+  .world { inset: 36% -20% 10% -20%; }
+}

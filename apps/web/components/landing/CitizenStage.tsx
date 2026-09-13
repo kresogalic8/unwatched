@@ -80,7 +80,7 @@ export default function CitizenStage({
         return;
       }
       if (dead) {
-        a.destroy(true, { children: true });
+        a.destroy({ removeView: true, releaseGlobalResources: false }, { children: true });
         return;
       }
       app = a;
@@ -164,7 +164,7 @@ export default function CitizenStage({
       document.removeEventListener("visibilitychange", visibility);
       ro?.disconnect();
       io?.disconnect();
-      app?.destroy(true, { children: true });
+      app?.destroy({ removeView: true, releaseGlobalResources: false }, { children: true });
     };
   }, []);
   return (

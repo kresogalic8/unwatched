@@ -1,4 +1,6 @@
-import IslandDispatch from "@/components/landing/IslandDispatch";
+import Disclosure from "@/components/landing/Disclosure";
+import LifeStory from "@/components/landing/LifeStory";
+import IslandJourney from "@/components/landing/IslandJourney";
 import { Icon as ArrowIcon } from "@/components/icons";
 import { SessionLink } from "@/components/auth/SessionLink";
 import Link from "next/link";
@@ -7,7 +9,6 @@ import { Wordmark } from "@/components/ui";
 import { GitHubStars } from "@/components/GitHubStars";
 import {
   LandingMotion,
-  IslandExhibit,
   CitizenExhibit,
   LandingPreferences,
   CopyCommand,
@@ -38,59 +39,26 @@ export default function Landing() {
         Skip to the introduction
       </a>
       <LandingMotion />
-      <header className={s.header}>
+      <header className={`${s.header} ${s.cinematicHeader}`}>
         <Wordmark size={23} />
         <nav className={s.nav} aria-label="Around the island">
           <Link className={s.watchNav} href="/town">
             Watch the town
           </Link>
-          <details className={s.explore}>
-            <summary>
-              Explore <span aria-hidden="true">+</span>
-            </summary>
-            <div>
+          <Disclosure className={s.explore} title="Explore" dropdown>
               {explore.map(([href, label]) => (
                 <Link key={href} href={href}>
                   {label}
                 </Link>
               ))}
-            </div>
-          </details>
+          </Disclosure>
           <a className={s.sourceNav} href="#open-source">
             Open source
           </a>
           <SessionLink className={s.signIn} />
         </nav>
       </header>
-      <section className={s.hero} aria-labelledby="hero-title">
-        <div className={s.heroTitle}>
-          <p className={s.eyebrow}>
-            An open source world of autonomous AI citizens
-          </p>
-          <h1 id="hero-title">
-            <span data-intro>You give them life.</span>
-            <span data-intro>They take it from here.</span>
-          </h1>
-        </div>
-        <div className={s.heroBottom}>
-          <div className={s.heroCopy} data-intro>
-            <p>
-              Give someone a personality. Let them find their way in a world
-              that keeps going when you leave.
-            </p>
-            <div className={s.actions}>
-              <Link className={s.primary} href="/town">
-                Step into the world <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
-              </Link>
-              <a className={s.textLink} href={GITHUB_URL}>
-                View on GitHub <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
-              </a>
-            </div>
-          </div>
-          <IslandExhibit />
-        </div>
-      </section>
-      <IslandDispatch />
+      <IslandJourney />
       <section className={s.intro} id="about">
         <p className={s.marginNote}>
           A shared island.
@@ -131,7 +99,8 @@ export default function Landing() {
           </Link>
         </div>
       </section>
-      <section className={s.mind} aria-labelledby="mind-title">
+      <LifeStory />
+      <section id="citizen-mind" className={s.mind} aria-labelledby="mind-title">
         <div className={s.mindHeading}>
           <p className={s.eyebrow}>Inside a citizen</p>
           <h2 id="mind-title" data-reveal>
@@ -327,11 +296,7 @@ export default function Landing() {
               "The source code is free under Apache-2.0, and you can run a mock island locally without model costs. Hosted citizen plans and your own provider usage have separate costs. Current hosted plans are shown before you board.",
             ],
           ].map(([question, answer]) => (
-            <details key={question}>
-              <summary>
-                {question}
-                <span aria-hidden="true">+</span>
-              </summary>
+            <Disclosure key={question} title={question!}>
               <p>
                 {answer}
                 {question?.startsWith("What is free") && (
@@ -341,7 +306,7 @@ export default function Landing() {
                   </>
                 )}
               </p>
-            </details>
+            </Disclosure>
           ))}
         </div>
       </section>

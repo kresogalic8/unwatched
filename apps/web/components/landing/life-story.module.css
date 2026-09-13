@@ -1,0 +1,78 @@
+.story { position: relative; isolation: isolate; height: 100svh; min-height: 700px; overflow: clip; background: #ece9df; color: #20291f; }
+.header { position: absolute; top: 48px; left: 48px; right: 48px; display: flex; justify-content: space-between; gap: 24px; align-items: start; z-index: 3; }
+.story .header h2 { font-size: clamp(32px, 3.5vw, 52px); letter-spacing: -.055em; line-height: 1.02; font-weight: 500; }
+.header h2 span { color: #757965; }
+.header p { color: #606557; font-size: 12px; line-height: 1.6; }
+.header strong { font-weight: 400; font-size: 11px; }
+.scene { position: absolute; inset: 20% 43% 18% 0; }
+.sun { position: absolute; width: 300px; height: 300px; max-width: 70%; aspect-ratio: 1; border-radius: 50%; background: #dedfcf; top: 4%; left: 20%; transition: background 700ms; }
+.ground { position: absolute; bottom: 8%; left: -8%; width: 105%; height: 20%; border-radius: 50%; background: #dadbc9; transform: rotate(-7deg); }
+.scene img { object-fit: contain; }
+.harbor { position: absolute; width: 70%; height: 25%; left: -15%; bottom: 3%; transition: opacity 600ms, transform 800ms; }
+.tree { position: absolute; width: 38%; height: 52%; top: 3%; left: 0; opacity: .75; }
+.bakery { position: absolute; right: 2%; top: 0; width: 58%; height: 72%; opacity: 0; transform: translateY(50px) scale(.9); transition: opacity 600ms, transform 900ms; }
+.stall { position: absolute; width: 40%; height: 30%; left: 5%; bottom: 13%; opacity: 0; transform: translateY(40px); transition: opacity 600ms, transform 900ms; }
+.character { position: absolute; width: 44%; height: 65%; left: 30%; bottom: 7%; z-index: 2; }
+.character canvas { width: 100%; height: 100%; }
+.monogram { font-size: 100px; display: block; text-align: center; margin-top: 50%; }
+.name { position: absolute; bottom: 0; left: 29%; right: 15%; z-index: 3; text-align: center; letter-spacing: .16em; font-size: 11px; }
+.name span { display: block; letter-spacing: 0; color: #606557; margin-top: 5px; }
+.story .thought { position: absolute; left: 13%; top: 30%; width: 170px; z-index: 3; background: #f6f4ed; border: 1px solid #cdd0bd; padding: 15px; font-size: 15px; line-height: 1.35; transform: rotate(-5deg); box-shadow: 0 4px 0 #cdd0bd55; animation: note 450ms ease-out; }
+.narrative { position: absolute; left: 61%; right: 7%; top: 27%; z-index: 3; }
+.day { display: flex; gap: 10px; align-items: baseline; color: #727666; font-size: 11px; }
+.day strong { font-size: clamp(60px, 7vw, 110px); font-weight: 400; color: #b3b8a0; line-height: 1; letter-spacing: -.06em; font-variant-numeric: tabular-nums; animation: reveal 400ms ease-out; }
+.chapter { animation: reveal 450ms ease-out; }
+.story .place { font-size: 11px; color: #a94323; text-transform: uppercase; letter-spacing: .12em; margin: 22px 0 15px; }
+.story h3 { font-size: clamp(28px, 3vw, 42px); line-height: 1.05; letter-spacing: -.045em; font-weight: 500; white-space: pre-line; margin: 0 0 20px; }
+.chapter > p:not(.place) { font-size: 16px; line-height: 1.6; color: #606557; max-width: 360px; }
+.chapter small { display: block; border-top: 1px solid #c6c9b8; margin-top: 25px; padding-top: 15px; font-size: 12px; color: #606557; }
+.footer { position: absolute; left: 48px; right: 48px; bottom: 85px; display: flex; align-items: center; justify-content: space-between; gap: 28px; }
+.timeline { display: flex; gap: 5px; width: 42%; }
+.timeline > span { flex: 1; font-size: 10px; padding-top: 12px; border-top: 2px solid #c6c9b8; color: #727666; transition: border-color 300ms, color 300ms; }
+.timeline > span[data-active="true"] { border-color: #bd4c29; color: #a94323; }
+.timeline button { min-height: 44px; padding: 8px; border: 1px solid #c6c9b8; color: #20291f; background: transparent; font: inherit; font-size: 12px; }
+.timeline button[aria-pressed="true"], .timeline button:hover { background: #20291f; color: #f2f1eb; }
+.footer a { display: inline-flex; align-items: center; gap: 24px; font-size: 16px; color: #20291f; }
+.footer a:hover { color: #a94323; }
+.skip { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: #606557; min-height: 44px; }
+.story :is(a,button):focus-visible { outline: 2px solid #a94323; outline-offset: 4px; }
+.story[data-phase="1"] .harbor, .story[data-phase="2"] .harbor, .story[data-phase="3"] .harbor { opacity: 0; transform: translateX(-50px); }
+.story[data-phase="1"] .bakery { opacity: .65; transform: none; }
+.story[data-phase="2"] .bakery { opacity: .3; transform: translateX(20px) scale(.95); }
+.story[data-phase="2"] .stall { opacity: 1; transform: none; }
+.story[data-phase="3"] .bakery { opacity: 1; transform: scale(1.07); }
+.story[data-phase="3"] .sun { background: #e9d3aa; }
+@keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes note { from { opacity: 0; transform: rotate(-9deg) translateY(8px); } to { opacity: 1; transform: rotate(-5deg); } }
+@media (max-width: 767px) {
+  .story { min-height: 750px; }
+  .header { top: 30px; left: 22px; right: 22px; }
+  .story .header h2 { font-size: 31px; }
+  .header p { max-width: 120px; font-size: 10px; }
+  .header strong { font-size: 9px; }
+  .scene { inset: 14% 0 45% 0; }
+  .sun { width: 180px; height: 180px; }
+  .character { height: 72%; width: 42%; left: 35%; }
+  .story .thought { font-size: 12px; padding: 10px; width: 130px; top: 27%; left: 5%; }
+  .name { left: 39%; right: 18%; bottom: -5%; font-size: 9px; }
+  .narrative { top: 58%; left: 22px; right: 22px; }
+  .day { position: absolute; top: -3px; right: 0; }
+  .day strong { font-size: 45px; }
+  .day > span { font-size: 9px; }
+  .story .place { margin: 0 0 15px; max-width: 62%; }
+  .story h3 { font-size: 26px; max-width: 90%; margin-bottom: 10px; }
+  .chapter > p:not(.place) { font-size: 13px; line-height: 1.4; }
+  .chapter small { display: none; }
+  .footer { left: 22px; right: 22px; bottom: 70px; gap: 16px; flex-direction: column; align-items: stretch; }
+  .timeline { width: 100%; }
+  .timeline > span { padding-top: 7px; font-size: 9px; }
+  .footer a { justify-content: space-between; font-size: 13px; }
+}
+@media (max-width: 360px) {
+  .story { min-height: 780px; }
+  .story h3 { font-size: 24px; }
+  .narrative { top: 57%; }
+  .scene { bottom: 46%; }
+}
+@media (prefers-reduced-motion: reduce) { .story *, .story *::before { animation: none !important; transition: none !important; } }
+.story[data-cinematic="false"] * { animation: none; transition: none; }

@@ -126,7 +126,7 @@
 .explore summary::-webkit-details-marker {
   display: none;
 }
-.explore[open] summary span {
+.explore[data-expanded="true"] summary span {
   transform: rotate(45deg);
 }
 .explore > div {
@@ -704,7 +704,7 @@
   font-size: 24px;
   color: var(--muted);
 }
-.faq details[open] summary span {
+.faq details[data-expanded="true"] summary span {
   transform: rotate(45deg);
 }
 .faq details p {
@@ -1258,37 +1258,55 @@
 }
 @media (prefers-reduced-motion: reduce) { .citizenDots span { transition: none; } }
 
-/* The miniature opens as a small tour; the dispatch is the actual public record. */
-.islandExhibit { min-width: 0; }
-.sceneStatus { font-size: 11px; line-height: 1.4; }
-.tour { margin: 0 8% 0 10%; border-top: 1px solid var(--rule); padding-top: 14px; }
-.tourStops { display: flex; flex-wrap: wrap; gap: 6px; }
-.tourStops button { border: 1px solid var(--rule); background: transparent; color: var(--muted); padding: 10px 12px; min-height: 44px; border-radius: 3px; font-size: 12px; transition: color 160ms, background 160ms; }
-.tourStops button:hover, .tourStops button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.page .tourStory { margin-top: 14px; color: var(--muted); font-size: 14px; line-height: 1.5; min-height: 63px; max-width: 450px; }
-.dispatch { width: min(100% - 96px, 1400px); padding: 48px 0 38px; border-top: 1px solid var(--rule); margin: 36px auto 0; }
-.dispatchHead { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; }
-.page .dispatchHead h2 { font-size: clamp(34px, 4vw, 56px); margin-top: 18px; }
-.dispatchMeta { color: var(--muted); font-size: 14px; line-height: 1.6; }
-.dispatchMeta > span { display: inline-block; border-bottom: 1px solid var(--rule); padding-bottom: 8px; margin-bottom: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.dispatchItems { margin-top: 34px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
-.dispatchItems article { border-top: 1px solid var(--rule); padding-top: 16px; min-width: 0; }
-.dispatchStamp { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
-.dispatchStamp > span { color: var(--accent); font-weight: 500; }
-.page .dispatchItems article p { margin-top: 15px; font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
-.dispatchEmpty { grid-column: 1 / -1; color: var(--muted); padding-block: 20px; }
-.dispatchFoot { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 32px; }
-.dispatchFoot > span { font-size: 12px; color: var(--muted); }
-@media (max-width: 639px) {
-  .tour { margin: 0; }
-  .tourStops { display: grid; grid-template-columns: repeat(2, 1fr); }
-  .page .tourStory { min-height: 64px; font-size: 13px; }
-  .dispatch { width: calc(100% - 40px); padding-block: 32px; margin-top: 24px; }
-  .dispatchHead { display: block; }
-  .dispatchMeta { margin-top: 22px; }
-  .dispatchMeta p { display: none; }
-  .dispatchItems { grid-template-columns: 1fr; gap: 22px; margin-top: 12px; }
-  .page .dispatchItems article p { font-size: 18px; -webkit-line-clamp: 3; }
-  .dispatchFoot { align-items: flex-start; flex-direction: column; gap: 18px; }
+.cinematicHeader { --ink: #f2f1e7; --paper: #28322b; --surface: #344036; --rule: #515b50; position: absolute; top: 0; left: 50%; transform: translateX(-50%); color: #f2f1e7; z-index: 5; }
+.cinematicHeader .signIn { border-color: #515b50; color: #f2f1e7; }
+
+/* Personality choices: visible affordances before the first interaction. */
+.personalityHint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; margin: 18px 0 0; }
+.desktopHint { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+.citizenButtons button { position: relative; border: 1px solid var(--rule); border-radius: 8px; cursor: pointer; transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease; }
+.citizenButtons button[aria-pressed="true"] { border-color: var(--accent); background: var(--paper); }
+.citizenButtons button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.personalityAction { display: inline-flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 11px; font-weight: 500; color: var(--ink); }
+.personalityAction svg { transition: transform 180ms ease; }
+.citizenButtons button[aria-pressed="true"] .personalityAction { color: var(--accent); }
+.citizenControls > button { cursor: pointer; transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease; }
+.citizenControls > button:active, .citizenButtons button:active { transform: scale(.97); }
+.storyReveal { margin: 0; }
+.citizens[data-animate="true"] .storyReveal { animation: personalityReveal 280ms ease-out both; }
+@keyframes personalityReveal { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@media (hover: hover) and (pointer: fine) {
+  .citizenButtons button:hover { transform: translateY(-4px); border-color: var(--ink); background: var(--paper); }
+  .citizenButtons button[aria-pressed="true"]:hover { border-color: var(--accent); }
+  .citizenButtons button:hover .personalityAction svg { transform: translate(2px, -2px); }
+  .citizenButtons button[aria-pressed="true"]:hover .personalityAction svg { transform: none; }
+  .citizenButtons button:active { transform: translateY(-1px) scale(.98); }
+  .citizenControls > button:hover { border-color: var(--accent); }
 }
-@media (prefers-reduced-motion: reduce) { .tourStops button { transition: none; } }
+.citizens[data-animate="false"] button, .citizens[data-animate="false"] svg, .citizens[data-animate="false"] .citizenDots span { transition: none; }
+.citizens[data-animate="false"] button:hover, .citizens[data-animate="false"] button:active, .citizens[data-animate="false"] button:hover svg { transform: none; }
+@media (max-width: 639px) {
+  .personalityHint { justify-content: center; text-align: center; gap: 2px; }
+  .personalityHint > span { width: 100%; }
+  .personalityHint .desktopHint { display: none; }
+  .personalityHint .swipeHint { display: block; font-size: 11px; }
+  .citizenButtons button[aria-pressed="true"] { border: 0; cursor: default; }
+  .citizenButtons .personalityAction { display: none; }
+  .citizenButtons button:hover, .citizenButtons button:active { transform: none; background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .citizens .storyReveal { animation: none !important; }
+  .citizenButtons button, .personalityAction svg, .citizenControls > button { transition: none; }
+  .citizenButtons button:hover, .citizenButtons button:active, .citizenButtons button:hover svg, .citizenControls > button:active { transform: none; }
+}
+
+/* Shared disclosure motion for navigation and answers. */
+.disclosureIcon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 24px; width: 24px; height: 24px; transition: transform 240ms cubic-bezier(.22,1,.36,1), color 180ms ease; }
+.answerClip { overflow: hidden; }
+.explore summary, .faq summary { transition: color 180ms ease; }
+.explore summary:hover .disclosureIcon, .faq summary:hover .disclosureIcon { color: var(--accent); }
+.explore > div { transform-origin: top center; z-index: 30; }
+.explore > div a { transition: background-color 160ms ease, padding-left 160ms ease; }
+.explore > div a:hover { padding-left: 14px; }
+.page [data-animate="false"] .disclosureIcon, .page [data-animate="false"] summary, .page [data-animate="false"] > div a { transition: none; }
+@media (prefers-reduced-motion: reduce) { .disclosureIcon, .explore summary, .faq summary, .explore > div a { transition: none; } }
