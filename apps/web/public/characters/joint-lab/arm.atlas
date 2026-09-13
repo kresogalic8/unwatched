@@ -1,0 +1,12 @@
+arm.png
+size: 599,2365
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+arm
+  rotate: false
+  xy: 0,0
+  size: 599,2365
+  orig: 599,2365
+  offset: 0,0
+  index: -1

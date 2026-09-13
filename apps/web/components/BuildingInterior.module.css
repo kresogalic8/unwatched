@@ -1,0 +1,15 @@
+.view{position:absolute;inset:12px;z-index:30;display:flex;flex-direction:column;background:#eeeade;color:#263127;overflow:auto;border:1px solid #c5c7b8;border-radius:18px;box-shadow:0 18px 70px #13221940;animation:enter .24s ease-out;pointer-events:auto}
+.header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 26px;border-bottom:1px solid #27332620}
+.header h2{font-size:clamp(22px,3vw,34px);line-height:1.1;letter-spacing:-.045em;margin:5px 0 0;font-weight:600}
+.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#67715f}
+.back{display:flex;align-items:center;gap:9px;font-size:12px;white-space:nowrap;padding:12px;border:1px solid #aeb4a5;border-radius:6px}
+.back:hover,.detailsButton:hover,.person:hover{background:#2631270b}.view button:focus-visible{outline:2px solid #dc5b35;outline-offset:3px}
+.room{flex:1;min-height:260px;display:flex;flex-direction:column;justify-content:center;background:#dcd9c7;padding:22px 18px 12px}
+.room>div:first-child{border-radius:0!important;max-width:920px;margin:auto;flex-shrink:0}
+.caption{font-size:12px;text-align:center;color:#56624f;padding:12px 6px 0}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 22px;border-top:1px solid #27332620}
+.people{display:flex;gap:8px;flex-wrap:wrap}.person{display:flex;text-align:left;align-items:center;gap:8px;padding:6px 9px;border-radius:6px}.person strong{display:block;font-size:12px;font-weight:600}.person small{display:block;font-size:10px;color:#69715f;margin-top:2px}
+.detailsButton{font-size:12px;white-space:nowrap;padding:10px}.detailsButton span{margin-left:10px}.details{padding:0 24px 24px;display:grid;gap:12px}.note{font-size:11px;line-height:1.5;color:#6d7463}
+@keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.view{inset:6px;border-radius:12px}.header{padding:15px 14px;align-items:flex-start}.back{font-size:0;padding:10px}.back svg{width:20px;height:20px}.room{padding:12px 5px;min-height:200px}.footer{padding:12px;align-items:flex-start;flex-direction:column}.details{padding:0 16px 18px}}
+@media(prefers-reduced-motion:reduce){.view{animation:none}}

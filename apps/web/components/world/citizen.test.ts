@@ -200,3 +200,21 @@ describe("citizen pose continuity", () => {
     } finally { c.destroy({ children: true }); }
   });
 });
+
+
+describe("citizen contact layer", () => {
+  it("reaches a shared target from both facing directions at different scales", () => {
+    for (const facing of [-1, 1] as const) {
+      const c = new Citizen(look, 0);
+      try {
+        c.face(facing); c.scale.set(2.4); c.position.set(180, 240); c.update(0);
+        const target = c["body"].toGlobal({ x: 14, y: -36 });
+        c.reachFor("right", target);
+        const wrist = c.wrist("right");
+        expect(Math.hypot(wrist.x-target.x, wrist.y-target.y)).toBeLessThan(.01);
+        c.reachFor("left", {x:10000,y:10000});
+        expect(Number.isFinite(c.wrist("left").x)).toBe(true);
+      } finally { c.destroy({children:true}); }
+    }
+  });
+});

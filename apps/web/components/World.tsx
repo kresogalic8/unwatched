@@ -1,4 +1,11 @@
 "use client";
+import { BuildingInterior, hasInterior } from "./BuildingInterior";
+import { Footfall } from "./world/footfall";
+import { PlaceMemory } from "./PlaceMemory";
+import { drawPlaceMarks, markPosition } from "./world/place-marks";
+import { coastalWonder, type Decoration } from "@unwatched/protocol";
+import { CoastalLife } from "./world/coastal-life";
+import { harborGround, harborBreeze, harborMoorings } from "./world/harbor-detail";
 import { advanceWalk, walkFacing } from "./world/locomotion";
 import { seatsFor, type Seat } from "./world/seating";
 import { previewZoom, coast } from "./world/camera-motion";
@@ -28,7 +35,7 @@ import townStyle from "./town/town.module.css";
  */
 const C = { ...GROUND, shell: CREAM, sage: SAGE, teal: TEAL, kelp: KELP, coral: CORAL, drift: DRIFT };
 
-type PlaceView = { community?: CommunityView; hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
+type PlaceView = { decorations?: Decoration[]; community?: CommunityView; hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
 type TownView = Clock & { size: { w: number; h: number }; places: PlaceView[] };
 
 
@@ -103,7 +110,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
   const ambienceRef = useRef<Ambience | null>(null);
   const [sound, setSound] = useState(false);
   const [cleanUi, setCleanUi] = useState(false);
-  const [placeInfo, setPlaceInfo] = useState<{ community?: CommunityView; stock?: Record<string,number>; hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
+  const placePast = useRef<{place:string;through:number} | null>(null);
+  const [placeInfo, setPlaceInfo] = useState<{ decorations?: Decoration[]; community?: CommunityView; stock?: Record<string,number>; hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
   const [mini, setMini] = useState<{ w: number; h: number; places: { id: string; x: number; y: number; kind: string; crowd: number }[]; view: { x: number; y: number; w: number; h: number }; people: { x: number; y: number; mine: boolean }[] } | null>(null);
 
   useEffect(() => {
@@ -162,9 +170,12 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // roads: an edge, a centre, cobbles in courses in the old town; and over them the wear, pale where feet actually go
       const segs = segmentsOf(places, OLD_TOWN); world.addChild(drawRoads(segs));
       const wear = new Wear(segs, (sg) => { const [a, b] = sg.key.split("|"); const hub = (id?: string) => id === "market" || id === "harbor" || id === "lane"; return (hub(a) ? 30 : 0) + (hub(b) ? 30 : 0) + (sg.cobbled ? 20 : 6); }); world.addChild(wear);
+      const harborSurface=harborGround(places.values(),inside);world.addChild(harborSurface.root);
       // the water's edge, alive: foam that breathes along the shore, whitecaps in wind and storm, rings where the rain hits
       const shoreLine = outline(1.012), shoreOut = outline(1.05); const foam = new Graphics(); world.addChild(foam);
       const seaLife = new Graphics(); world.addChild(seaLife);
+      const coastalLife = new CoastalLife((a, r) => ({ x: cx + Rx * wobble(a) * r * Math.cos(a), y: cy + Ry * wobble(a) * r * Math.sin(a) }), inside);
+      world.addChild(coastalLife.root);
       const drawFoam = (t: number, rough: number) => {
         foam.clear();
         for (let k = 0; k < shoreLine.length; k += 2) { const ph = Math.sin(t / 30 + k * 0.35); if (ph < -0.2) continue; const a = shoreLine[k]!, b = shoreLine[(k + 1) % shoreLine.length]!; foam.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2.5 + rough * 2, color: C.foam, alpha: 0.45 + 0.45 * ph, cap: "round" }); }
@@ -172,6 +183,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       };
 
       // everything with a foot on the ground sorts by y
+      const footfall = new Footfall(); world.addChild(footfall.g);
       const scene = new Container(); scene.sortableChildren = true; world.addChild(scene);
       // everything standing on the ground is drawn in code, in one projection, at its natural size; props may be scaled
       const shadows = new Graphics(); shadows.zIndex = 0.5; scene.addChild(shadows);
@@ -199,6 +211,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const smallStyle = new TextStyle({ fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x1e5a63, stroke: { color: 0xf7f6f3, width: 3, join: "round" } });
       // each place owns its drawn things so it can be redrawn when someone builds on it
       const drawn = new Map<string, Container>();
+      const drawnMarks = new Map<string, Container>();
       const drawPlace = (p: PlaceView) => {
         drawn.get(p.id)?.destroy({ children: true });
         const g = new Container(); g.sortableChildren = true; g.zIndex = p.y; scene.addChild(g); drawn.set(p.id, g);
@@ -243,19 +256,20 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (p.owner && p.kind !== "plot") { const nb = new Graphics(); nb.roundRect(-30, -12, 60, 11, 2).fill(C.shell).stroke({ width: 1.2, color: C.kelp }); nb.position.set(48, -6); nb.zIndex = 2; g.addChild(nb); const nt = new Text({ text: p.owner.split(" ").slice(-1)[0]!.toUpperCase(), style: { ...smallStyle, fontSize: 7 } }); nt.anchor.set(0.5, 0.5); nt.position.set(48, -12.5); nt.zIndex = 3; g.addChild(nt); }
         }
         const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(0, p.site ? 22 : 6); t.zIndex = 100000; g.addChild(t);
+        const marks = drawPlaceMarks(p.decorations ?? [], i=>markPosition(i,p,{x:cx,y:cy},inside)); g.addChild(marks); drawnMarks.set(p.id, marks);
         g.position.set(p.x, p.y);
         g.eventMode = "static"; g.cursor = "pointer"; const bounds=g.getLocalBounds(); g.hitArea=new Rectangle(bounds.x-8,bounds.y-8,bounds.width+16,bounds.height+16);
-        g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); onSelect(null); setPlaceInfo({ community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, ...(a.pose ? { pose: a.pose } : {}) })) }); });
+        g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); onSelect(null); placePast.current=null; setPlaceInfo({ decorations:p.decorations, community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, carrying:a.carrying, ...(a.pose ? { pose: a.pose } : {}) })) }); });
       };
       for (const p of places.values()) drawPlace(p);
       const decor = keepOffRoads(decorFor([...places.values()]), segs);
       let trees: Container[] = [];
       const plantTrees = () => {
         for (const t of trees) t.destroy({ children: true }); trees = [];
-        for (const d of decor) { if (!/tree|bush/.test(d.sprite)) continue; const sp = put(d.sprite, d.x, d.y, d.w, d.flip); if (!sp) continue; const sh = new Graphics(); sh.ellipse(d.w ? d.w * 0.12 : 8, 3, d.sprite === "tree-large" ? 40 : d.sprite === "bush" ? 12 : 26, d.sprite === "tree-large" ? 12 : d.sprite === "bush" ? 4 : 8).fill({ color: C.kelp, alpha: 0.09 }); sp.addChildAt(sh, 0); trees.push(sp); }
+        for (const d of decor) { if (!/tree|bush|olive|cypress/.test(d.sprite)) continue; const sp = put(d.sprite, d.x, d.y, d.w, d.flip); if (!sp) continue; const sh = new Graphics(); sh.ellipse(d.w ? d.w * 0.12 : 8, 3, d.sprite === "tree-large" ? 40 : d.sprite === "bush" ? 12 : 26, d.sprite === "tree-large" ? 12 : d.sprite === "bush" ? 4 : 8).fill({ color: C.kelp, alpha: 0.09 }); sp.addChildAt(sh, 0); trees.push(sp); }
       };
       setSeason(forcedSeason ?? clockRef.current?.season ?? townView.season ?? "summer");
-      for (const d of decor) { if (/tree|bush/.test(d.sprite)) continue; put(d.sprite, d.x, d.y, d.w, d.flip); }
+      for (const d of decor) { if (/tree|bush|olive|cypress/.test(d.sprite)) continue; put(d.sprite, d.x, d.y, d.w, d.flip); }
       plantTrees();
       const SEASON_CAST: Record<string, number> = { winter: 0xeaf0f0, spring: 0xffffff, summer: 0xfbf2dc, autumn: 0xf7e9d2 };
       // wet ground darkens the island under the rain; snow settles on it and melts again
@@ -267,6 +281,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const findParts = (label: string): Container[] => { const out: Container[] = []; const walk = (n: Container) => { if (n.label === label) out.push(n); for (const ch of n.children) if (ch instanceof Container) walk(ch); }; walk(scene); return out; };
       const sails = findParts("sails"), bells = findParts("bell"), cloths = findParts("cloth"); let millSpeed = 0;
       const boats = [...scene.children].filter((ch) => decor.some((d) => d.sprite === "rowboat" && Math.abs(ch.position.x - d.x) < 1 && Math.abs(ch.position.y - d.y) < 1)) as (Container & { userData: number })[]; for (const bt of boats) bt.userData = bt.position.y;
+      const updateMoorings=harborMoorings(scene,boats,decor.filter(d=>d.sprite==="pier"));
+      let detailSeconds=0;const quietMotion=window.matchMedia("(prefers-reduced-motion: reduce)");
       const wake = new Graphics(); wake.zIndex = 0.6; scene.addChild(wake);
       const aboard: Container[] = []; // figures riding the boat, parented to it
       const gulls = new Graphics(); gulls.zIndex = 180000; scene.addChild(gulls);
@@ -355,7 +371,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const releaseSeat = (f: Fig) => { if(f.seat) takenBenches.delete(f.seat.key); f.seat=undefined; f.bench=false; f.rig.seatAt(null); };
       const benchAt = (place: string): Seat | null => {
         const p=places.get(place); if(!p)return null;
-        return availableSeats.filter(seat => !takenBenches.has(seat.key) && Math.hypot(seat.x-p.x,seat.y-p.y)<260)
+        const addedSeats = [...places.values()].flatMap((pl,pi) => (pl.decorations ?? []).flatMap((d,i)=>d.kind==='bench'?seatsFor({sprite:'bench',x:pl.x+markPosition(i,pl,{x:cx,y:cy},inside).x,y:pl.y+markPosition(i,pl,{x:cx,y:cy},inside).y},100000+pi*6+i):[]));
+        return [...availableSeats,...addedSeats].filter(seat => !takenBenches.has(seat.key) && Math.hypot(seat.x-p.x,seat.y-p.y)<260)
           .sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0] ?? null;
       };
       const spot = (place: string, seat: number) => { const p = places.get(place) ?? places.get("market")!; const g = gather(p); const cols = 5; return { x: g.x + 20 + (seat % cols) * ((g.w - 40) / (cols - 1)), y: g.y + Math.floor(seat / cols) * 26 }; };
@@ -366,7 +383,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const g = new Container();
           const rig = new Citizen(aged(lookFor(a.name, a.appearance as Partial<Look> | null), a.age)); rig.scale.set(0.82); rig.age(a.age); rig.trade(a.job); rig.hold(a.carrying ?? null); g.addChild(rig);
           g.eventMode = "static"; g.cursor = "pointer"; g.hitArea = { contains: (x: number, y: number) => x > -18 && x < 18 && y > -66 && y < 0 } as never;
-          g.on("pointertap", () => { if (performance.now() >= suppressSelectUntil) { setPlaceInfo(null); onSelect(agents.current.get(a.id) ?? null); } });
+          g.on("pointertap", () => { if (performance.now() >= suppressSelectUntil) { placePast.current=null; setPlaceInfo(null); onSelect(agents.current.get(a.id) ?? null); } });
           g.on("pointerover", () => { hoverRef.current = a.id; }); g.on("pointerout", () => { if (hoverRef.current === a.id) hoverRef.current = null; });
           scene.addChild(g);
           const seat = seatOf.current.get(a.location) ?? 0; seatOf.current.set(a.location, (seat + 1) % 10);
@@ -380,7 +397,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         return f;
       };
       const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) wear.step(f.place, place); f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
-      const refreshPlaces = async () => { try { const t = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock)) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
+      const refreshPlaces = async () => { try { const t = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock)) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
       // Full population snapshots are authoritative, including citizens who were moved off island.
       const syncPopulation = (list: PublicAgent[]) => {
@@ -395,6 +412,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           removed = true;
         }
         for (const a of list) ensure(a);
+        setPlaceInfo(info=>info?{...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))}:info);
         if (removed) setFeed(feed => [...feed]);
       };
       poll = setInterval(() => { void fetch(`${API}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
@@ -405,7 +423,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (msg.type === "clock" && msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; }
         if (msg.type === "event" && msg.event) {
           const e = msg.event;
-          if ((e.kind === "town.gathering" || e.kind === "town.fire") && e.place) { const pl = places.get(e.place); const pay = (e.payload ?? {}) as { kind?: string; crowd?: string[]; held?: boolean; stage?: string }; if (pl) { const kind = e.kind === "town.fire" ? "fire" : (pay.kind ?? "feast"); staged.current = { kind, place: e.place, x: pl.x, y: pl.y, actors: e.actors, until: Date.now() + (kind === "fire" ? 180000 : 150000) }; const crowd = (pay.crowd ?? []).map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place); const leads = e.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f); const g = gather(pl); const cxp = g.x + g.w / 2, cyp = g.y + 10; leads.forEach((f, i) => { releaseSeat(f); f.tx = cxp - 14 + i * 28; f.ty = cyp; f.facing = i === 0 ? 1 : -1; }); const others = crowd.filter((f) => !leads.includes(f)); others.forEach((f, i) => { const n = Math.max(1, others.length); const ang = Math.PI * 0.15 + (Math.PI * 0.7 * i) / n; const r = 70 + (i % 2) * 22; releaseSeat(f); f.tx = cxp + Math.cos(ang) * r * 1.6; f.ty = cyp + 30 + Math.sin(ang) * r * 0.5; }); if (kind === "wedding" || kind === "funeral") ambienceRef.current?.toll(kind === "wedding" ? 6 : 3); } }
+          const eventActor=agents.current.get(e.actors[0]!);
+          if(eventActor && e.kind==="agent.sleep"){eventActor.asleep=true;eventActor.pose="sleep";}
+          if(eventActor && e.kind==="agent.wake"){eventActor.asleep=false;eventActor.pose="idle";}
+          if(["agent.move","agent.sleep","agent.wake","agent.work"].includes(e.kind)) setPlaceInfo(info=>{
+            if(!info)return info;
+            const list=[...agents.current.values()].map(a=>a.id!==e.actors[0]?a:{...a,...(e.kind==="agent.move"&&e.place?{location:e.place}:{}),...(e.kind==="agent.sleep"?{asleep:true,pose:"sleep" as const}:{}),...(e.kind==="agent.wake"?{asleep:false,pose:"idle" as const}:{})});
+            return {...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))};
+          });
+          if ((e.kind === "town.gathering" || e.kind === "town.fire") && e.place) { const pl = places.get(e.place); const pay = (e.payload ?? {}) as { kind?: string; crowd?: string[]; held?: boolean; stage?: string }; if (pl && pay.held !== false) { const kind = e.kind === "town.fire" ? "fire" : (pay.kind ?? "feast"); staged.current = { kind, place: e.place, x: pl.x, y: pl.y, actors: e.actors, until: Date.now() + (kind === "fire" ? 180000 : 150000) }; const crowd = (pay.crowd ?? []).map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place); const leads = e.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place && !f.asleep); const g = gather(pl); const cxp = g.x + g.w / 2, cyp = g.y + 10; leads.forEach((f, i) => { releaseSeat(f); f.tx = cxp - 14 + i * 28; f.ty = cyp; f.facing = i === 0 ? 1 : -1; }); const others = crowd.filter((f) => !leads.includes(f)); others.forEach((f, i) => { const n = Math.max(1, others.length); const ang = Math.PI * 0.15 + (Math.PI * 0.7 * i) / n; const r = 70 + (i % 2) * 22; releaseSeat(f); f.tx = cxp + Math.cos(ang) * r * 1.6; f.ty = cyp + 30 + Math.sin(ang) * r * 0.5; }); if (kind === "wedding" || kind === "funeral") ambienceRef.current?.toll(kind === "wedding" ? 6 : 3); } }
           if (e.importance >= 0.45 && e.kind !== "agent.move" && e.kind !== "agent.reflect") { const f = e.actors[0] ? figs.current.get(e.actors[0]) : null; const p = e.place ? places.get(e.place) : null; const x = f?.x ?? p?.x, y = f?.y ?? p?.y; if (x !== undefined && y !== undefined) cinema.current = { x, y: y - 40, ids: e.actors, at: Date.now() }; }
           if (e.kind === "agent.move" && e.place) moveTo(e.actors[0]!, e.place);
           if (e.kind === "agent.sleep") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = true; f.pose = "sleep"; } }
@@ -417,8 +443,16 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
             bubbles.current.set(e.actors[0]!, { text: e.text.split(": ").slice(1).join(": ") || e.text, until: Date.now() + 9000 });
             for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "greet", until: Date.now() + 1800 }; }
           }
-          if (e.kind === "garden.harvest") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "work", until: Date.now() + 8000 }; }
-          if (e.kind.startsWith("project.") || e.kind === "garden.harvest") void refreshPlaces();
+          if (e.kind === "garden.harvest" || e.kind === "place.decorated") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "work", until: Date.now() + 8000 }; }
+          if (e.kind.startsWith("project.") || e.kind === "garden.harvest" || e.kind === "place.decorated") void refreshPlaces();
+          if (e.kind === "agent.give" && e.actors.length===2) {
+            const pair=e.actors.map(id=>figs.current.get(id));const [a,b]=pair;
+            if(a&&b&&a.place===b.place&&!a.asleep&&!b.asleep){
+              dialogue.set(a.id,{peers:[b.id],until:Date.now()+4000});dialogue.set(b.id,{peers:[a.id],until:Date.now()+4000});
+              for(const f of [a,b])f.moment={pose:"greet",until:Date.now()+2400};
+            }
+          }
+          if (e.kind === "agent.eat") {const f=figs.current.get(e.actors[0]!);if(f)f.moment={pose:"eat",until:Date.now()+6000};}
           if (e.kind === "agent.say") { const q = /“([^”]+)”/.exec(e.text)?.[1]; if (q) bubbles.current.set(e.actors[0]!, { text: q, until: Date.now() + 7000 }); }
           if (e.kind === "conversation") { const lines = (e.payload?.lines as { speaker: string; text: string }[] | undefined) ?? []; const until = Date.now() + Math.max(5500, (lines.length - 1) * 2600 + 5500);
             for (const id of e.actors) dialogue.set(id, { peers: e.actors.filter(peer => peer !== id), until });
@@ -457,8 +491,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // where the frame goes, for tuning: window.__ftperf holds milliseconds per section since load
       const perf: Record<string, number> = {}; let perfT = 0; let perfSection = "start"; (window as unknown as { __ftperf: Record<string, number>; __ftworld: Container; __ftscene: Container }).__ftperf = perf; (window as unknown as { __ftworld: Container }).__ftworld = world; (window as unknown as { __ftscene: Container }).__ftscene = scene;
       const perfMark = (next: string) => { const now = performance.now(); perf[perfSection] = (perf[perfSection] ?? 0) + (now - perfT); perfT = now; perfSection = next; };
+      world.addChild(coastalLife.glow);
       app.ticker.add(() => {
-        if (!app) return; tick++; perfT = performance.now(); perfSection = "camera"; perf.frames = (perf.frames ?? 0) + 1;
+        if (!app) return; if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000; tick++; perfT = performance.now(); perfSection = "camera"; perf.frames = (perf.frames ?? 0) + 1;
         const Wd = app.screen.width, Hd = app.screen.height; const cam = camera.current;
         const hand = viewRef.current === "street" ? cam.hand : null;
         if (viewRef.current !== "street" && cam.hand) cam.hand = null;
@@ -509,12 +544,13 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (tick % 2 === 0) { wake.clear(); if (sailing) { const dir = Math.sign(boatTarget - boat.position.x); for (let i = 1; i <= 7; i++) { const x = boat.position.x - dir * (70 + i * 26), y = boat.position.y + 6 + Math.sin(tick / 9 + i) * 2; wake.moveTo(x, y - i * 1.5).lineTo(x - dir * 18, y - i * 1.5).moveTo(x, y + i * 1.5).lineTo(x - dir * 18, y + i * 1.5).stroke({ width: 2, color: C.foam, alpha: Math.max(0, 0.7 - i * 0.09), cap: "round" }); } } }
         // out of sight, the passengers are gone
         if (aboard.length && Math.abs(boat.position.x - awayX) < 4) { for (const g of aboard) g.destroy({ children: true }); aboard.length = 0; }
-        for (let i = 0; i < boats.length; i++) { const bt = boats[i]!; bt.position.y = bt.userData + Math.sin(tick / 35 + i * 2) * 1.2; bt.rotation = Math.sin(tick / 50 + i) * 0.03; }
+        for (let i = 0; i < boats.length; i++) { const bt = boats[i]!; const breeze=harborBreeze(detailSeconds,bt.x,bt.userData,wind);bt.position.y=bt.userData+Math.sin(detailSeconds*1.35+i*2)*(quietMotion.matches?0:.7+breeze*1.2);bt.rotation=quietMotion.matches?0:Math.sin(detailSeconds*.9+i)*(.007+breeze*.018); }
+        updateMoorings();
         // the mill turns while it is worked; the chapel bell swings at ten on Sunday; the washing sways in the wind
         const millP = places.get("mill"); const millOn = !!millP && millP.crowd > 0 && (c?.hour ?? 12) >= 7 && (c?.hour ?? 12) < 15 && c?.weekday !== "Sunday";
         millSpeed += ((millOn ? 0.012 : 0) - millSpeed) * 0.01; for (const sl of sails) sl.rotation += millSpeed;
         const bellOn = c?.weekday === "Sunday" && c.hour === 10 && c.minute % 60 < 3; for (const bl of bells) bl.rotation = bellOn ? Math.sin(tick / 4) * 0.5 : bl.rotation * 0.95;
-        for (const cl of cloths) cl.skew.x = Math.sin(tick / 18) * 0.12 * wind + Math.sin(tick / 6) * 0.03 * wind;
+        for (const cl of cloths) {const parent=cl.parent;const breeze=harborBreeze(detailSeconds,parent?.x??0,parent?.y??0,wind);cl.skew.x=quietMotion.matches?0:Math.sin(detailSeconds*2.1)*.075*breeze+Math.sin(detailSeconds*5)*.02*breeze;}
         // gulls over the quay by day, a few, wheeling
         if (tick % 2 === 0) { gulls.clear(); if (!(c && (c.hour < 6 || c.hour >= 20)) && weather !== "storm") for (let i = 0; i < 5; i++) { const t = tick / 60 + i * 1.3; const gx = harbor.x - 120 + Math.cos(t * 0.7 + i) * (160 + i * 30), gy = harbor.y - 260 - i * 28 + Math.sin(t * 1.1) * 40; const flap = Math.sin(tick / 5 + i) * 4; gulls.moveTo(gx - 9, gy + flap).quadraticCurveTo(gx - 4, gy - 4, gx, gy).quadraticCurveTo(gx + 4, gy - 4, gx + 9, gy + flap).stroke({ width: 1.6, color: C.kelp, alpha: 0.7, cap: "round" }); } }
         if (tick % 2 === 0) {
@@ -531,6 +567,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         }
         wetness += ((wet && !snowing ? 1 : 0) - wetness) * (wet ? 0.002 : 0.0006);
         snowiness += ((snowing ? 1 : 0) - snowiness) * (snowing ? 0.0015 : winter ? 0.0002 : 0.001);
+        harborSurface.update(wetness,detailSeconds);
         wetGround.alpha = 0.12 * wetness; snowGround.alpha = 0.6 * snowiness;
         // snow settles on every roof and crown; rain leaves the roofs shining; footprints cross the snow and fill in
         if (tick % 15 === 0) {
@@ -545,7 +582,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         // the short season: the fields turn to lavender
         if (tick % 60 === 0) { const bloom = !!c?.inSeason?.includes("lavender"); if (bloom !== lavender.visible) { lavender.visible = bloom; } }
         if (tick % 15 === 0) { puddles.clear(); if (wetness > 0.02) for (let i = 0; i < 26; i++) { const xx = ((i * 587) % (W - 400)) + 200, yy = ((i * 911) % (H - 400)) + 200; puddles.ellipse(xx, yy, 26 + (i % 4) * 8, 9 + (i % 3) * 3).fill({ color: C.waterDeep, alpha: 0.55 * wetness }); } }
-        for (let i = 0; i < trees.length; i++) { const tr = trees[i]!; tr.skew.x = Math.sin(tick / 22 + i) * 0.035 * wind + Math.sin(tick / 7 + i * 2) * 0.012 * wind; }
+        for (let i = 0; i < trees.length; i++) { const tr = trees[i]!; const breeze=harborBreeze(detailSeconds,tr.x,tr.y,wind);tr.skew.x=quietMotion.matches?0:Math.sin(detailSeconds*1.5+i*.35)*.023*breeze+Math.sin(detailSeconds*3.4+i)*.006*breeze; }
         if (tick % 3 === 0) { fog.clear(); if (weather === "fog") for (let i = 0; i < 18; i++) { const xx = ((i * 431 + tick * 0.6) % (W + 800)) - 400, yy = ((i * 277) % (H + 200)) - 100; fog.ellipse(xx, yy, 340 + (i % 3) * 120, 110 + (i % 2) * 50).fill({ color: C.shell, alpha: 0.16 }); } }
         if (weather === "storm") { if (tick > nextBolt) { flash.alpha = 0.55; nextBolt = tick + 300 + Math.random() * 900; } flash.alpha *= 0.82; } else flash.alpha = 0;
         // light: a warm dawn, a coral dusk, kelp at night
@@ -566,7 +603,11 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
             hearths: [...litHearths].map((id) => { const p = places.get(id); const off = HEARTHS[id] ?? [0, 0]; return p ? { x: p.x + off[0], y: p.y + off[1] } : null; }).filter((h): h is { x: number; y: number } => !!h),
             forge: { x: smithy ? smithy.x - 58 : 0, y: smithy ? smithy.y - 2 : 0, on: !!smithy && (forced.has("forge") || (smithy.crowd > 0 && hour >= 7 && hour < 18)) },
             cart: { x: carter.g.x, y: carter.g.y, moving: cartMoving && carter.g.visible }, meadows: lifeMeadows }); }
-        life.update({ tick, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: [...figs.current.values()].map((f) => ({ x: f.x, y: f.y, moving: Math.abs(f.tx - f.x) > 1.5 || Math.abs(f.ty - f.y) > 1.5 })), effects: effectsOn });
+        for(const [id,marks] of drawnMarks) marks.children.forEach((child,i)=>{child.visible=placePast.current?.place!==id || i<placePast.current.through;});
+        const livingPeople = [...figs.current.values()].map(f => ({ id: f.id, x: f.x, y: f.y, moving: Math.hypot(f.tx-f.x, f.ty-f.y)>1.5 }));
+        footfall.update(detailSeconds,livingPeople,wetness>.35,quietMotion.matches,inside);
+        coastalLife.update(detailSeconds, night.alpha / 0.42, weather, [boat, ...boats].filter(b => b.visible), livingPeople, quietMotion.matches, coastalWonder(c?.day ?? 1,hour,forcedSeason ?? c?.season ?? "summer",weather));
+        life.update({ tick, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn });
         for (const snd of life.sounds) ambience.cue(snd.name, Math.hypot(snd.x - cam.x, snd.y - cam.y), snd.x - cam.x, snd.level ?? 1);
         if (effectsRef.current !== effectsOn) { effectsOn = effectsRef.current; sea.filters = effectsOn && !nofx.has("water") ? [water] : null; ripples.visible = !effectsOn; lamps.visible = !effectsOn; night.visible = !effectsOn; dusk.visible = !effectsOn; rain.visible = !effectsOn; if (!effectsOn) { sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; } fog.visible = !effectsOn; if (!effectsOn) { lighting.dark.visible = false; lighting.glow.visible = false; weatherFx.rain.visible = false; weatherFx.snow.visible = false; weatherFx.fog.visible = false; clouds.puffs.visible = false; clouds.shadows.visible = false; } }
         if (effectsOn) {
@@ -733,15 +774,21 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         {mini.people.map((pp, i) => <circle key={i} cx={pp.x} cy={pp.y} r={pp.mine ? 30 : 16} fill={pp.mine ? "#E8735A" : "#1E2A2B"} />)}
         <rect x={mini.view.x} y={mini.view.y} width={mini.view.w} height={mini.view.h} fill="none" stroke="#1F5F5B" strokeWidth={18} rx={40} />
       </svg>}
-      {placeInfo && !cleanUi && <div data-world-control="place" className="absolute right-3 top-14 sm:right-6 sm:top-16 w-[min(320px,calc(100%-24px))] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
-        <div className="flex justify-between items-baseline gap-2"><div><div className="label">{placeInfo.district}</div><div className="display text-[20px] font-semibold">{placeInfo.name}</div></div><button onClick={() => setPlaceInfo(null)} className="text-sm text-drift">Close</button></div>
+      {placeInfo && !cleanUi && hasInterior(placeInfo.kind,placeInfo.sprite,placeInfo.site) && <BuildingInterior key={placeInfo.id} name={placeInfo.name} district={placeInfo.district} kind={placeInfo.kind} sprite={placeInfo.sprite} hour={clock?.hour ?? 12} people={placeInfo.people} stock={placeInfo.stock} onClose={()=>{placePast.current=null;setPlaceInfo(null);}} onPerson={id=>{placePast.current=null;setPlaceInfo(null);onSelect(agents.current.get(id)??null);}}>
+        {placeInfo.owner && <p className="text-sm">Owned by {placeInfo.owner}.</p>}
+        <PlaceMemory marks={placeInfo.decorations??[]} onPreview={through=>{placePast.current=through===null?null:{place:placeInfo.id,through};}}/>
+        {placeInfo.hasHistory && <a className="text-sm font-semibold" href={`/built/${encodeURIComponent(placeInfo.id)}`}>Explore the building record →</a>}
+      </BuildingInterior>}
+      {placeInfo && !cleanUi && !hasInterior(placeInfo.kind,placeInfo.sprite,placeInfo.site) && <div data-world-control="place" className="absolute right-3 top-14 sm:right-6 sm:top-16 max-h-[calc(100%-5rem)] overflow-y-auto w-[min(320px,calc(100%-24px))] bg-shell rounded-card p-4 flex flex-col gap-2 pointer-events-auto rise">
+        <div className="flex justify-between items-baseline gap-2"><div><div className="label">{placeInfo.district}</div><div className="display text-[20px] font-semibold">{placeInfo.name}</div></div><button onClick={() => {placePast.current=null;setPlaceInfo(null);}} className="text-sm text-drift">Close</button></div>
         {!placeInfo.community && placeInfo.kind !== "plot" && placeInfo.kind !== "wild" && <Interior kind={placeInfo.kind} sprite={placeInfo.sprite} hour={clock?.hour ?? 12} people={placeInfo.people} />}
         {placeInfo.community && <ProjectDetails project={placeInfo.community} site={placeInfo.site} stock={placeInfo.stock} />}
+        <PlaceMemory key={placeInfo.id} marks={placeInfo.decorations ?? []} onPreview={through=>{placePast.current=through===null?null:{place:placeInfo.id,through};}} />
         {placeInfo.hasHistory && <a href={`/built/${encodeURIComponent(placeInfo.id)}`} className="text-sm font-semibold text-teal underline underline-offset-4">Explore the building record →</a>}
         {placeInfo.owner && <div className="text-sm text-ink2">Owned by {placeInfo.owner}.</div>}
         {placeInfo.site && <div className="text-sm text-ink2">{constructionStage(placeInfo.site.done, placeInfo.site.of)} · {placeInfo.site.by} is building {placeInfo.site.name}: {placeInfo.site.done} of {placeInfo.site.of} mornings done.</div>}
         {placeInfo.kind === "plot" && !placeInfo.site && !placeInfo.community && <div className="text-sm text-ink2">Empty land. A house costs 15 coins and six mornings; a shop 30 and ten.</div>}
-        <div className="text-sm">{placeInfo.people.length === 0 ? <span className="text-drift">Nobody here right now.</span> : placeInfo.people.map((pp) => <div key={pp.name} className="flex items-center gap-2 py-0.5"><Portrait name={pp.name} appearance={pp.appearance} age={pp.age ?? 30} size={26} /><span>{pp.name}{pp.asleep ? ", asleep" : pp.job ? `, ${pp.job}` : ""}</span></div>)}</div>
+        <div className="text-sm">{placeInfo.people.length === 0 ? <span className="text-drift">Nobody here right now.</span> : placeInfo.people.map((pp) => <div key={pp.id} className="flex items-center gap-2 py-0.5"><Portrait name={pp.name} appearance={pp.appearance} age={pp.age ?? 30} size={26} /><span>{pp.name}{pp.asleep ? ", asleep" : pp.job ? `, ${pp.job}` : ""}</span></div>)}</div>
       </div>}
       <div hidden={cleanUi || observer} className="absolute left-3 bottom-3 sm:left-6 sm:bottom-6 bg-shell rounded-card p-3 sm:p-4 w-[calc(100%-24px)] sm:w-[330px] flex flex-col gap-1.5 pointer-events-auto max-h-[38%] sm:max-h-none overflow-hidden">
         <div className="label">Just now{clock ? ` · day ${clock.day} ${String(clock.hour).padStart(2, "0")}:${String(clock.minute % 60).padStart(2, "0")} · ${clock.weather}${typeof clock.temperatureC === "number" ? ` · ${Math.round(clock.temperatureC)}°` : ""}` : ""}</div>

@@ -1,6 +1,6 @@
 import type { TownEvent } from '@unwatched/protocol';
 export interface EvolutionStory { id:string; title:string; started:number; updated:number; total:number; moments:{id:number;t:number;day:number;kind:string;text:string;actors:string[];simulated:boolean;success:boolean|null}[] }
-const tracked=new Set(['skill.proposed','skill.tested','skill.practiced','skill.shared','building.repaired','project.proposed','project.contributed','town.built','town.recipe','institution.founded','institution.joined','institution.left']);
+const tracked=new Set(['place.decorated','skill.proposed','skill.tested','skill.practiced','skill.shared','building.repaired','project.proposed','project.contributed','town.built','town.recipe','institution.founded','institution.joined','institution.left']);
 export function recordEvolution(stories:EvolutionStory[], e:TownEvent) {
  if(!tracked.has(e.kind))return;
  const id=typeof e.payload?.skill==='string'?`skill-${e.payload.skill}`:e.place?`place-${e.place}`:`event-${e.id}`;

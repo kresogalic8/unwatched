@@ -1,0 +1,122 @@
+{
+  "neutral": {
+    "x": 4,
+    "y": 4,
+    "width": 337,
+    "height": 357
+  },
+  "smile": {
+    "x": 516,
+    "y": 4,
+    "width": 337,
+    "height": 357
+  },
+  "blink": {
+    "x": 1028,
+    "y": 4,
+    "width": 333,
+    "height": 356
+  },
+  "talk": {
+    "x": 1540,
+    "y": 4,
+    "width": 335,
+    "height": 356
+  },
+  "neck": {
+    "x": 2052,
+    "y": 4,
+    "width": 217,
+    "height": 171
+  },
+  "torso": {
+    "x": 4,
+    "y": 516,
+    "width": 415,
+    "height": 420
+  },
+  "hips": {
+    "x": 516,
+    "y": 516,
+    "width": 395,
+    "height": 364
+  },
+  "upper-far": {
+    "x": 1028,
+    "y": 516,
+    "width": 196,
+    "height": 411
+  },
+  "upper-near": {
+    "x": 1540,
+    "y": 516,
+    "width": 184,
+    "height": 411
+  },
+  "scarf": {
+    "x": 2052,
+    "y": 516,
+    "width": 165,
+    "height": 385
+  },
+  "fore-far": {
+    "x": 4,
+    "y": 1028,
+    "width": 149,
+    "height": 365
+  },
+  "fore-near": {
+    "x": 516,
+    "y": 1028,
+    "width": 140,
+    "height": 364
+  },
+  "hand-far": {
+    "x": 1028,
+    "y": 1028,
+    "width": 129,
+    "height": 365
+  },
+  "hand-near": {
+    "x": 1540,
+    "y": 1028,
+    "width": 132,
+    "height": 364
+  },
+  "shoe-near": {
+    "x": 2052,
+    "y": 1028,
+    "width": 403,
+    "height": 187
+  },
+  "thigh-far": {
+    "x": 4,
+    "y": 1540,
+    "width": 238,
+    "height": 404
+  },
+  "thigh-near": {
+    "x": 516,
+    "y": 1540,
+    "width": 231,
+    "height": 405
+  },
+  "shin-far": {
+    "x": 1028,
+    "y": 1540,
+    "width": 166,
+    "height": 358
+  },
+  "shin-near": {
+    "x": 1540,
+    "y": 1540,
+    "width": 179,
+    "height": 358
+  },
+  "shoe-far": {
+    "x": 2052,
+    "y": 1540,
+    "width": 400,
+    "height": 185
+  }
+}

@@ -1,0 +1,4072 @@
+{
+  "skeleton": {
+    "spine": "4.2.22",
+    "width": 64,
+    "height": 86,
+    "fps": 30,
+    "images": "./images/"
+  },
+  "bones": [
+    {
+      "name": "root"
+    },
+    {
+      "name": "hip",
+      "parent": "root",
+      "y": 35
+    },
+    {
+      "name": "torso",
+      "parent": "hip"
+    },
+    {
+      "name": "neck",
+      "parent": "torso",
+      "y": 31
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "y": 10
+    },
+    {
+      "name": "hair",
+      "parent": "head"
+    },
+    {
+      "name": "eyes",
+      "parent": "head",
+      "y": 1
+    },
+    {
+      "name": "brows",
+      "parent": "head",
+      "y": 4
+    },
+    {
+      "name": "mouth",
+      "parent": "head",
+      "x": 1,
+      "y": -4
+    },
+    {
+      "name": "thigh-far",
+      "parent": "hip",
+      "x": -5,
+      "rotation": -90,
+      "length": 17
+    },
+    {
+      "name": "shin-far",
+      "parent": "thigh-far",
+      "x": 17,
+      "length": 17
+    },
+    {
+      "name": "foot-far",
+      "parent": "shin-far",
+      "x": 17,
+      "rotation": 0,
+      "inherit": "onlyTranslation"
+    },
+    {
+      "name": "arm-far",
+      "parent": "torso",
+      "x": -9,
+      "y": 26,
+      "rotation": -90,
+      "length": 14
+    },
+    {
+      "name": "fore-far",
+      "parent": "arm-far",
+      "x": 14,
+      "length": 12
+    },
+    {
+      "name": "hand-far",
+      "parent": "fore-far",
+      "x": 12
+    },
+    {
+      "name": "thigh-near",
+      "parent": "hip",
+      "x": 5,
+      "rotation": -90,
+      "length": 17
+    },
+    {
+      "name": "shin-near",
+      "parent": "thigh-near",
+      "x": 17,
+      "length": 17
+    },
+    {
+      "name": "foot-near",
+      "parent": "shin-near",
+      "x": 17,
+      "rotation": 0,
+      "inherit": "onlyTranslation"
+    },
+    {
+      "name": "arm-near",
+      "parent": "torso",
+      "x": 9,
+      "y": 26,
+      "rotation": -90,
+      "length": 14
+    },
+    {
+      "name": "fore-near",
+      "parent": "arm-near",
+      "x": 14,
+      "length": 12
+    },
+    {
+      "name": "hand-near",
+      "parent": "fore-near",
+      "x": 12
+    },
+    {
+      "name": "hand-target",
+      "parent": "root",
+      "x": 28,
+      "y": 50
+    },
+    {
+      "name": "foot-target-far",
+      "parent": "root",
+      "x": -5,
+      "y": 1
+    },
+    {
+      "name": "foot-target-near",
+      "parent": "root",
+      "x": 5,
+      "y": 1
+    }
+  ],
+  "slots": [
+    {
+      "name": "thigh-far",
+      "bone": "thigh-far",
+      "attachment": "thigh-far"
+    },
+    {
+      "name": "shin-far",
+      "bone": "shin-far",
+      "attachment": "shin-far"
+    },
+    {
+      "name": "shoe-far",
+      "bone": "foot-far",
+      "attachment": "shoe-far"
+    },
+    {
+      "name": "thigh-near",
+      "bone": "thigh-near",
+      "attachment": "thigh-near"
+    },
+    {
+      "name": "shin-near",
+      "bone": "shin-near",
+      "attachment": "shin-near"
+    },
+    {
+      "name": "shoe-near",
+      "bone": "foot-near",
+      "attachment": "shoe-near"
+    },
+    {
+      "name": "upper-far",
+      "bone": "arm-far",
+      "attachment": "upper-far"
+    },
+    {
+      "name": "fore-far",
+      "bone": "fore-far",
+      "attachment": "fore-far"
+    },
+    {
+      "name": "hand-far",
+      "bone": "hand-far",
+      "attachment": "hand-far"
+    },
+    {
+      "name": "hips",
+      "bone": "hip",
+      "attachment": "hips"
+    },
+    {
+      "name": "torso",
+      "bone": "torso",
+      "attachment": "torso"
+    },
+    {
+      "name": "neck",
+      "bone": "neck",
+      "attachment": "neck"
+    },
+    {
+      "name": "upper-near",
+      "bone": "arm-near",
+      "attachment": "upper-near"
+    },
+    {
+      "name": "fore-near",
+      "bone": "fore-near",
+      "attachment": "fore-near"
+    },
+    {
+      "name": "hand-near",
+      "bone": "hand-near",
+      "attachment": "hand-near"
+    },
+    {
+      "name": "face",
+      "bone": "head",
+      "attachment": "face"
+    },
+    {
+      "name": "beard",
+      "bone": "head",
+      "attachment": "beard"
+    },
+    {
+      "name": "eye-far",
+      "bone": "eyes",
+      "attachment": "eye-far"
+    },
+    {
+      "name": "eye-near",
+      "bone": "eyes",
+      "attachment": "eye-near"
+    },
+    {
+      "name": "brow-far",
+      "bone": "brows",
+      "attachment": "brow-far"
+    },
+    {
+      "name": "brow-near",
+      "bone": "brows",
+      "attachment": "brow-near"
+    },
+    {
+      "name": "mouth",
+      "bone": "mouth",
+      "attachment": "mouth"
+    },
+    {
+      "name": "glasses",
+      "bone": "eyes",
+      "attachment": "glasses"
+    },
+    {
+      "name": "hair",
+      "bone": "hair",
+      "attachment": "hair"
+    }
+  ],
+  "ik": [
+    {
+      "name": "plant-far",
+      "order": 0,
+      "bones": [
+        "thigh-far",
+        "shin-far"
+      ],
+      "target": "foot-target-far",
+      "mix": 0,
+      "bendPositive": false
+    },
+    {
+      "name": "plant-near",
+      "order": 1,
+      "bones": [
+        "thigh-near",
+        "shin-near"
+      ],
+      "target": "foot-target-near",
+      "mix": 0,
+      "bendPositive": false
+    },
+    {
+      "name": "reach",
+      "order": 2,
+      "bones": [
+        "arm-near",
+        "fore-near"
+      ],
+      "target": "hand-target",
+      "mix": 0,
+      "bendPositive": true
+    }
+  ],
+  "skins": [
+    {
+      "name": "mara-front",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "mara/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "mara/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "mara/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "mara/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "mara/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "mara/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "mara/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "mara/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "mara/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "mara/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "mara/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "mara/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "mara/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "mara/face",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "mara/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "mara/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "mara/brow",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "mara/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "mara/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "mara-side",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "mara/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "mara/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "mara/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "mara/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "mara/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "mara/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "mara/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "mara/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "mara/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "mara/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "mara/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "mara/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "mara/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "mara/profile",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "mara/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 4.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "mara/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "mara/brow",
+            "width": 64,
+            "height": 64,
+            "x": 4.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "mara/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "mara/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "mara-back",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "mara/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "mara/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "mara/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "mara/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "mara/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "mara/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "mara/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "mara/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "mara/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "mara/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "mara/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "mara/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "mara/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "mara/back",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "mara/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "mara/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "mara/brow",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 0,
+            "scaleY": 0
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "mara/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "mara/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "ivo-front",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "ivo/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "ivo/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "ivo/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "ivo/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "ivo/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "ivo/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "ivo/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "ivo/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "ivo/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "ivo/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "ivo/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "ivo/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "ivo/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "ivo/face",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "ivo/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "ivo/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "ivo/brow",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "ivo/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "ivo/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "ivo-side",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "ivo/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "ivo/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "ivo/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "ivo/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "ivo/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "ivo/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "ivo/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "ivo/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "ivo/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "ivo/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "ivo/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "ivo/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "ivo/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "ivo/profile",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "ivo/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 4.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "ivo/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "ivo/brow",
+            "width": 64,
+            "height": 64,
+            "x": 4.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "ivo/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "ivo/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "ivo-back",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "ivo/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "ivo/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "ivo/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "ivo/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "ivo/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "ivo/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "ivo/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "ivo/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "ivo/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "ivo/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "ivo/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "ivo/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "ivo/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "ivo/back",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "ivo/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "ivo/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "ivo/brow",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 0,
+            "scaleY": 0
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "ivo/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "ivo/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "elio-front",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "elio/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "elio/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "elio/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "elio/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "elio/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "elio/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "elio/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "elio/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "elio/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "elio/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "elio/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "elio/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "elio/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "elio/face",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "elio/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "elio/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "elio/brow",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "elio/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "elio/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "elio-side",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "elio/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "elio/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "elio/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "elio/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "elio/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "elio/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "elio/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "elio/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "elio/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "elio/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "elio/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "elio/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "elio/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "elio/profile",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "elio/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 4.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "elio/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "elio/brow",
+            "width": 64,
+            "height": 64,
+            "x": 4.2,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "elio/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "elio/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "elio-back",
+      "attachments": {
+        "thigh-far": {
+          "thigh-far": {
+            "path": "elio/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-far": {
+          "shin-far": {
+            "path": "elio/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-far": {
+          "shoe-far": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "thigh-near": {
+          "thigh-near": {
+            "path": "elio/thigh",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shin-near": {
+          "shin-near": {
+            "path": "elio/shin",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "shoe-near": {
+          "shoe-near": {
+            "path": "shoe",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-far": {
+          "upper-far": {
+            "path": "elio/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-far": {
+          "fore-far": {
+            "path": "elio/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-far": {
+          "hand-far": {
+            "path": "elio/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hips": {
+          "hips": {
+            "path": "elio/hips",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "torso": {
+          "torso": {
+            "path": "elio/torso",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "neck": {
+          "neck": {
+            "path": "elio/neck",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "upper-near": {
+          "upper-near": {
+            "path": "elio/upper",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "fore-near": {
+          "fore-near": {
+            "path": "elio/fore",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "hand-near": {
+          "hand-near": {
+            "path": "elio/hand",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "face": {
+          "face": {
+            "path": "elio/back",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        "beard": {
+          "beard": {
+            "path": "elio/beard",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-far": {
+          "eye-far": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "eye-near": {
+          "eye-near": {
+            "path": "eye",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-far": {
+          "brow-far": {
+            "path": "elio/brow",
+            "width": 64,
+            "height": 64,
+            "x": -3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "brow-near": {
+          "brow-near": {
+            "path": "elio/brow",
+            "width": 64,
+            "height": 64,
+            "x": 3.2,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "mouth": {
+          "mouth": {
+            "path": "mouth-neutral",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          },
+          "smile": {
+            "path": "mouth-smile",
+            "width": 64,
+            "height": 64,
+            "scaleX": 0,
+            "scaleY": 0
+          },
+          "talk": {
+            "path": "mouth-talk",
+            "width": 64,
+            "height": 64,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "glasses": {
+          "glasses": {
+            "path": "elio/glasses",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 0,
+            "scaleY": 0
+          }
+        },
+        "hair": {
+          "hair": {
+            "path": "elio/hair",
+            "width": 64,
+            "height": 64,
+            "x": 0,
+            "y": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "idle": {
+      "bones": {
+        "torso": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -0.7,
+              "curve": [
+                0.35,
+                -0.7,
+                0.65,
+                0.7
+              ]
+            },
+            {
+              "time": 1,
+              "value": 0.7,
+              "curve": [
+                1.35,
+                0.7,
+                1.65,
+                -0.7
+              ]
+            },
+            {
+              "time": 2,
+              "value": -0.7
+            }
+          ]
+        },
+        "head": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 1,
+              "curve": [
+                0.35,
+                1,
+                0.65,
+                -1
+              ]
+            },
+            {
+              "time": 1,
+              "value": -1,
+              "curve": [
+                1.35,
+                -1,
+                1.65,
+                1
+              ]
+            },
+            {
+              "time": 2,
+              "value": 1
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 7,
+              "curve": [
+                0.35,
+                7,
+                0.65,
+                10
+              ]
+            },
+            {
+              "time": 1,
+              "value": 10,
+              "curve": [
+                1.35,
+                10,
+                1.65,
+                7
+              ]
+            },
+            {
+              "time": 2,
+              "value": 7
+            }
+          ]
+        },
+        "hair": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -1,
+              "curve": [
+                0.385,
+                -1,
+                0.7150000000000001,
+                1
+              ]
+            },
+            {
+              "time": 1.1,
+              "value": 1,
+              "curve": [
+                1.415,
+                1,
+                1.685,
+                -1
+              ]
+            },
+            {
+              "time": 2,
+              "value": -1
+            }
+          ]
+        },
+        "eyes": {
+          "scale": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 1.7,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 1.77,
+              "x": 1,
+              "y": 0.08
+            },
+            {
+              "time": 1.85,
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 2,
+              "x": 1,
+              "y": 1
+            }
+          ]
+        }
+      }
+    },
+    "walk": {
+      "bones": {
+        "hip": {
+          "translate": [
+            {
+              "time": 0,
+              "x": 0,
+              "y": -1.5
+            },
+            {
+              "time": 0.3,
+              "x": 0,
+              "y": -2
+            },
+            {
+              "time": 0.6,
+              "x": 0,
+              "y": -1.5
+            },
+            {
+              "time": 0.9,
+              "x": 0,
+              "y": -2
+            },
+            {
+              "time": 1.2,
+              "x": 0,
+              "y": -1.5
+            }
+          ]
+        },
+        "torso": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 1
+            },
+            {
+              "time": 0.6,
+              "value": -1
+            },
+            {
+              "time": 1.2,
+              "value": 1
+            }
+          ]
+        },
+        "head": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -1
+            },
+            {
+              "time": 0.6,
+              "value": 1
+            },
+            {
+              "time": 1.2,
+              "value": -1
+            }
+          ]
+        },
+        "hair": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -2
+            },
+            {
+              "time": 0.3,
+              "value": 1
+            },
+            {
+              "time": 0.6,
+              "value": 2
+            },
+            {
+              "time": 0.9,
+              "value": -1
+            },
+            {
+              "time": 1.2,
+              "value": -2
+            }
+          ]
+        },
+        "arm-far": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -16
+            },
+            {
+              "time": 0.6,
+              "value": 16
+            },
+            {
+              "time": 1.2,
+              "value": -16
+            }
+          ]
+        },
+        "fore-far": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 8
+            },
+            {
+              "time": 0.6,
+              "value": 16
+            },
+            {
+              "time": 1.2,
+              "value": 8
+            }
+          ]
+        },
+        "arm-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 16
+            },
+            {
+              "time": 0.6,
+              "value": -16
+            },
+            {
+              "time": 1.2,
+              "value": 16
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 8
+            },
+            {
+              "time": 0.6,
+              "value": 16
+            },
+            {
+              "time": 1.2,
+              "value": 8
+            }
+          ]
+        },
+        "foot-target-far": {
+          "translate": [
+            {
+              "time": 0,
+              "x": -7,
+              "y": 0
+            },
+            {
+              "time": 0.05,
+              "x": -5.833333333333334,
+              "y": 1.2940952255126026
+            },
+            {
+              "time": 0.1,
+              "x": -4.666666666666666,
+              "y": 2.5000000000000004
+            },
+            {
+              "time": 0.15,
+              "x": -3.5,
+              "y": 3.5355339059327373
+            },
+            {
+              "time": 0.2,
+              "x": -2.3333333333333313,
+              "y": 4.3301270189221945
+            },
+            {
+              "time": 0.25,
+              "x": -1.166666666666666,
+              "y": 4.8296291314453415
+            },
+            {
+              "time": 0.3,
+              "x": 0,
+              "y": 5
+            },
+            {
+              "time": 0.35,
+              "x": 1.1666666666666679,
+              "y": 4.829629131445341
+            },
+            {
+              "time": 0.4,
+              "x": 2.333333333333334,
+              "y": 4.330127018922193
+            },
+            {
+              "time": 0.45,
+              "x": 3.5,
+              "y": 3.5355339059327378
+            },
+            {
+              "time": 0.5,
+              "x": 4.666666666666668,
+              "y": 2.499999999999998
+            },
+            {
+              "time": 0.55,
+              "x": 5.833333333333334,
+              "y": 1.2940952255126028
+            },
+            {
+              "time": 0.6,
+              "x": 7,
+              "y": 0
+            },
+            {
+              "time": 0.65,
+              "x": 5.833333333333331,
+              "y": 0
+            },
+            {
+              "time": 0.7,
+              "x": 4.6666666666666625,
+              "y": 0
+            },
+            {
+              "time": 0.75,
+              "x": 3.5,
+              "y": 0
+            },
+            {
+              "time": 0.8,
+              "x": 2.3333333333333313,
+              "y": 0
+            },
+            {
+              "time": 0.85,
+              "x": 1.1666666666666625,
+              "y": 0
+            },
+            {
+              "time": 0.9,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.95,
+              "x": -1.1666666666666625,
+              "y": 0
+            },
+            {
+              "time": 1,
+              "x": -2.3333333333333375,
+              "y": 0
+            },
+            {
+              "time": 1.05,
+              "x": -3.5,
+              "y": 0
+            },
+            {
+              "time": 1.1,
+              "x": -4.666666666666668,
+              "y": 0
+            },
+            {
+              "time": 1.15,
+              "x": -5.833333333333332,
+              "y": 0
+            },
+            {
+              "time": 1.2,
+              "x": -7,
+              "y": 0
+            }
+          ]
+        },
+        "foot-target-near": {
+          "translate": [
+            {
+              "time": 0,
+              "x": 7,
+              "y": 0
+            },
+            {
+              "time": 0.05,
+              "x": 5.833333333333333,
+              "y": 0
+            },
+            {
+              "time": 0.1,
+              "x": 4.666666666666666,
+              "y": 0
+            },
+            {
+              "time": 0.15,
+              "x": 3.5,
+              "y": 0
+            },
+            {
+              "time": 0.2,
+              "x": 2.333333333333333,
+              "y": 0
+            },
+            {
+              "time": 0.25,
+              "x": 1.166666666666666,
+              "y": 0
+            },
+            {
+              "time": 0.3,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.35,
+              "x": -1.1666666666666679,
+              "y": 0
+            },
+            {
+              "time": 0.4,
+              "x": -2.333333333333334,
+              "y": 0
+            },
+            {
+              "time": 0.45,
+              "x": -3.5,
+              "y": 0
+            },
+            {
+              "time": 0.5,
+              "x": -4.666666666666668,
+              "y": 0
+            },
+            {
+              "time": 0.55,
+              "x": -5.833333333333334,
+              "y": 0
+            },
+            {
+              "time": 0.6,
+              "x": -7,
+              "y": 0
+            },
+            {
+              "time": 0.65,
+              "x": -5.833333333333331,
+              "y": 1.2940952255126061
+            },
+            {
+              "time": 0.7,
+              "x": -4.666666666666666,
+              "y": 2.5000000000000004
+            },
+            {
+              "time": 0.75,
+              "x": -3.5,
+              "y": 3.5355339059327373
+            },
+            {
+              "time": 0.8,
+              "x": -2.3333333333333313,
+              "y": 4.3301270189221945
+            },
+            {
+              "time": 0.85,
+              "x": -1.166666666666666,
+              "y": 4.8296291314453415
+            },
+            {
+              "time": 0.9,
+              "x": 0,
+              "y": 5
+            },
+            {
+              "time": 0.95,
+              "x": 1.166666666666666,
+              "y": 4.829629131445342
+            },
+            {
+              "time": 1,
+              "x": 2.333333333333334,
+              "y": 4.330127018922193
+            },
+            {
+              "time": 1.05,
+              "x": 3.5000000000000036,
+              "y": 3.535533905932735
+            },
+            {
+              "time": 1.1,
+              "x": 4.666666666666668,
+              "y": 2.499999999999998
+            },
+            {
+              "time": 1.15,
+              "x": 5.833333333333332,
+              "y": 1.2940952255126073
+            },
+            {
+              "time": 1.2,
+              "x": 7,
+              "y": 0
+            }
+          ]
+        }
+      }
+    },
+    "wave": {
+      "bones": {
+        "arm-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 10,
+              "curve": [
+                0.13999999999999999,
+                10,
+                0.26,
+                125
+              ]
+            },
+            {
+              "time": 0.4,
+              "value": 125,
+              "curve": [
+                0.54,
+                125,
+                0.66,
+                130
+              ]
+            },
+            {
+              "time": 0.8,
+              "value": 130,
+              "curve": [
+                0.94,
+                130,
+                1.06,
+                125
+              ]
+            },
+            {
+              "time": 1.2,
+              "value": 125,
+              "curve": [
+                1.34,
+                125,
+                1.46,
+                130
+              ]
+            },
+            {
+              "time": 1.6,
+              "value": 130,
+              "curve": [
+                1.74,
+                130,
+                1.86,
+                10
+              ]
+            },
+            {
+              "time": 2,
+              "value": 10
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 8,
+              "curve": [
+                0.13999999999999999,
+                8,
+                0.26,
+                32
+              ]
+            },
+            {
+              "time": 0.4,
+              "value": 32,
+              "curve": [
+                0.48750000000000004,
+                32,
+                0.5625,
+                12
+              ]
+            },
+            {
+              "time": 0.65,
+              "value": 12,
+              "curve": [
+                0.7375,
+                12,
+                0.8125,
+                36
+              ]
+            },
+            {
+              "time": 0.9,
+              "value": 36,
+              "curve": [
+                0.9874999999999999,
+                36,
+                1.0625,
+                12
+              ]
+            },
+            {
+              "time": 1.15,
+              "value": 12,
+              "curve": [
+                1.2374999999999998,
+                12,
+                1.3125,
+                36
+              ]
+            },
+            {
+              "time": 1.4,
+              "value": 36,
+              "curve": [
+                1.4874999999999998,
+                36,
+                1.5625,
+                12
+              ]
+            },
+            {
+              "time": 1.65,
+              "value": 12,
+              "curve": [
+                1.7725,
+                12,
+                1.8775,
+                8
+              ]
+            },
+            {
+              "time": 2,
+              "value": 8
+            }
+          ]
+        },
+        "head": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 0,
+              "curve": [
+                0.175,
+                0,
+                0.325,
+                -5
+              ]
+            },
+            {
+              "time": 0.5,
+              "value": -5,
+              "curve": [
+                0.85,
+                -5,
+                1.15,
+                -5
+              ]
+            },
+            {
+              "time": 1.5,
+              "value": -5,
+              "curve": [
+                1.675,
+                -5,
+                1.825,
+                0
+              ]
+            },
+            {
+              "time": 2,
+              "value": 0
+            }
+          ]
+        }
+      },
+      "slots": {
+        "mouth": {
+          "attachment": [
+            {
+              "name": "smile"
+            },
+            {
+              "time": 2,
+              "name": "mouth"
+            }
+          ]
+        }
+      }
+    },
+    "talk": {
+      "bones": {
+        "arm-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 22,
+              "curve": [
+                0.175,
+                22,
+                0.325,
+                45
+              ]
+            },
+            {
+              "time": 0.5,
+              "value": 45,
+              "curve": [
+                0.675,
+                45,
+                0.825,
+                27
+              ]
+            },
+            {
+              "time": 1,
+              "value": 27,
+              "curve": [
+                1.175,
+                27,
+                1.325,
+                42
+              ]
+            },
+            {
+              "time": 1.5,
+              "value": 42,
+              "curve": [
+                1.675,
+                42,
+                1.825,
+                22
+              ]
+            },
+            {
+              "time": 2,
+              "value": 22
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 34,
+              "curve": [
+                0.175,
+                34,
+                0.325,
+                44
+              ]
+            },
+            {
+              "time": 0.5,
+              "value": 44,
+              "curve": [
+                0.675,
+                44,
+                0.825,
+                25
+              ]
+            },
+            {
+              "time": 1,
+              "value": 25,
+              "curve": [
+                1.175,
+                25,
+                1.325,
+                40
+              ]
+            },
+            {
+              "time": 1.5,
+              "value": 40,
+              "curve": [
+                1.675,
+                40,
+                1.825,
+                34
+              ]
+            },
+            {
+              "time": 2,
+              "value": 34
+            }
+          ]
+        },
+        "head": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 0,
+              "curve": [
+                0.13999999999999999,
+                0,
+                0.26,
+                3
+              ]
+            },
+            {
+              "time": 0.4,
+              "value": 3,
+              "curve": [
+                0.54,
+                3,
+                0.66,
+                0
+              ]
+            },
+            {
+              "time": 0.8,
+              "value": 0,
+              "curve": [
+                1.01,
+                0,
+                1.19,
+                -2
+              ]
+            },
+            {
+              "time": 1.4,
+              "value": -2,
+              "curve": [
+                1.6099999999999999,
+                -2,
+                1.79,
+                0
+              ]
+            },
+            {
+              "time": 2,
+              "value": 0
+            }
+          ]
+        }
+      },
+      "slots": {
+        "mouth": {
+          "attachment": [
+            {
+              "name": "talk"
+            },
+            {
+              "time": 0.18,
+              "name": "mouth"
+            },
+            {
+              "time": 0.4,
+              "name": "talk"
+            },
+            {
+              "time": 0.65,
+              "name": "mouth"
+            },
+            {
+              "time": 1,
+              "name": "talk"
+            },
+            {
+              "time": 1.3,
+              "name": "smile"
+            },
+            {
+              "time": 2,
+              "name": "mouth"
+            }
+          ]
+        }
+      }
+    },
+    "listen": {
+      "bones": {
+        "head": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -3,
+              "curve": [
+                0.175,
+                -3,
+                0.325,
+                1
+              ]
+            },
+            {
+              "time": 0.5,
+              "value": 1,
+              "curve": [
+                0.605,
+                1,
+                0.6950000000000001,
+                -3
+              ]
+            },
+            {
+              "time": 0.8,
+              "value": -3,
+              "curve": [
+                0.94,
+                -3,
+                1.06,
+                -3
+              ]
+            },
+            {
+              "time": 1.2,
+              "value": -3,
+              "curve": [
+                1.305,
+                -3,
+                1.395,
+                1
+              ]
+            },
+            {
+              "time": 1.5,
+              "value": 1,
+              "curve": [
+                1.675,
+                1,
+                1.825,
+                -3
+              ]
+            },
+            {
+              "time": 2,
+              "value": -3
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 12,
+              "curve": [
+                0.7,
+                12,
+                1.3,
+                12
+              ]
+            },
+            {
+              "time": 2,
+              "value": 12
+            }
+          ]
+        }
+      }
+    },
+    "offer": {
+      "bones": {
+        "arm-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 0,
+              "curve": [
+                0.175,
+                0,
+                0.325,
+                45
+              ]
+            },
+            {
+              "time": 0.5,
+              "value": 45,
+              "curve": [
+                0.85,
+                45,
+                1.15,
+                45
+              ]
+            },
+            {
+              "time": 1.5,
+              "value": 45,
+              "curve": [
+                1.675,
+                45,
+                1.825,
+                0
+              ]
+            },
+            {
+              "time": 2,
+              "value": 0
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 8,
+              "curve": [
+                0.175,
+                8,
+                0.325,
+                35
+              ]
+            },
+            {
+              "time": 0.5,
+              "value": 35,
+              "curve": [
+                0.85,
+                35,
+                1.15,
+                35
+              ]
+            },
+            {
+              "time": 1.5,
+              "value": 35,
+              "curve": [
+                1.675,
+                35,
+                1.825,
+                8
+              ]
+            },
+            {
+              "time": 2,
+              "value": 8
+            }
+          ]
+        },
+        "head": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 0,
+              "curve": [
+                0.24499999999999997,
+                0,
+                0.45499999999999996,
+                5
+              ]
+            },
+            {
+              "time": 0.7,
+              "value": 5,
+              "curve": [
+                0.9099999999999999,
+                5,
+                1.09,
+                3
+              ]
+            },
+            {
+              "time": 1.3,
+              "value": 3,
+              "curve": [
+                1.545,
+                3,
+                1.755,
+                0
+              ]
+            },
+            {
+              "time": 2,
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    "sit": {
+      "bones": {
+        "hip": {
+          "translate": [
+            {
+              "time": 0,
+              "x": 0,
+              "y": -14
+            },
+            {
+              "time": 2,
+              "x": 0,
+              "y": -14
+            }
+          ]
+        },
+        "thigh-far": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 90
+            },
+            {
+              "time": 2,
+              "value": 90
+            }
+          ]
+        },
+        "thigh-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 90
+            },
+            {
+              "time": 2,
+              "value": 90
+            }
+          ]
+        },
+        "shin-far": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -90
+            },
+            {
+              "time": 2,
+              "value": -90
+            }
+          ]
+        },
+        "shin-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": -90
+            },
+            {
+              "time": 2,
+              "value": -90
+            }
+          ]
+        },
+        "arm-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 35
+            },
+            {
+              "time": 2,
+              "value": 35
+            }
+          ]
+        },
+        "fore-near": {
+          "rotate": [
+            {
+              "time": 0,
+              "value": 30
+            },
+            {
+              "time": 2,
+              "value": 30
+            }
+          ]
+        }
+      }
+    }
+  }
+}

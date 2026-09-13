@@ -1,0 +1,12 @@
+{
+  "status": "isolated full-rig candidate",
+  "base": "Mara V4",
+  "changed": "Calibrated wave arm, shoulder rise, opaque shortened neck overlap, tapered upper thighs, wider pelvic weight transfer",
+  "uniformScale": 0.013,
+  "source": "joint-lab/arm.json",
+  "limitations": [
+    "Shoulder placement is a manual fit.",
+    "Generated arm color is not guaranteed to match the original shirt.",
+    "This is not a replacement for the accepted character."
+  ]
+}

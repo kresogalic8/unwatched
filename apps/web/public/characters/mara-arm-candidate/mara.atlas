@@ -1,0 +1,226 @@
+mara.png
+size: 2560,2048
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+neutral
+  rotate: false
+  xy: 4,4
+  size: 337,357
+  orig: 337,357
+  offset: 0,0
+  index: -1
+smile
+  rotate: false
+  xy: 516,4
+  size: 337,357
+  orig: 337,357
+  offset: 0,0
+  index: -1
+blink
+  rotate: false
+  xy: 1028,4
+  size: 333,356
+  orig: 333,356
+  offset: 0,0
+  index: -1
+talk
+  rotate: false
+  xy: 1540,4
+  size: 335,356
+  orig: 335,356
+  offset: 0,0
+  index: -1
+neck
+  rotate: false
+  xy: 2052,4
+  size: 217,171
+  orig: 217,171
+  offset: 0,0
+  index: -1
+torso
+  rotate: false
+  xy: 4,516
+  size: 415,420
+  orig: 415,420
+  offset: 0,0
+  index: -1
+hips
+  rotate: false
+  xy: 516,516
+  size: 395,364
+  orig: 395,364
+  offset: 0,0
+  index: -1
+upper-far
+  rotate: false
+  xy: 1028,516
+  size: 196,411
+  orig: 196,411
+  offset: 0,0
+  index: -1
+upper-near
+  rotate: false
+  xy: 1540,516
+  size: 184,411
+  orig: 184,411
+  offset: 0,0
+  index: -1
+scarf
+  rotate: false
+  xy: 2052,516
+  size: 165,385
+  orig: 165,385
+  offset: 0,0
+  index: -1
+fore-far
+  rotate: false
+  xy: 4,1028
+  size: 149,365
+  orig: 149,365
+  offset: 0,0
+  index: -1
+fore-near
+  rotate: false
+  xy: 516,1028
+  size: 140,364
+  orig: 140,364
+  offset: 0,0
+  index: -1
+hand-far
+  rotate: false
+  xy: 1028,1028
+  size: 129,365
+  orig: 129,365
+  offset: 0,0
+  index: -1
+hand-near
+  rotate: false
+  xy: 1540,1028
+  size: 132,364
+  orig: 132,364
+  offset: 0,0
+  index: -1
+shoe-near
+  rotate: false
+  xy: 2052,1028
+  size: 403,187
+  orig: 403,187
+  offset: 0,0
+  index: -1
+thigh-far
+  rotate: false
+  xy: 4,1540
+  size: 238,404
+  orig: 238,404
+  offset: 0,0
+  index: -1
+thigh-near
+  rotate: false
+  xy: 516,1540
+  size: 231,405
+  orig: 231,405
+  offset: 0,0
+  index: -1
+shin-far
+  rotate: false
+  xy: 1028,1540
+  size: 166,358
+  orig: 166,358
+  offset: 0,0
+  index: -1
+shin-near
+  rotate: false
+  xy: 1540,1540
+  size: 179,358
+  orig: 179,358
+  offset: 0,0
+  index: -1
+shoe-far
+  rotate: false
+  xy: 2052,1540
+  size: 400,185
+  orig: 400,185
+  offset: 0,0
+  index: -1
+
+continuous.png
+size: 3072,2048
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+continuous/head
+  rotate: false
+  xy: 4,4
+  size: 358,443
+  orig: 358,443
+  offset: 0,0
+  index: -1
+continuous/body
+  rotate: false
+  xy: 1028,4
+  size: 280,596
+  orig: 280,596
+  offset: 0,0
+  index: -1
+continuous/leg-near
+  rotate: false
+  xy: 2052,4
+  size: 188,635
+  orig: 188,635
+  offset: 0,0
+  index: -1
+continuous/leg-far
+  rotate: false
+  xy: 4,1028
+  size: 180,596
+  orig: 180,596
+  offset: 0,0
+  index: -1
+continuous/arm-near
+  rotate: false
+  xy: 1028,1028
+  size: 111,529
+  orig: 111,529
+  offset: 0,0
+  index: -1
+continuous/arm-far
+  rotate: false
+  xy: 2052,1028
+  size: 184,624
+  orig: 184,624
+  offset: 0,0
+  index: -1
+continuous/arm-far-clean
+  rotate: false
+  xy: 2094,1112
+  size: 114,540
+  orig: 114,540
+  offset: 0,0
+  index: -1
+
+wave-hand.png
+size: 1024,1024
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+wave-palm
+  rotate: false
+  xy: 260,260
+  size: 444,646
+  orig: 444,646
+  offset: 0,0
+  index: -1
+
+cal-arm.png
+size: 599,2365
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+cal-arm
+  rotate: false
+  xy: 0,0
+  size: 599,2365
+  orig: 599,2365
+  offset: 0,0
+  index: -1

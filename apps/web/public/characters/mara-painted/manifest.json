@@ -1,0 +1,13 @@
+{
+  "version": 4,
+  "character": "Mara",
+  "sourceJob": "6d960d0a-777e-4009-9727-af0289cb3702",
+  "artDirectionJob": "a3052794-c1ba-419b-89a7-be619bc228dc",
+  "construction": "Continuous weighted arm, leg and torso meshes; original animation curves",
+  "view": "three-quarter right",
+  "limitations": [
+    "Facial expressions use painted head attachments.",
+    "Local review only; additional directions are not authored."
+  ],
+  "generator": "scripts/characters/build-mara-painted.mjs"
+}

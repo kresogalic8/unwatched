@@ -56,7 +56,7 @@ export const TravellingSkill = z.object({recipe:SkillRecipe,origin:z.object({isl
 
 /** The action kinds the town can carry out. Nothing else exists. */
 export const ActionKind = z.enum([
-  "move", "say", "give", "take", "use", "work", "apply", "quit", "trade",
+  "decorate", "move", "say", "give", "take", "use", "work", "apply", "quit", "trade",
   "propose", "vote", "write", "build", "message_owner", "sleep", "wait",
   "hire", "lend", "lodge", "leave",
   "fund", "accuse", "search", "do", "stock", "make", "call",
@@ -73,7 +73,11 @@ export const CommunityProject = z.object({
 });
 export type CommunityProject = z.infer<typeof CommunityProject>;
 
+export const Decoration = z.object({ kind: z.enum(["flowers", "bench", "cairn"]), by: AgentId, name: z.string(), why: z.string(), day: z.number(), t: z.number() });
+export type Decoration = z.infer<typeof Decoration>;
+
 export const Action = z.discriminatedUnion("kind", [
+  z.object({kind:z.literal("decorate"),what:z.enum(["flowers","bench","cairn"]),why:z.string().trim().min(3).max(200)}),
   z.object({kind:z.literal("found_institution"),name:z.string().trim().min(3).max(60),charter:z.string().trim().min(10).max(400)}),
   z.object({kind:z.literal("join_institution")}),z.object({kind:z.literal("leave_institution")}),
   z.object({kind:z.literal("repair")}),
@@ -240,6 +244,7 @@ export const Perception = z.object({
   place: z.object({ id: PlaceId, name: z.string(), kind: z.string(), for_sale: z.array(z.object({ item: z.string(), price: z.number() })), jobs_open: z.array(z.string()), exits: z.array(PlaceId),
     institution: z.object({name:z.string(),charter:z.string(),founder:z.string(),members:z.array(z.string()),founded:z.number()}).optional(),
     community: CommunityProject.optional(),
+    decorations: z.array(Decoration).optional(),
     owner: z.string().nullable().optional(),
     /** For someone who works here: what is in the store room, and whether the place is broken. */
     stock: z.record(z.string(), z.number()).optional(), broken: z.boolean().optional(),
@@ -269,7 +274,7 @@ export type Perception = z.infer<typeof Perception>;
 export const EventKind = z.enum([
   "tick.day", "boat.dock", "boat.depart", "agent.arrive", "agent.leave",
   "institution.founded", "institution.joined", "institution.left", "building.repaired", "skill.proposed", "skill.tested", "skill.practiced", "skill.shared",
-  "project.proposed", "project.contributed", "project.withdrawn", "garden.harvest", "knowledge.shared",
+  "town.wonder", "place.decorated", "project.proposed", "project.contributed", "project.withdrawn", "garden.harvest", "knowledge.shared",
   "agent.move", "agent.say", "agent.give", "agent.take", "agent.trade",
   "agent.work", "agent.hired", "agent.quit", "agent.fired", "agent.sleep", "agent.wake",
   "agent.eat", "agent.rent", "agent.evicted", "agent.reflect", "agent.letter",
@@ -385,4 +390,10 @@ export type BuildingReplay = {
 export function constructionStage(labor: number, needed: number): string {
   const progress = labor / Math.max(1, needed);
   return progress >= 1 ? "Built" : progress >= 0.8 ? "Roof going on" : progress >= 0.3 ? "Walls rising" : "Foundations";
+}
+
+/** A rare natural phenomenon, shared by perception and rendering; never a staged citizen action. */
+export function coastalWonder(day: number, hour: number, season: string, weather: string): boolean {
+  const eveningDay = hour < 3 ? day - 1 : day;
+  return Number.isInteger(day) && day > 0 && eveningDay % 5 === 4 && (hour >= 21 || hour < 3) && season === "summer" && (weather === "clear" || weather === "wind");
 }

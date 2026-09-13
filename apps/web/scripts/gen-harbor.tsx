@@ -1,5 +1,6 @@
 /** Rebuild with: node --import tsx apps/web/scripts/gen-harbor.tsx */
 import React from 'react';
+import { createHash } from 'node:crypto';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
@@ -14,8 +15,10 @@ function add(name:string,node:React.ReactNode,w:number,anchor:[number,number],sc
  const bounds=new Resvg(source).getBBox();if(!bounds)throw new Error(`Empty artwork: ${name}`);
  const x=Math.floor(bounds.x)-2,y=Math.floor(bounds.y)-2,width=Math.ceil(bounds.width)+4,height=Math.ceil(bounds.height)+4;
  const cropped=source.replace('viewBox="-500 -500 1000 1000"',`viewBox="${x} ${y} ${width} ${height}"`).replace('width="1000" height="1000"',`width="${width}" height="${height}"`);
- writeFileSync(new URL(name+'.png',directory),new Resvg(cropped,{fitTo:{mode:'zoom',value:3}}).render().asPng());
- assets[name]={src:'/harbor/'+name+'.png',w:w*scale,x,y,width,height};
+ const png=new Resvg(cropped,{fitTo:{mode:'zoom',value:3}}).render().asPng();
+ writeFileSync(new URL(name+'.png',directory),png);
+ const version=createHash('sha256').update(png).digest('hex').slice(0,10);
+ assets[name]={src:'/harbor/'+name+'.png?v='+version,w:w*scale,x,y,width,height};
 }
 for(const [name,w,d,h,cafe,color,side] of [
  ['house',130,95,142,false,'#ece3cc','#c4c5ac'],['cottage',110,85,106,false,'#ddd5b8','#b8bca2'],

@@ -1,0 +1,362 @@
+harbor.png
+size: 2048,1792
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+mara/torso
+  rotate: false
+  xy: 0,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/hips
+  rotate: false
+  xy: 256,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/thigh
+  rotate: false
+  xy: 512,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/shin
+  rotate: false
+  xy: 768,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/upper
+  rotate: false
+  xy: 1024,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/fore
+  rotate: false
+  xy: 1280,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/hand
+  rotate: false
+  xy: 1536,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/neck
+  rotate: false
+  xy: 1792,0
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/face
+  rotate: false
+  xy: 0,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/profile
+  rotate: false
+  xy: 256,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/hair
+  rotate: false
+  xy: 512,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/back
+  rotate: false
+  xy: 768,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/brow
+  rotate: false
+  xy: 1024,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/beard
+  rotate: false
+  xy: 1280,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mara/glasses
+  rotate: false
+  xy: 1536,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/torso
+  rotate: false
+  xy: 1792,256
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/hips
+  rotate: false
+  xy: 0,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/thigh
+  rotate: false
+  xy: 256,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/shin
+  rotate: false
+  xy: 512,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/upper
+  rotate: false
+  xy: 768,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/fore
+  rotate: false
+  xy: 1024,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/hand
+  rotate: false
+  xy: 1280,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/neck
+  rotate: false
+  xy: 1536,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/face
+  rotate: false
+  xy: 1792,512
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/profile
+  rotate: false
+  xy: 0,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/hair
+  rotate: false
+  xy: 256,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/back
+  rotate: false
+  xy: 512,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/brow
+  rotate: false
+  xy: 768,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/beard
+  rotate: false
+  xy: 1024,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+ivo/glasses
+  rotate: false
+  xy: 1280,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/torso
+  rotate: false
+  xy: 1536,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/hips
+  rotate: false
+  xy: 1792,768
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/thigh
+  rotate: false
+  xy: 0,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/shin
+  rotate: false
+  xy: 256,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/upper
+  rotate: false
+  xy: 512,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/fore
+  rotate: false
+  xy: 768,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/hand
+  rotate: false
+  xy: 1024,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/neck
+  rotate: false
+  xy: 1280,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/face
+  rotate: false
+  xy: 1536,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/profile
+  rotate: false
+  xy: 1792,1024
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/hair
+  rotate: false
+  xy: 0,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/back
+  rotate: false
+  xy: 256,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/brow
+  rotate: false
+  xy: 512,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/beard
+  rotate: false
+  xy: 768,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+elio/glasses
+  rotate: false
+  xy: 1024,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+shoe
+  rotate: false
+  xy: 1280,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+eye
+  rotate: false
+  xy: 1536,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mouth-neutral
+  rotate: false
+  xy: 1792,1280
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mouth-smile
+  rotate: false
+  xy: 0,1536
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+mouth-talk
+  rotate: false
+  xy: 256,1536
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1
+parcel
+  rotate: false
+  xy: 512,1536
+  size: 256,256
+  orig: 256,256
+  offset: 0,0
+  index: -1

@@ -405,6 +405,22 @@ export class Citizen extends Container {
   setPose(p: Pose, immediate = false): void { if (this.pose === p) return; this.transition = !immediate && this.lastUpdate !== null ? { elapsed: 0, from: this.poseTransforms(), duration: this.transition?.duration } : null; this.pose = p; this.mouth.visible = p !== "sleep" && this.facingMode !== "back"; this.tool.visible = p === "work" && this.look.carrying !== "Suitcase"; this.letter.visible = p === "read" || p === "write"; this.cup.visible = p === "drink"; this.bowl.visible = p === "eat"; this.spoon.visible = p === "eat"; this.pen.visible = p === "write"; this.held.visible = !["read","write","eat","drink"].includes(p); this.carry.visible = !(p === "read" || p === "write" || p === "eat" || p === "drink") && this.facingMode !== "back"; const talking = p === "talk" || p === "argue"; if (talking !== this.talking) { this.talking = talking; this.drawFace(); } }
   face(dir: -1 | 1, animate = false): void { this.facing4(dir < 0 ? "left" : "right", animate); }
 
+  /** Optional contact layer, applied after update(). Target uses renderer coordinates. */
+  reachFor(side: "left" | "right", target: { x: number; y: number }, weight = 1): void {
+    const arm = side === "left" ? this.armL : this.armR;
+    const fore = side === "left" ? this.foreL : this.foreR;
+    const local = this.body.toLocal(target);
+    const [shoulder, elbow] = this.reach(arm, local.x, local.y);
+    const w = Math.max(0, Math.min(1, weight));
+    arm.rotation += Math.atan2(Math.sin(shoulder-arm.rotation), Math.cos(shoulder-arm.rotation))*w;
+    fore.rotation += Math.atan2(Math.sin(elbow-fore.rotation), Math.cos(elbow-fore.rotation))*w;
+  }
+
+  /** Wrist position for attaching a shared prop without a handoff teleport. */
+  wrist(side: "left" | "right"): { x: number; y: number } {
+    return (side === "left" ? this.foreL : this.foreR).toGlobal({ x: 0, y: this.foreH });
+  }
+
   /** Solve a wrist target with the elbow bending naturally forward. */
   private reach(arm: Graphics, x: number, y: number): [number, number] {
     const dx=x-arm.x, dy=y-arm.y;

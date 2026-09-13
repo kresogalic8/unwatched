@@ -131,6 +131,9 @@ importers:
         specifier: ^0.186.0
         version: 0.186.0
     devDependencies:
+      '@esotericsoftware/spine-pixi-v8':
+        specifier: ~4.2.120
+        version: 4.2.120(pixi.js@8.20.1)
       '@google/genai':
         specifier: ^2.22.0
         version: 2.22.0
@@ -443,6 +446,17 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@esotericsoftware/spine-canvas@4.2.120':
+    resolution: {integrity: sha512-9a3QmIwNqBJSxEwoR0DYp7mkDqgbvuJlaR246ArpmslsBxVcku2t/3tFyO+fS0IN2pYOxeeBhqEjX4Tt0JDW3g==}
+
+  '@esotericsoftware/spine-core@4.2.120':
+    resolution: {integrity: sha512-X62MPnfiZTWok4Wk5Q5DqaAUBUFypKpb94IVd1W/j4eLHhg0HH3tve4HvIlkgxDpls2NokHaAtzjxX12rJknOA==}
+
+  '@esotericsoftware/spine-pixi-v8@4.2.120':
+    resolution: {integrity: sha512-5Upjk0mlqEMWGpJgJ2aEM7R4Uy8ODmYi2MYKyiqYNNLngH0korvVSZ8+Y7WiWqM5uMRQ6fo8Q0rtjoWfJt28Fg==}
+    peerDependencies:
+      pixi.js: ^8.16.0
 
   '@google/genai@2.22.0':
     resolution: {integrity: sha512-NE90Nl0AP75YZ2tGxXjQQs6Gkunma7a1JmPCx5g5CxvjHXshmuI2aNoPJ1xLrRixjkNxog898oylM+MyNudUQw==}
@@ -1839,6 +1853,17 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@esotericsoftware/spine-canvas@4.2.120':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.2.120
+
+  '@esotericsoftware/spine-core@4.2.120': {}
+
+  '@esotericsoftware/spine-pixi-v8@4.2.120(pixi.js@8.20.1)':
+    dependencies:
+      '@esotericsoftware/spine-canvas': 4.2.120
+      pixi.js: 8.20.1
 
   '@google/genai@2.22.0':
     dependencies:

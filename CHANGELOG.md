@@ -6,9 +6,21 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Living coastal details: fish schools react to boats and walkers, shoreline crabs retreat, sea grass follows currents, and shells, mooring floats and fading footprints enrich the actual town.
+- Citizen-authored flowers, benches and stone markers with material and coin costs, ownership checks, bounded place capacity, persistent attribution and reasons. New benches participate in visual seating.
+- Place-memory controls replay recorded additions on the map; contributions also appear in the evolution record.
+- Rare summer bioluminescence shared by rendering and agent perception, plus dust and wet footfall effects grounded in observed movement.
+- Direct building-interior view on click, with room-specific furniture, current location occupants, reported activities, stock-aware fish counters and keyboard return to the street.
+
 ### Changed
 
+- Harbor architecture and paving gain material detail; boats, laundry and trees share a travelling breeze. Asset URLs include content hashes.
+- Character and Spine research is retained under the development-only `/experiments/characters` workspace, with an `/experiments` index. Standalone world-study routes and their image-animation concept are removed.
+
 ### Fixed
+
+- Cancelled gatherings no longer produce staged scenes; absent participants are excluded.
+- Interior population refreshes with live movement and authoritative snapshots. Co-location alone no longer implies a conversation.
 
 ## [0.13.0] - 2026-09-13
 ### Added

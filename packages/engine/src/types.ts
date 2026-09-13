@@ -4,6 +4,7 @@ import type { AgentId, PlaceId, Persona, TownEvent, Perception, ActionProposal, 
 export type PlaceKind = "harbor" | "inn" | "market" | "shop" | "workplace" | "public" | "home" | "civic" | "plot" | "wild";
 
 export interface Place {
+  decorations?: import("@unwatched/protocol").Decoration[];
   /** Public building milestones, retained with the place after the rolling event log expires. */
   history?: import("@unwatched/protocol").BuildingHistory;
   community?: import("@unwatched/protocol").CommunityProject;

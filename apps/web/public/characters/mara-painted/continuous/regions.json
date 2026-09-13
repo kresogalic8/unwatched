@@ -1,0 +1,38 @@
+{
+  "head": {
+    "x": 4,
+    "y": 4,
+    "width": 358,
+    "height": 443
+  },
+  "body": {
+    "x": 1028,
+    "y": 4,
+    "width": 280,
+    "height": 596
+  },
+  "leg-near": {
+    "x": 2052,
+    "y": 4,
+    "width": 188,
+    "height": 635
+  },
+  "leg-far": {
+    "x": 4,
+    "y": 1028,
+    "width": 180,
+    "height": 596
+  },
+  "arm-near": {
+    "x": 1028,
+    "y": 1028,
+    "width": 111,
+    "height": 529
+  },
+  "arm-far": {
+    "x": 2052,
+    "y": 1028,
+    "width": 184,
+    "height": 624
+  }
+}

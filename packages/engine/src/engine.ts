@@ -1,3 +1,4 @@
+import { coastalWonder } from "@unwatched/protocol";
 import { desiresForMind, desireEvidence, reviseDesires, recordDesireAttempt } from "./desires.ts";
 import { recordEvolution, type EvolutionStory } from "./evolution.ts";
 import { skillId, achieved, importedSkill, type SkillMeasure } from "./skills.ts";
@@ -211,7 +212,7 @@ export class Town {
     // what people built, over the map the code lays out: the code owns positions and roads, the record owns everything else
     for (const sp of snap.places ?? []) {
       const p = this.places.get(sp.id);
-      if (p) { if(sp.institution)p.institution=structuredClone(sp.institution);else delete p.institution; if (sp.community) p.community = structuredClone(sp.community); else delete p.community; if (sp.history) p.history = structuredClone(sp.history); else delete p.history; p.name = sp.name; p.kind = sp.kind; p.sells = sp.sells; p.owner = sp.owner ?? null; p.site = structuredClone(sp.site ?? null); p.treasury = sp.treasury ?? p.treasury; if (sp.stock) p.stock = { ...sp.stock }; if (sp.look) p.look = sp.look; else delete p.look; if (sp.brokenUntil) p.brokenUntil = sp.brokenUntil; if (sp.beds) p.beds = sp.beds; else delete p.beds; if (sp.sprite) p.sprite = sp.sprite; }
+      if (p) { if(sp.decorations)p.decorations=structuredClone(sp.decorations);else delete p.decorations; if(sp.institution)p.institution=structuredClone(sp.institution);else delete p.institution; if (sp.community) p.community = structuredClone(sp.community); else delete p.community; if (sp.history) p.history = structuredClone(sp.history); else delete p.history; p.name = sp.name; p.kind = sp.kind; p.sells = sp.sells; p.owner = sp.owner ?? null; p.site = structuredClone(sp.site ?? null); p.treasury = sp.treasury ?? p.treasury; if (sp.stock) p.stock = { ...sp.stock }; if (sp.look) p.look = sp.look; else delete p.look; if (sp.brokenUntil) p.brokenUntil = sp.brokenUntil; if (sp.beds) p.beds = sp.beds; else delete p.beds; if (sp.sprite) p.sprite = sp.sprite; }
     }
     for (const p of this.places.values()) stockShelf(this.pack, p); // a record from before shelves were counted gets its counts now
     for (const sj of snap.jobs ?? []) if (!this.jobs.has(sj.id) && this.places.has(sj.place)) this.jobs.set(sj.id, { ...sj, holders: [] });
@@ -401,7 +402,7 @@ export class Town {
     return {
       type: "perceive", agent_id: a.id,
       ...((this.rules.length || this.sayings.some((x) => x.by.length >= 2) || people.length || projects.length) ? { town: { ...this.ways(), ...(projects.length ? { projects } : {}), ...(people.length ? { people } : {}) } } : {}),
-      time: { sim: this.clock(), day: this.day, minute: this.minuteOfDay, season: this.season, weather: this.weather, weekday: this.weekdayName, ...(this.occasion ? { occasion: this.occasion } : {}), ...(this.nextGathering() ? { gathering: this.nextGathering()! } : {}), ...(this.temperatureC !== null ? { temperature_c: this.temperatureC } : {}) },
+      time: { sim: this.clock(), day: this.day, minute: this.minuteOfDay, season: this.season, weather: this.weather, weekday: this.weekdayName, ...((this.occasion || coastalWonder(this.day,this.hour,this.season,this.weather)) ? { occasion: [this.occasion, coastalWonder(this.day,this.hour,this.season,this.weather) ? "Blue bioluminescent surf is visible along the coast" : null].filter(Boolean).join("; ") } : {}), ...(this.nextGathering() ? { gathering: this.nextGathering()! } : {}), ...(this.temperatureC !== null ? { temperature_c: this.temperatureC } : {}) },
       self: { location: a.location, needs: { ...a.needs }, feels: this.feels(a), coins: a.coins, inventory: [...a.inventory], job: a.job ? (this.jobs.get(a.job)?.title ?? a.job) : null, shift: job ? { place: job.place, wage: job.wage, hours: [job.hours[0], job.hours[1]] } : null, debts: a.debts.map((d) => ({ to: this.agents.get(d.to)?.persona.name ?? d.to, coins: d.coins, overdue: this.t >= d.due })), ...(a.deals.some((d) => d.state === "offered" || d.state === "open") ? { deals: a.deals.filter((d) => d.state === "offered" || d.state === "open").map((d) => ({ id: d.id, with: this.agents.get(d.with)?.persona.name ?? d.with, what: d.what, coins: d.coins, mine: d.mine, state: d.state as "offered" | "open", ...(d.construction ? { construction: { site: d.construction.site, mornings: d.construction.mornings, done: d.construction.done } } : {}), due_in_days: d.due === null ? null : Math.max(0, Math.ceil((d.due - this.t) / MINUTES_PER_DAY)) })) } : {}), days_hungry: a.starving, weak: a.starving >= 2, family: { partner: this.partnerOf(a)?.persona.name ?? null, children: this.children.filter((c) => c.parents.includes(a.id)).map((c) => `${c.name}, ${this.day - c.bornDay} days old`) }, owns: [...this.places.values()].filter((p) => p.owner === a.id).map((p) => p.name), housing: a.home ? { kind: a.home.place, nights_left: a.home.nightsPaid } : null ,
         ...(this.mayor === a.id ? { mayor: true } : {}), ...(a.convictions ? { convictions: a.convictions } : {}),
         ...(a.watch.length ? { watching: [...a.watch] } : {}),
@@ -414,6 +415,7 @@ export class Town {
         ...(Object.keys(a.secretsKnown).length ? { knows: Object.entries(a.secretsKnown).map(([id, secret]) => ({ who: this.agents.get(id)?.persona.name ?? id, secret })) } : {}), },
       nearby,
       place: { id: here.id, name: here.name, kind: here.kind, for_sale: here.sells.map((s) => ({ item: s.item, price: this.price(here, s.item) })).filter((x): x is { item: string; price: number } => x.price !== null), jobs_open: this.openJobsAt(here.id).map((j) => j.id), exits: [...here.exits],
+        ...(here.decorations?.length ? { decorations: structuredClone(here.decorations) } : {}),
         ...(here.community ? { community: structuredClone(here.community) } : {}),
         owner: here.owner ? (this.agents.get(here.owner)?.persona.name ?? here.owner) : null,
         ...(a.job && this.jobs.get(a.job)?.place === here.id && Object.keys(here.stock).length ? { stock: { ...here.stock } } : {}),
@@ -429,7 +431,7 @@ export class Town {
       owner_letters: [...(a.instructions ? [{ id: 0, text: `Standing instructions from whoever sent you: ${a.instructions}` }] : []), ...a.letters.filter((l) => !l.read).map((l) => ({ id: l.id, text: l.text }))],
       ...(a.hint ? { hint: a.hint } : {}), ...(a.crossroads ? { crossroads: a.crossroads } : {}),
       today: a.plan?.day === this.day && a.plan.goals.length ? { mood: a.plan.mood, goals: a.plan.goals, steps: a.plan.steps } : null,
-      options: [...OPTIONS_DEFAULT, ...(here.institution ? ["join_institution" as const,"leave_institution" as const] : here.owner===a.id ? ["found_institution" as const] : []), ...(here.brokenUntil && here.brokenUntil>this.day ? ["repair" as const] : []), ...(this.learning ? ["propose_skill" as const, ...(a.skills?.length ? ["test_skill" as const, "practice_skill" as const, "share_skill" as const] : [])] : []), ...(here.kind === "plot" && !here.site && !here.community ? ["build" as const, "start_project" as const] : []), ...(here.community ? ["contribute_project" as const, "withdraw_project" as const] : []), ...(this.learning && nearby.length && a.foodLessons?.length ? ["teach" as const] : []), ...(here.owner === a.id ? ["hire" as const] : []), ...([...this.places.values()].some((p) => p.owner === a.id && p.beds) && nearby.length ? ["lodge" as const] : []), ...(nearby.length && a.coins > 0 ? ["lend" as const] : []), ...(here.kind === "harbor" && this.boatRunning ? ["leave" as const] : []), ...(here.kind === "civic" ? ["accuse" as const, ...(this.mayor === a.id ? ["fund" as const] : [])] : []), ...(here.owner === a.id ? ["stock" as const] : []), ...((here.owner === a.id || (a.job && this.jobs.get(a.job)?.place === here.id)) && Object.keys(here.stock).length ? ["make" as const] : []), ...(here.kind !== "wild" ? ["call" as const] : []), ...(this.residentsOf(here).some((r) => r.id !== a.id) && !this.residentsOf(here).some((r) => r.id !== a.id && r.location === here.id) ? ["search" as const] : [])],
+      options: [...OPTIONS_DEFAULT, ...(!here.site && (here.owner===a.id || (!here.owner && ["public","harbor","market","wild"].includes(here.kind))) && (here.decorations?.length??0)<6 ? ["decorate" as const] : []), ...(here.institution ? ["join_institution" as const,"leave_institution" as const] : here.owner===a.id ? ["found_institution" as const] : []), ...(here.brokenUntil && here.brokenUntil>this.day ? ["repair" as const] : []), ...(this.learning ? ["propose_skill" as const, ...(a.skills?.length ? ["test_skill" as const, "practice_skill" as const, "share_skill" as const] : [])] : []), ...(here.kind === "plot" && !here.site && !here.community ? ["build" as const, "start_project" as const] : []), ...(here.community ? ["contribute_project" as const, "withdraw_project" as const] : []), ...(this.learning && nearby.length && a.foodLessons?.length ? ["teach" as const] : []), ...(here.owner === a.id ? ["hire" as const] : []), ...([...this.places.values()].some((p) => p.owner === a.id && p.beds) && nearby.length ? ["lodge" as const] : []), ...(nearby.length && a.coins > 0 ? ["lend" as const] : []), ...(here.kind === "harbor" && this.boatRunning ? ["leave" as const] : []), ...(here.kind === "civic" ? ["accuse" as const, ...(this.mayor === a.id ? ["fund" as const] : [])] : []), ...(here.owner === a.id ? ["stock" as const] : []), ...((here.owner === a.id || (a.job && this.jobs.get(a.job)?.place === here.id)) && Object.keys(here.stock).length ? ["make" as const] : []), ...(here.kind !== "wild" ? ["call" as const] : []), ...(this.residentsOf(here).some((r) => r.id !== a.id) && !this.residentsOf(here).some((r) => r.id !== a.id && r.location === here.id) ? ["search" as const] : [])],
       deadline_ms: 8000,
     };
   }
@@ -522,6 +524,16 @@ export class Town {
       }
       case "join_institution": {here.institution!.members.push(a.id);this.emit("institution.joined",[a.id],here.id,`${name} joined ${here.institution!.name}.`,.4);return true;}
       case "leave_institution": {here.institution!.members=here.institution!.members.filter(id=>id!==a.id);this.emit("institution.left",[a.id],here.id,`${name} left ${here.institution!.name}.`,.4);return true;}
+      case "decorate": {
+        const cost = action.what === "flowers" ? 2 : action.what === "bench" ? 3 : 0;
+        a.coins -= cost; here.treasury += cost;
+        if(action.what === "bench") for(let i=0;i<2;i++) a.inventory.splice(a.inventory.indexOf("planks"),1);
+        (here.decorations ??= []).push({kind:action.what,by:a.id,name,why:action.why,day:this.day,t:this.t});
+        a.needs.rest = clamp(a.needs.rest + .04);
+        this.emit("place.decorated",[a.id],here.id,`${name} added ${action.what} at ${here.name}: ${action.why}`,.55,{what:action.what});
+        this.remember(a,`I added ${action.what} at ${here.name}: ${action.why}`,.65);
+        break;
+      }
       case "repair": {
         for(let i=0;i<2;i++)a.inventory.splice(a.inventory.indexOf("planks"),1);
         here.brokenUntil=Math.max(this.day,(here.brokenUntil??this.day)-1);a.needs.rest=clamp(a.needs.rest+.1);
@@ -979,6 +991,7 @@ export class Town {
 
   // ---------- hourly and nightly ----------
   private hourly(): void {
+    if (this.hour === 21 && coastalWonder(this.day, this.hour, this.season, this.weather)) this.emit("town.wonder", [], "coast", "A blue glow appeared in the summer surf. The water lights up where the waves break.", .6);
     const h = this.hour;
     if (this.boatTimes.includes(h)) {
       if (this.boatHeld) this.emit("boat.dock", [], "harbor", `The ${String(h).padStart(2, "0")}:00 boat did not come.`, 0.2);
@@ -1039,7 +1052,7 @@ export class Town {
       const rels = [...a.relationships.entries()].map(([id, r]) => ({ id, name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion }));
       const experiences = desireEvidence(todays, a.id, dayStart);
       let ref: Reflection;
-      try { ref = await this.brain.reflect({ desireEvidence: experiences, agent: a, day: this.day, actionEvidence: todays.filter(e => e.actors.includes(a.id) && ["agent.trade", "agent.work", "agent.hired", "agent.quit", "agent.build", "town.built", "agent.give", "agent.take", "action.rejected"].includes(e.kind)).slice(-24).map(e => `[event ${e.id}, minute ${e.t}, ${e.kind}] ${e.text}`), dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
+      try { ref = await this.brain.reflect({ desireEvidence: experiences, agent: a, day: this.day, actionEvidence: todays.filter(e => e.actors.includes(a.id) && ["place.decorated", "agent.trade", "agent.work", "agent.hired", "agent.quit", "agent.build", "town.built", "agent.give", "agent.take", "action.rejected"].includes(e.kind)).slice(-24).map(e => `[event ${e.id}, minute ${e.t}, ${e.kind}] ${e.text}`), dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
       catch (err) { await refundReflection(); this.log(`reflect failed for ${a.persona.name}: ${(err as Error).message}`); continue; }
       this.remember(a, ref.summary, 0.75, "reflect");
       for (const i of ref.insights) this.remember(a, i, 0.6, "reflect");

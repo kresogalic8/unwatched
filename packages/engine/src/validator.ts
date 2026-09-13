@@ -32,6 +32,14 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
     case "found_institution": return here.owner===a.id&&!here.institution&&!a.asleep ? {ok:true}:{ok:false,reason:"found an institution at your own place, which must not already have one"};
     case "join_institution": return here.institution&&!here.institution.members.includes(a.id)&&here.institution.members.length<100?{ok:true}:{ok:false,reason:"no institution to join here, already a member, or full"};
     case "leave_institution": return here.institution?.members.includes(a.id)?{ok:true}:{ok:false,reason:"not a member here"};
+    case "decorate": {
+      if (here.site || (here.owner && here.owner !== a.id) || !(here.owner === a.id || ["public", "harbor", "market", "wild"].includes(here.kind))) return {ok:false,reason:"choose your own place or a public outdoor place without construction"};
+      if ((here.decorations?.length ?? 0) >= 6 || here.decorations?.some(d=>d.by===a.id && d.day===(v.day??0))) return {ok:false,reason:"six improvements fit here, and each person can add one per day"};
+      if (a.starving >= 2 || v.weather === "storm") return {ok:false,reason:"too weak or stormy for outdoor work"};
+      const cost = action.what === "flowers" ? 2 : action.what === "bench" ? 3 : 0;
+      if(a.coins < cost || (action.what === "bench" && a.inventory.filter(i=>i==="planks").length<2)) return {ok:false,reason:"flowers need 2 coins; a bench needs 3 coins and two carried planks; a cairn uses loose local stones"};
+      return {ok:true};
+    }
     case "repair": return here.brokenUntil && here.brokenUntil>(v.day??0) && a.inventory.filter(i=>i==="planks").length>=2 ? {ok:true} : {ok:false,reason:"stand at a damaged building with two planks to reduce its repair time by one day"};
     case "propose_skill": {
       if(v.learning===false)return {ok:false,reason:"learning is disabled"};

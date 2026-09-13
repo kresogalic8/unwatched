@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "spine": "4.2",
+  "variants": [
+    "mara",
+    "ivo",
+    "elio"
+  ],
+  "views": [
+    "front",
+    "side",
+    "back"
+  ],
+  "animations": [
+    "idle",
+    "walk",
+    "wave",
+    "talk",
+    "listen",
+    "offer",
+    "sit"
+  ],
+  "artwork": "Original Unwatched harbor character parts",
+  "generator": "scripts/characters/build-harbor-spine.mjs"
+}

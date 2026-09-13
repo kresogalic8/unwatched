@@ -60,8 +60,15 @@ export function House({u,v,w,d,h,name,color="#ece3cc",side="#c4c5ac",roof=0,lit=
  <Face points={[q(0,d,0),q(w,d,0),q(w,d,h),q(0,d,h)]} fill={color}/>
  <Face points={[q(w,d,0),q(w,0,0),q(w,0,h),q(w,d,h)]} fill={side}/>
  <polygon points={frontPolygon} fill="url(#hs-plaster)" opacity=".22"/>
+ {/* Baked limewash grain survives atlas export; the legacy SVG pattern is stripped by the packer. */}
+ <g opacity=".34">{Array.from({length:340},(_,i)=>{const a=2+noise(i+w*7)*(w-4),z=3+noise(i+h*11)*(h-7),[x,y]=q(a,d+.03,z);return <ellipse key={`grain-${i}`} cx={x} cy={y} rx={.3+noise(i+417)*.75} ry={.25+noise(i+883)*.45} fill={i%3?"#a99d7e":"#fff5db"}/>;})}</g>
+ <g opacity=".25">{Array.from({length:200},(_,i)=>{const b=2+noise(i+d*5)*(d-4),z=3+noise(i+h*17)*(h-7),[x,y]=q(w+.03,b,z);return <ellipse key={`side-grain-${i}`} cx={x} cy={y} rx={.3+noise(i+124)*.6} ry={.35} fill={i%3?"#7d8b73":"#e4ddc3"}/>;})}</g>
+
  <Face points={[q(w,0,0),q(w,d,0),q(w,d,7),q(w,0,7)]} fill="#a2a992"/>
  <Face points={[q(0,d,0),q(w,d,0),q(w,d,8),q(0,d,8)]} fill="#cec7b0"/>
+ {/* The base is worn stone, not a perfectly straight painted stripe. */}
+ {Array.from({length:Math.floor(w/14)},(_,i)=>{const a=i*14+1,z=5+noise(i+34)*5;return <g key={`base-stone-${i}`}><Face points={[q(a,d+.1,1),q(a+12,d+.1,1),q(a+13,d+.1,z),q(a+2,d+.1,z+1)]} fill={i%2?"#b8b49b":"#c7bea3"} stroke="#989c84" width={.5}/><Line a={q(a+2,d+.2,z+1)} b={q(a+12,d+.2,z)} color="#e8ddbf" width={.7}/></g>;})}
+
  {/* Corner stones and roof overhang anchor the walls in depth. */}
  <Face points={[q(w,d,9),q(w,0,9),q(w,0,18),q(w,d,18)]} fill="#89957e" stroke="none"/>
  <Face points={[q(0,d,h-7),q(w,d,h-7),q(w,d,h-16),q(0,d,h-16)]} fill="#776e55" stroke="none"/>
