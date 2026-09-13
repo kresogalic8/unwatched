@@ -5,6 +5,8 @@ import { MockBrain } from "./mock.ts";
 import { WORLD, personaBlock, decidePrompt, conversePrompt, reflectPrompt, paperSystem, paperPrompt, lifeSystem, lifePrompt, judgeSystem, judgePrompt, planPrompt, digestSystem, digestPrompt, childSystem, childPrompt, depthSystem, depthPrompt } from "./prompts.ts";
 
 export interface OpenRouterBrainOptions {
+  /** Production must not deliver mock output as a paid model response. */
+  allowFallback?: boolean;
   apiKey?: string;
   routine?: string;
   stakes?: string;
@@ -80,16 +82,19 @@ const TOWN = Object.freeze({ id: "town", owner: null, brainKind: "hosted", funde
 export class OpenRouterBrain implements Brain {
   readonly name = "openrouter";
   private key: string;
+  private allowFallback: boolean;
+  private blockedUntil = 0;
   private models: Models;
   private log: (l: string) => void;
   private fallback = new MockBrain(13);
+  private providerCost: number | null = 0;
   private spent = { calls: 0, prompt: 0, completion: 0 };
   private timeoutMs: number; private reflectTimeoutMs: number;
 
   constructor(o: OpenRouterBrainOptions = {}) {
     const key = o.apiKey ?? process.env.OPENROUTER_API_KEY;
     if (!key) throw new Error("OPENROUTER_API_KEY is not set");
-    this.key = key;
+    this.key = key; this.allowFallback = o.allowFallback ?? true;
     this.models = {
       routine: o.routine ?? process.env.UW_OR_MODEL_ROUTINE ?? "anthropic/claude-haiku-4.5",
       stakes: o.stakes ?? process.env.UW_OR_MODEL_STAKES ?? "anthropic/claude-sonnet-5",
@@ -100,7 +105,7 @@ export class OpenRouterBrain implements Brain {
     this.log = o.log ?? (() => {});
   }
 
-  usage() { return { ...this.spent }; }
+  usage() { return { ...this.spent, costUsd: this.providerCost }; }
   private cached = 0;
   /** Prompt tokens served from the cache so far. */
   cachedTokens() { return this.cached; }
@@ -122,9 +127,10 @@ export class OpenRouterBrain implements Brain {
    * and a Patron about every eight, so for them it is a tax; an own-key citizen at the default five minutes gets it.
    */
   private cachePersona(a: AgentState) { return a.thinkEvery !== null && a.thinkEvery !== undefined && a.thinkEvery <= 5; }
-  private stood<T extends object>(kind: CallKind, model: string, out: T): T { this.log(`warn: fallback stood in for ${kind} (${model})`); return markFallback(out); }
+  private stood<T extends object>(kind: CallKind, model: string, out: T): T { if (!this.allowFallback) throw new Error(`Model unavailable: ${kind} (${model}); no synthetic response delivered`); this.log(`warn: fallback stood in for ${kind} (${model})`); return markFallback(out); }
 
   private async post(body: unknown, model: string, name: CallKind, slot: Slot): Promise<{ text: string } | null> {
+    if (Date.now() < this.blockedUntil) throw new Error("Provider unavailable; retry after cooldown");
     const ms = slot === "reflect" ? this.reflectTimeoutMs : this.timeoutMs;
     for (let attempt = 0; attempt < 2; attempt++) {
       // the whole attempt is inside the try: the deadline aborts the body as well as the headers, so an answer that arrives half-read must fall back like any other
@@ -136,8 +142,9 @@ export class OpenRouterBrain implements Brain {
           signal: AbortSignal.timeout(ms),
         });
         if (res.status === 429 || res.status >= 500) { this.log(`openrouter ${res.status}; ${attempt === 0 ? "retrying" : "falling back"}`); if (attempt === 1) { this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; } await new Promise((r) => setTimeout(r, 1500)); continue; }
-        if (!res.ok) { const msg = (await res.text()).slice(0, 600); this.log(`openrouter ${res.status}: ${msg}`); this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; }
-        const data = await res.json() as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
+        if (!res.ok) { if ([401, 402, 403, 429].includes(res.status)) this.blockedUntil = Date.now() + 300000; const msg = (await res.text()).slice(0, 600); this.log(`openrouter ${res.status}: ${msg}`); this.onFallback?.({ what: name, model, reason: `openrouter ${res.status}` }); return null; }
+        const data = await res.json() as { choices?: { message?: { content?: string } }[]; usage?: { cost?: number; prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
+        if (typeof data.usage?.cost === "number" && this.providerCost !== null) this.providerCost += data.usage.cost; else this.providerCost = null;
         this.spent.calls++; this.spent.prompt += data.usage?.prompt_tokens ?? 0; this.spent.completion += data.usage?.completion_tokens ?? 0; this.cached += data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
         return { text: data.choices?.[0]?.message?.content ?? "" };
       } catch (err) {
@@ -189,7 +196,7 @@ export class OpenRouterBrain implements Brain {
   }
   async reflect(ctx: ReflectContext): Promise<Reflection> {
     // a quiet night (nothing of importance happened, says the engine) is thought through on the middle mind, briefly; the prompt is the same
-    const quiet = (ctx as { quiet?: boolean }).quiet === true;
+    const quiet = ctx.agent.budget?.reflectionIncluded !== true && (ctx as { quiet?: boolean }).quiet === true;
     const { model, slot } = this.pick("reflection", ctx.agent, quiet ? "stakes" : "reflect");
     const out = await this.call("reflection", model, slot, { shared: WORLD, own: personaBlock(ctx.agent), cacheOwn: this.cachePersona(ctx.agent) }, reflectPrompt(ctx), Reflection, quiet ? 900 : 2000);
     return out ?? this.stood("reflection", model, await this.fallback.reflect(ctx));

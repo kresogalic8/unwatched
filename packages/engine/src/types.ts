@@ -82,6 +82,10 @@ export interface Memory {
 }
 
 export interface Budget {
+  tier1Used?: number;
+  tier2Used?: number;
+  reflectionIncluded?: boolean;
+  planningIncluded?: boolean;
   tier1Max: number;
   tier2Max: number;
   tier1Left: number;

@@ -10,6 +10,10 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Fixed
 
+- Preserve daily decision allowances and refund top-up credits after provider failures; renew allowances independently of nightly reflection and back off failed calls.
+- Apply purchased plan allowances immediately while preserving usage across reloads and plan changes. Included morning planning no longer consumes the advertised decision quotas; paid nightly reflections retain their advertised model.
+- Prepare separate OpenRouter routing for hosted subscribers, outside public-world model downgrades. Production OpenRouter failures no longer deliver synthetic mock answers as paid responses. Deployment requires a separately funded subscriber key.
+
 - Run the server's development command with the free mock brain, no shared store and no paid voice/image providers, even when the repository `.env` contains production credentials. Live model testing must be started explicitly.
 
 ## [0.10.2] - 2026-09-12

@@ -33,6 +33,7 @@ export interface TownOptions {
   log?: (line: string) => void;
   /** Asked when an agent's daily allowance is spent. Return true to pay for the thought from the owner's credits. */
   creditBank?: (agent: AgentState, tier: Tier) => boolean;
+  creditRefund?: (agent: AgentState, tier: Tier) => void;
 }
 
 export interface AddAgentOptions {
@@ -49,6 +50,8 @@ const WEATHERS = ["clear", "clear", "clear", "rain", "rain", "wind", "fog", "sto
 const OUTDOOR_WORK = new Set(["fishhouse", "fields", "orchard", "quarry", "pinewood", "sawpit"]);
 
 export class Town {
+  private retryAt = new Map<string, number>();
+  private creditRefund: ((agent: AgentState, tier: Tier) => void) | undefined;
   readonly rng: Rng;
   readonly brain: Brain;
   readonly pack: WorldPack;
@@ -119,7 +122,7 @@ export class Town {
     this.day = opts.startDay ?? 1;
     this.onEvent = opts.onEvent;
     this.log = opts.log ?? (() => {});
-    this.creditBank = opts.creditBank;
+    this.creditBank = opts.creditBank; this.creditRefund = opts.creditRefund;
     this.t = (this.day - 1) * MINUTES_PER_DAY + 6 * 60; // towns start at 06:00
     this.weather = this.rollWeather();
   }
@@ -300,7 +303,7 @@ export class Town {
     // 1. needs
     for (const a of this.agents.values()) this.decayNeeds(a);
     // 2. habit for everyone, salience for some
-    const thinkers: { a: AgentState; tier: Tier; why: string }[] = [];
+    const thinkers: { a: AgentState; tier: Tier; why: string; refund: () => void }[] = [];
     for (const a of this.agents.values()) if (a.asleep) this.maybeWake(a);
     // morning plans touch nothing but the planner, so they run side by side, a few at a time
     const planners = [...this.agents.values()].filter((a) => !a.asleep && a.plan?.day !== this.day);
@@ -311,8 +314,9 @@ export class Town {
       const nearby = this.nearby(a);
       for (const b of nearby) { if (!a.seenToday.includes(b.id)) a.seenToday.push(b.id); this.rel(a, b.id).lastPlace = b.location; }
       const gathering = this.gatheringAhead(a);
-      const s = this.brain.name === "none" || this.paused ? null : salience(a, { hour: this.hour, t: this.t, day: this.day, nearby, jobsOpenHere: this.openJobsAt(here.id).length, plotHere: here.kind === "plot" && !here.site, watched: this.watched(a, here, nearby), debtDue: a.debtThoughtDay !== this.day && this.debtDueToday(a), gathering });
-      if (s && this.spend(a, s.tier)) { thinkers.push({ a, tier: s.tier, why: s.why }); this.noteThought(a, s.why, gathering); }
+      const s = this.brain.name === "none" || this.paused || (this.retryAt.get(a.id) ?? 0) > this.t ? null : salience(a, { hour: this.hour, t: this.t, day: this.day, nearby, jobsOpenHere: this.openJobsAt(here.id).length, plotHere: here.kind === "plot" && !here.site, watched: this.watched(a, here, nearby), debtDue: a.debtThoughtDay !== this.day && this.debtDueToday(a), gathering });
+      const refund = s ? this.reserve(a, s.tier) : null;
+      if (s && refund) { thinkers.push({ a, tier: s.tier, why: s.why, refund }); }
       else {
         const choices: {baseline:string;preferred:string}[]=[];
         let act = habit(a, {...this.habitView(), onFoodChoice:(baseline,preferred)=>choices.push({baseline,preferred})});
@@ -336,16 +340,18 @@ export class Town {
     }
     // 3. thoughts. Everyone perceives the same minute, thinks at the same time, and acts in seeded order; the validator settles any clash.
     const perceived = thinkers.map((th) => { this.rememberPlace(th.a); return { th, p: this.perceive(th.a) }; });
-    const proposals: ActionProposal[] = new Array(perceived.length);
+    const proposals: (ActionProposal | undefined)[] = new Array(perceived.length);
     const CONCURRENCY = 8;
     for (let i = 0; i < perceived.length; i += CONCURRENCY) {
       await Promise.all(perceived.slice(i, i + CONCURRENCY).map(async ({ th, p }, j) => {
         try { proposals[i + j] = await this.brain.decide(p, th.a, th.tier); }
-        catch (err) { this.log(`brain failed for ${th.a.persona.name}: ${(err as Error).message}`); proposals[i + j] = { action: { kind: "wait" }, remember: [] }; }
+        catch (err) { this.log(`brain failed for ${th.a.persona.name}: ${(err as Error).message}`); th.refund(); this.retryAt.set(th.a.id, this.t + 5); }
       }));
     }
     perceived.forEach(({ th }, i) => {
-      const proposal = proposals[i]!;
+      const proposal = proposals[i];
+      if (!proposal) return;
+      this.noteThought(th.a, th.why, this.gatheringAhead(th.a));
       const wasAsked = th.a.crossroads !== null && th.a.replyTo !== null; // this thought is the one the letter raised
       th.a.lastThought = this.t; th.a.hint = null; th.a.crossroads = null;
       for (const l of th.a.letters) if (!l.read) { l.read = true; this.remember(th.a, `A letter from whoever sent me: "${l.text}"`, 0.6, "letter"); if (asksSomething(l.text) && !l.answered && !th.a.replyTo) { th.a.replyTo = l.id; th.a.crossroads = `A letter from whoever sent you asks something of you: "${l.text}"`; } } // a letter that asks gets its answer: the next thought is a crossroads
@@ -853,7 +859,9 @@ export class Town {
           a.lastConversation = this.t; b.lastConversation = this.t;
           continue;
         }
-        if (!(this.spend(a, 1) || this.spend(b, 1))) continue;
+        if ((this.retryAt.get(a.id) ?? 0) > this.t || (this.retryAt.get(b.id) ?? 0) > this.t) continue;
+        const refund = this.reserve(a, 1) ?? this.reserve(b, 1);
+        if (!refund) continue;
         const place = this.places.get(placeId)!;
         this.rememberPlace(b);
         let d;
@@ -865,7 +873,7 @@ export class Town {
             rumorsA: a.rumors.slice(-2),
             known: !!(a.relationships.get(b.id) || b.relationships.get(a.id)), aToday: a.plan?.day === this.day && a.plan.goals.length ? a.plan.goals.join("; ") : null, bToday: b.plan?.day === this.day && b.plan.goals.length ? b.plan.goals.join("; ") : null,
           });
-        } catch (err) { this.log(`converse failed: ${(err as Error).message}`); continue; }
+        } catch (err) { refund(); this.retryAt.set(a.id, this.t + 5); this.retryAt.set(b.id, this.t + 5); this.log(`converse failed: ${(err as Error).message}`); continue; }
         a.lastConversation = this.t; b.lastConversation = this.t;
         a.needs.social = Math.max(0, a.needs.social - 0.5); b.needs.social = Math.max(0, b.needs.social - 0.5);
         const pair = [a, b];
@@ -933,17 +941,21 @@ export class Town {
     for (const a of this.agents.values()) { if (a.asleep && a.home?.place === a.location) { const p = this.places.get(a.location)!; p.freeBeds = Math.max(0, (p.freeBeds ?? 0) - 1); } }
     // what goes off on the shelves overnight
     this.spoil();
+    // Allowance renewal must not depend on a successful model response or reflection eligibility.
+    for (const a of this.agents.values()) { a.budget.tier1Left = a.budget.tier1Max; a.budget.tier2Left = a.budget.tier2Max; a.budget.tier1Used = 0; a.budget.tier2Used = 0; }
     // reflection
     const dayStart = (this.day - 1) * MINUTES_PER_DAY; const todays = this.events.filter((e) => e.t >= dayStart);
     for (const a of this.agents.values()) {
       if (!a.funded || this.brain.name === "none" || this.paused) continue;
-      if (a.brainKind === "hosted" && a.budget.tier2Max === 0 && !(this.creditBank?.(a, 3) ?? false)) continue; // a Visitor with no credits keeps the day, not the reflection
+      const included = a.budget.reflectionIncluded ?? a.budget.tier2Max > 0;
+      const refundReflection = a.brainKind === "hosted" && !included ? this.reserve(a, 3) : () => {};
+      if (!refundReflection) continue; // a Visitor with no credits keeps the day, not the reflection
       const dayMemories = a.memory.filter((m) => m.t >= dayStart && m.kind !== "reflect").sort((x, y) => y.importance - x.importance).slice(0, 12).map(memoryForMind);
       const keyMemories = retrieve(a.memory, a.persona.want, this.t, 6).map(memoryForMind);
       const rels = [...a.relationships.entries()].map(([id, r]) => ({ id, name: this.agents.get(id)?.persona.name ?? id, trust: r.trust, opinion: r.opinion }));
       let ref: Reflection;
       try { ref = await this.brain.reflect({ agent: a, day: this.day, actionEvidence: todays.filter(e => e.actors.includes(a.id) && ["agent.trade", "agent.work", "agent.hired", "agent.quit", "agent.build", "town.built", "agent.give", "agent.take", "action.rejected"].includes(e.kind)).slice(-24).map(e => `[event ${e.id}, minute ${e.t}, ${e.kind}] ${e.text}`), dayMemories, keyMemories, relationships: rels, unreadLetters: a.letters.filter((l) => !l.read).map((l) => l.text), plan: this.planSheet(a), projects: a.projects.filter((x) => !x.done).map((x) => ({ title: x.title, why: x.why, progress: x.progress, since: x.since })), beliefs: a.beliefs.map((b) => ({ about: b.about, belief: b.belief, confidence: Math.round(b.confidence * 100) / 100 })), watch: [...a.watch], quiet: this.quietDay(a, todays, dayStart) }); }
-      catch (err) { this.log(`reflect failed for ${a.persona.name}: ${(err as Error).message}`); continue; }
+      catch (err) { refundReflection(); this.log(`reflect failed for ${a.persona.name}: ${(err as Error).message}`); continue; }
       this.remember(a, ref.summary, 0.75, "reflect");
       for (const i of ref.insights) this.remember(a, i, 0.6, "reflect");
       for (const o0 of ref.opinions) { const about = this.resolveRef(o0.about); if (!this.agents.has(about) || about === a.id) continue; const o = { ...o0, about }; const r = this.rel(a, o.about); r.opinion = o.opinion; r.trust = clamp(r.trust + o.trust_delta); if (Math.abs(o.trust_delta) > 0.1) this.emit("relation.change", [a.id, o.about], undefined, `${a.persona.name} now thinks of ${this.agents.get(o.about)?.persona.name ?? o.about}: “${o.opinion}”`, 0.4 + Math.abs(o.trust_delta)); }
@@ -977,7 +989,6 @@ export class Town {
       if (ref.letter_to_owner && a.owner) { this.emit("agent.letter", [a.id], a.location, `${a.persona.name} wrote to ${a.owner}: “${ref.letter_to_owner}”`, 0.8, { text: ref.letter_to_owner }); }
       this.emit("agent.reflect", [a.id], a.location, `${a.persona.name} reflected: ${ref.summary}`, 0.2);
       a.memory = compress(age(a.memory, this.t));
-      a.budget.tier1Left = a.budget.tier1Max; a.budget.tier2Left = a.budget.tier2Max;
     }
     for (const a of this.agents.values()) { a.doToday = 0; a.seenToday = []; }
     // the body: a day that ends hungry counts; a night without a roof counts; two hungry days weaken, five can kill
@@ -1419,9 +1430,11 @@ export class Town {
 
   /** On waking, once a day: a thought about what today is for. Costs a stakes thought when the person can afford it. */
   private async maybePlan(a: AgentState): Promise<void> {
-    if (a.plan?.day === this.day || !a.funded || this.brain.name === "none" || this.paused || this.hour < 5) return;
-    const tier: Tier = this.spend(a, 2) ? 2 : this.spend(a, 1) ? 1 : 0 as unknown as Tier;
-    if (!tier) { a.plan = { day: this.day, mood: "", goals: [], steps: [] }; return; } // cannot afford to plan today; habit carries them
+    if ((this.retryAt.get(a.id) ?? 0) > this.t || a.plan?.day === this.day || !a.funded || this.brain.name === "none" || this.paused || this.hour < 5) return;
+    let tier: Tier = 2;
+    let refund = a.budget.planningIncluded ? () => {} : this.reserve(a, 2);
+    if (!refund) { tier = 1; refund = this.reserve(a, 1); }
+    if (!refund) { a.plan = { day: this.day, mood: "", goals: [], steps: [] }; return; } // cannot afford to plan today; habit carries them
     const lastReflection = [...a.memory].reverse().find((m) => m.kind === "reflect");
     const yesterday = lastReflection ? memoryForMind(lastReflection) : null;
     const ctx = {
@@ -1440,7 +1453,7 @@ export class Town {
     a.plan = { day: this.day, mood: "", goals: [], steps: [] }; // reserved: an overlapping tick must not plan this person twice
     let plan: DayPlan;
     try { plan = await this.brain.plan(ctx, tier); }
-    catch (err) { this.log(`plan failed for ${a.persona.name}: ${(err as Error).message}`); a.plan = { day: this.day, mood: "", goals: [], steps: [] }; return; }
+    catch (err) { a.plan = null; refund(); this.retryAt.set(a.id, this.t + 5); this.log(`plan failed for ${a.persona.name}: ${(err as Error).message}`); return; }
     const steps = plan.steps.map((st) => ({ hour: st.hour, do: st.do ?? "", place: st.place ? this.resolvePlace(st.place) : null })).map((st) => ({ ...st, place: st.place && this.places.has(st.place) ? st.place : null })).sort((x, y) => x.hour - y.hour).map((st) => ({ ...st, done: false }));
     a.plan = { ...plan, steps, day: this.day };
     a.lastThought = this.t;
@@ -1500,12 +1513,27 @@ export class Town {
     if (this.hour >= wake && a.needs.rest < 0.4) { a.asleep = false; this.emit("agent.wake", [a.id], a.location, `${a.persona.name} woke up.`, 0.01); }
     else if (this.hour >= 10 && this.hour < 20) { a.asleep = false; }
   }
+  /** Reserve a quota unit, with an idempotent refund if the provider fails. */
+  private reserve(a: AgentState, tier: Tier): (() => void) | null {
+    const before1 = a.budget.tier1Left, before2 = a.budget.tier2Left;
+    if (!this.spend(a, tier)) return null;
+    const used1 = before1 - a.budget.tier1Left, used2 = before2 - a.budget.tier2Left;
+    let refunded = false;
+    return () => {
+      if (refunded) return;
+      refunded = true;
+      a.budget.tier1Left = Math.min(a.budget.tier1Max, a.budget.tier1Left + used1);
+      a.budget.tier2Left = Math.min(a.budget.tier2Max, a.budget.tier2Left + used2);
+      if (used1) a.budget.tier1Used = Math.max(0, (a.budget.tier1Used ?? 0) - used1);
+      if (used2) a.budget.tier2Used = Math.max(0, (a.budget.tier2Used ?? 0) - used2);
+      if (a.brainKind === "hosted" && !used1 && !used2) this.creditRefund?.(a, tier);
+    };
+  }
   private spend(a: AgentState, tier: Tier): boolean {
     if (!a.funded) return false;
     if (a.brainKind !== "hosted") return true; // their compute, their bill; the router applies their own caps
-    if (tier === 1 && a.budget.tier1Left > 0) { a.budget.tier1Left--; return true; }
-    if (tier === 2 && a.budget.tier2Left > 0) { a.budget.tier2Left--; return true; }
-    if (tier === 2 && a.budget.tier1Left > 0) { a.budget.tier1Left--; return true; }
+    if (tier === 1 && a.budget.tier1Left > 0) { a.budget.tier1Used = (a.budget.tier1Used ?? a.budget.tier1Max - a.budget.tier1Left) + 1; a.budget.tier1Left--; return true; }
+    if (tier === 2 && a.budget.tier2Left > 0) { a.budget.tier2Used = (a.budget.tier2Used ?? a.budget.tier2Max - a.budget.tier2Left) + 1; a.budget.tier2Left--; return true; }
     return this.creditBank?.(a, tier) ?? false;
   }
   /** Who sleeps at a place: its owner, and anyone whose home it is. */

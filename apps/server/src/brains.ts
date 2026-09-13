@@ -109,7 +109,8 @@ export class BrainRouter implements Brain {
   readonly name: string;
   readonly perAgent = new Map<string, OwnKeyBrain | OwnBrain>();
   onBad: ((text: string) => void) | null = null;
-  constructor(readonly town: Brain, private log: (l: string) => void) { this.name = town.name; }
+  constructor(readonly town: Brain, private log: (l: string) => void, private hostedFor?: (a: AgentState) => Brain | undefined) { this.name = town.name; }
+  private forAgent(a: AgentState) { return this.perAgent.get(a.id) ?? this.hostedFor?.(a) ?? this.town; }
   set(agentId: string, row: BrainRow | null): void {
     this.perAgent.delete(agentId);
     if (!row || row.kind === "hosted") return;
@@ -117,15 +118,15 @@ export class BrainRouter implements Brain {
     if (row.kind === "own_brain") { const b = new OwnBrain(row, this.log); b.onBad = this.onBad; this.perAgent.set(agentId, b); }
   }
   ownBrainByToken(token: string): OwnBrain | null { for (const b of this.perAgent.values()) if (b instanceof OwnBrain && b.row.token === token) return b; return null; }
-  decide(p: Perception, a: AgentState, tier: Tier) { return (this.perAgent.get(a.id) ?? this.town).decide(p, a, tier); }
-  converse(ctx: ConverseContext) { return (this.perAgent.get(ctx.a.id) ?? this.perAgent.get(ctx.b.id) ?? this.town).converse(ctx); }
-  reflect(ctx: ReflectContext) { return (this.perAgent.get(ctx.agent.id) ?? this.town).reflect(ctx); }
-  plan(ctx: PlanContext, tier: Tier) { return (this.perAgent.get(ctx.agent.id) ?? this.town).plan(ctx, tier); }
-  digest(ctx: DigestContext) { return this.town.digest(ctx); }
+  decide(p: Perception, a: AgentState, tier: Tier) { return this.forAgent(a).decide(p, a, tier); }
+  converse(ctx: ConverseContext) { return (this.perAgent.get(ctx.a.id) ?? this.perAgent.get(ctx.b.id) ?? this.hostedFor?.(ctx.a) ?? this.hostedFor?.(ctx.b) ?? this.town).converse(ctx); }
+  reflect(ctx: ReflectContext) { return this.forAgent(ctx.agent).reflect(ctx); }
+  plan(ctx: PlanContext, tier: Tier) { return this.forAgent(ctx.agent).plan(ctx, tier); }
+  digest(ctx: DigestContext) { return this.forAgent(ctx.agent).digest(ctx); }
   child(ctx: ChildContext) { return this.town.child(ctx); }
   writePaper(ctx: PaperContext) { return this.town.writePaper(ctx); }
   life(ctx: LifeContext) { return this.town.life(ctx); }
-  judge(ctx: JudgeContext) { return this.town.judge(ctx); }
+  judge(ctx: JudgeContext) { return this.forAgent(ctx.agent).judge(ctx); }
 }
 
 export const newToken = () => `ft_agent_${randomBytes(18).toString("base64url")}`;

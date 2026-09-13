@@ -37,8 +37,15 @@ const BRAIN = process.env.UW_BRAIN ?? "mock";
 const CITIZENS = Number(process.env.UW_CITIZENS ?? 20);
 const log = (l: string) => console.log(`[town] ${l}`);
 
-const townBrain: Brain = BRAIN === "openrouter" ? new OpenRouterBrain({ log }) : BRAIN === "anthropic" ? new AnthropicBrain({ log }) : new MockBrain(SEED);
-const router = new BrainRouter(townBrain, log);
+const townBrain: Brain = BRAIN === "openrouter" ? new OpenRouterBrain({ log, allowFallback: false }) : BRAIN === "anthropic" ? new AnthropicBrain({ log }) : new MockBrain(SEED);
+if (BRAIN === "openrouter" && process.env.OPENROUTER_SUBSCRIBER_API_KEY && process.env.OPENROUTER_SUBSCRIBER_API_KEY === process.env.OPENROUTER_API_KEY) throw new Error("Subscriber and public-world keys must be different");
+const subscriberBrain = BRAIN === "openrouter" && process.env.OPENROUTER_SUBSCRIBER_API_KEY
+  ? new OpenRouterBrain({ apiKey: process.env.OPENROUTER_SUBSCRIBER_API_KEY, log, allowFallback: false }) : null;
+const router = new BrainRouter(townBrain, log, (a) => {
+  if (BRAIN !== "openrouter" || a.brainKind !== "hosted" || !a.owner || billing.wallet(a.owner).plan === "none") return undefined;
+  if (!subscriberBrain) throw new Error("Subscriber AI key is not configured; entitlement preserved");
+  return subscriberBrain;
+});
 const MODELS = { routine: process.env.UW_OR_MODEL_ROUTINE ?? "anthropic/claude-haiku-4.5", stakes: process.env.UW_OR_MODEL_STAKES ?? "anthropic/claude-sonnet-5", reflect: process.env.UW_OR_MODEL_REFLECT ?? "anthropic/claude-opus-5" };
 let clockRef = () => ({ day: 1, hour: 6, t: 0 });
 const PATRON_MODELS = { stakes: process.env.UW_OR_MODEL_PATRON_STAKES ?? "anthropic/claude-opus-5", reflect: process.env.UW_OR_MODEL_REFLECT ?? "anthropic/claude-opus-5" }; // a Patron's careful thoughts go to the most capable mind
@@ -79,13 +86,19 @@ function broadcast(msg: unknown) { const s = JSON.stringify(msg); for (const c o
 
 const billing = new Billing(store, log); await billing.load();
 modelsFor = (a) => {
+  if (a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan !== "none") return billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
   if (DAILY_CEILING_USD > 0 && metrics.today(town.day).cost >= DAILY_CEILING_USD) return { stakes: MODELS.routine, reflect: MODELS.stakes }; // the ceiling: cheaper minds, same seconds
   return a.owner && a.brainKind === "hosted" && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
 };
+if (subscriberBrain) {
+  subscriberBrain.modelsFor = (a) => a.owner && billing.wallet(a.owner).plan === "patron" ? PATRON_MODELS : null;
+  subscriberBrain.onFallback = f => metrics.fallback(f);
+}
 const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.wallet(a.owner).plan === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
-const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
+const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, creditRefund: billing.refund, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { store?.sink(e); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
 if (townBrain instanceof OpenRouterBrain) townBrain.primer = primerOf(town);
+if (subscriberBrain) subscriberBrain.primer = primerOf(town);
 let saved: Awaited<ReturnType<NonNullable<typeof store>["loadSnapshot"]>> = null;
 try { saved = store ? await store.loadSnapshot() : null; }
 catch (err) { log(`${(err as Error).message}; not starting, so the island on record is not seeded over. Apply the migrations, then start again.`); process.exit(1); }
@@ -94,13 +107,13 @@ if (saved && saved.agents.length > 0) {
   town.events.push(...(await store!.recentEvents(300)));
   for (const row of await store!.loadBrains()) { const a = town.agents.get(row.agent_id); if (!a) continue; brain.set(row.agent_id, row); a.brainKind = row.kind; a.thinkEvery = row.kind === "own_key" ? row.think_every : null; }
   for (const a of town.agents.values()) billing.applyPlan(a);
-  billing.onPlan = (owner) => { for (const b of town.agents.values()) if (b.owner === owner) billing.applyPlan(b); }; // a plan bought or dropped on Stripe reaches the citizens at once
   log(`restored the island from its record: ${town.clock()}, ${town.agents.size} citizens, ${saved.papers.length} editions`);
 } else {
   for (const p of seedPersonas(new Rng(SEED), CITIZENS)) town.addAgent({ persona: p, owner: null });
   if (store) { await store.ensureTown("The island", SEED); await store.snapshot(town); }
   log("a new island: seeded the first citizens");
 }
+billing.onPlan = (owner) => { for (const b of town.agents.values()) if (b.owner === owner) billing.applyPlan(b); };
 clockRef = () => ({ day: town.day, hour: town.hour, t: town.t });
 // the island keeps our time: the sky, calendar, clock and timetable of a real point on the earth, by latitude and longitude
 const REAL = process.env.UW_REAL_WORLD ? await (async () => { const p = parsePlace(process.env.UW_REAL_WORLD!, process.env.UW_REAL_WORLD_NAME); if (!p) { log(`UW_REAL_WORLD should be "lat,lon" or "lat,lon,Area/City" (got ${JSON.stringify(process.env.UW_REAL_WORLD)}); the island keeps its own time`); return null; } return resolveZone(p); })() : null;
@@ -519,6 +532,7 @@ app.get("/api/ops", (c) => {
     clock: clockOf(town), switches: { paused: town.paused, economyFrozen: town.economyFrozen, boatHeld: town.boatHeld },
     stats: { agents: agents.length, funded: funded.length, hosted: hosted.length, ownKey: ownKey.length, ownBrain: ownBrain.length, costToday: Math.round(today.cost * 100) / 100, costPerFunded: hosted.length ? Math.round(today.cost / hosted.length * 100) / 100 : 0, p50: today.p50, p95: today.p95, holds: metrics.holds.filter((h) => !h.done && h.level === "hold").length, fallbacksToday: metrics.fallbacks.filter((f) => Date.now() - f.at < 86400000).length, cachedTokens: townBrain instanceof OpenRouterBrain ? townBrain.cachedTokens() : 0, ceiling: Number(process.env.UW_DAILY_CEILING_USD ?? 120) },
     hours: metrics.hours.filter((h) => h.day === town.day).map((h) => ({ hour: h.hour, calls: h.t1 + h.t2 + h.t3 + h.converse, t1: h.t1, t2: h.t2, t3: h.t3, converse: h.converse, cost: Math.round(h.cost * 100) / 100 })),
+    providerUsage: { world: townBrain instanceof OpenRouterBrain ? townBrain.usage() : null, subscribers: subscriberBrain?.usage() ?? null },
     byTier: [{ tier: "Tier 1 · routine", model: MODELS.routine, calls: today.t1 + today.converse }, { tier: "Tier 2 · stakes", model: MODELS.stakes, calls: today.t2 }, { tier: "Tier 3 · reflection and the paper", model: MODELS.reflect, calls: today.t3 }],
     real: real ? { ...real.state, season: town.season, timetable: town.boatTimes } : null,
     shelves: Object.fromEntries([...town.places.values()].filter((p) => Object.keys(p.stock).length).map((p) => [p.id, p.stock])),

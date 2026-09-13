@@ -8,13 +8,13 @@ const brain: Brain = {
   async decide() { return { action: { kind: "wait" }, remember: [] }; },
   async converse(ctx) { return { lines: [{ speaker: ctx.a.id, text: "I repaired the mill." }], outcome: { a_remember: "I repaired the mill.", b_remember: "The mill was repaired.", a_trust_delta: 0, b_trust_delta: 0, rumor: null } }; },
   async reflect() { return { summary: "I believe the roof is fixed.", insights: [], opinions: [], intentions: [], letter_to_owner: null, projects: [{ title: "Fix roof", progress: "I believe it is fixed", done: true }] }; },
-  async plan() { throw Error("not used"); }, async digest() { throw Error("not used"); }, async child() { throw Error("not used"); }, async writePaper() { throw Error("not used"); }, async life() { throw Error("not used"); }, async judge() { throw Error("not used"); },
+  async plan() { return { mood: "quiet", goals: [], steps: [] }; }, async digest() { throw Error("not used"); }, async child() { throw Error("not used"); }, async writePaper() { throw Error("not used"); }, async life() { throw Error("not used"); }, async judge() { throw Error("not used"); },
 };
 
 describe("grounded memory", () => {
   it("keeps a model's pre-action success claim subjective when validation rejects its purchase", async () => {
     const town = new Town({ seed: 7, brain: { ...brain, async decide() { return { action: { kind: "trade", buy: "bread", with: "mill" }, remember: ["I bought bread at the mill."] }; } } });
-    const a = town.addAgent({ persona: persona("Mira") }); a.location = "bakery"; a.hint = "Decide now";
+    const a = town.addAgent({ persona: persona("Mira") }); a.location = "bakery"; a.hint = "Decide now"; a.plan = { day: 1, mood: "", goals: [], steps: [] };
     await town.tick();
     expect(town.events.some(e => e.kind === "action.rejected")).toBe(true);
     expect(a.memory.find(m => m.text === "I bought bread at the mill.")?.kind).toBe("reflect");

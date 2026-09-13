@@ -177,3 +177,19 @@ describe("an answer that arrives broken", () => {
     expect(Date.now() - started).toBeLessThan(2500); // one backoff, not two
   }, 10_000);
 });
+
+describe('paid service integrity', () => {
+  const ctx = (a: AgentState): ReflectContext => ({agent:a,day:1,dayMemories:[],keyMemories:[],relationships:[],unreadLetters:[],plan:null,projects:[],beliefs:[],watch:[],quiet:true});
+  it('does not substitute a cheaper model for an included paid reflection', async () => {
+    const {bodies}=fakeFetch([{summary:'Quiet.',insights:[],opinions:[],intentions:[],letter_to_owner:null}]);
+    const a=citizen('ada');a.budget={tier1Max:50,tier1Left:50,tier2Max:6,tier2Left:6,reflectionIncluded:true};
+    await new OpenRouterBrain({apiKey:'test',...models,allowFallback:false}).reflect(ctx(a));
+    expect(bodies[0]?.model).toBe('opus');
+  });
+  it('rejects provider credit exhaustion without fake output or repeated paid requests during cooldown', async () => {
+    const {fetch}=fakeFetch([{status:402}]);const b=new OpenRouterBrain({apiKey:'test',...models,allowFallback:false});
+    await expect(b.reflect(ctx(citizen('ada')))).rejects.toThrow('no synthetic response');
+    await expect(b.reflect(ctx(citizen('ada')))).rejects.toThrow('cooldown');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});

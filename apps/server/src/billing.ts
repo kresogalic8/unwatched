@@ -3,8 +3,8 @@ import type { AgentState, Tier } from "@unwatched/engine";
 import type { Store, Wallet, Plan } from "@unwatched/store";
 
 /**
- * What each plan buys per day, per citizen, per month. From the cost audit of September 2026: a Visitor costs us about $1.10 a month,
- * a Resident $5.70 at typical use and $9.40 if every thought is spent, a Patron $16 and $27 with its careful thoughts on Opus.
+ * What each plan buys per day, per citizen, per month. Provider cost must be measured
+ * separately; these entitlements are not a dollar estimate or a shared-world budget.
  * Nobody thinks for free: an account with no plan has a citizen on habit alone. `gets` is the whole truth of the plan, shown as is.
  */
 export const PLANS: Record<Plan, { name: string; price: number; tier1: number; tier2: number; reflect: boolean; blurb: string; gets: string[] }> = {
@@ -49,7 +49,14 @@ export class Billing {
   }
   wallet(ownerId: string): Wallet { let w = this.wallets.get(ownerId); if (!w) { w = { ownerId, plan: "none", credits: 0, stripeCustomer: null }; this.wallets.set(ownerId, w); } return w; }
   allowance(ownerId: string) { const p = PLANS[this.wallet(ownerId).plan]; return { tier1Max: p.tier1, tier2Max: p.tier2 }; }
-  applyPlan(a: AgentState) { if (!a.owner || a.brainKind !== "hosted") return; const al = this.allowance(a.owner); a.budget.tier1Max = al.tier1Max; a.budget.tier2Max = al.tier2Max; a.budget.tier1Left = Math.min(a.budget.tier1Left, al.tier1Max); a.budget.tier2Left = Math.min(a.budget.tier2Left, al.tier2Max); }
+  applyPlan(a: AgentState) { if (!a.owner || a.brainKind !== "hosted") return; const al = this.allowance(a.owner);
+    a.budget.tier1Used ??= a.budget.tier1Max - a.budget.tier1Left;
+    a.budget.tier2Used ??= a.budget.tier2Max - a.budget.tier2Left;
+    a.budget.tier1Left = Math.max(0, al.tier1Max - a.budget.tier1Used);
+    a.budget.tier2Left = Math.max(0, al.tier2Max - a.budget.tier2Used);
+    a.budget.tier1Max = al.tier1Max; a.budget.tier2Max = al.tier2Max;
+    a.budget.reflectionIncluded = PLANS[this.wallet(a.owner).plan].reflect;
+    a.budget.planningIncluded = this.wallet(a.owner).plan !== "none"; }
 
   /** The engine asks; we answer from the wallet. */
   bank = (a: AgentState, tier: Tier): boolean => {
@@ -59,6 +66,12 @@ export class Billing {
     w.credits -= cost;
     void this.store?.saveWallet(w); void this.store?.credit(a.owner, -cost, tier === 1 ? "thought" : tier === 2 ? "stakes" : "reflection", a.id);
     return true;
+  };
+
+  refund = (a: AgentState, tier: Tier): void => {
+    if (!a.owner) return;
+    const w = this.wallet(a.owner); w.credits += COST[tier];
+    void this.store?.saveWallet(w); void this.store?.credit(a.owner, COST[tier], "failed-thought-refund", a.id);
   };
 
   async grant(ownerId: string, credits: number, reason: string, ref: string | null = null) { const w = this.wallet(ownerId); w.credits += credits; await this.store?.saveWallet(w); await this.store?.credit(ownerId, credits, reason, ref); return w; }
