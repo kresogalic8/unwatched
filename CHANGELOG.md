@@ -4,11 +4,15 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ## [Unreleased]
 
-### Added
-
 ### Changed
 
+- Full-window town observation with compact navigation, a collapsible journal, lower citizen details and responsive mobile controls.
+- Clickable island minimap, whole-island camera framing and following selected citizens independently of ownership.
+
 ### Fixed
+
+- Ultrawide landing headlines retain their text column; hero type scales with viewport height and actions align with the content.
+- The landing wordmark stays white over the dark hero. Town feedback moves into the header to avoid overlapping map controls.
 
 ## [0.14.0] - 2026-09-13
 ### Added

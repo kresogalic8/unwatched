@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import s from "./feedback.module.css";
 export function FeedbackEntry() {
   const path = usePathname();
-  if (path.startsWith("/ops") || path.startsWith("/feedback")) return null;
+  if (path === "/town" || path.startsWith("/ops") || path.startsWith("/feedback")) return null;
   return (
     <Link
       className={s.entry}

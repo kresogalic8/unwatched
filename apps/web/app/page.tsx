@@ -40,7 +40,7 @@ export default function Landing() {
       </a>
       <LandingMotion />
       <header className={`${s.header} ${s.cinematicHeader}`}>
-        <Wordmark size={23} />
+        <Wordmark size={23} dark />
         <nav className={s.nav} aria-label="Around the island">
           <Link className={s.watchNav} href="/town">
             Watch the town

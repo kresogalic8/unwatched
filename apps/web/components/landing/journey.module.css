@@ -6,7 +6,7 @@
 .chapters { position: relative; z-index: 2; padding: 180px 48px 145px; max-width: 670px; }
 .chapter { margin-bottom: 60px; }
 .kicker { font-size: 11px; letter-spacing: .1em; color: #ed7651; margin: 0 0 24px !important; }
-.journey .chapter h1, .journey .chapter h2 { font-size: clamp(60px, 6.2vw, 102px); line-height: .94; letter-spacing: -.06em; font-weight: 500; margin: 0; }
+.journey .chapter h1, .journey .chapter h2 { font-size: clamp(52px, min(6.2vw, 9.2svh), 102px); line-height: .94; letter-spacing: -.06em; font-weight: 500; margin: 0; }
 .chapter em { font-style: normal; color: #b8c2ad; }
 .journey .copy { margin: 25px 0 0; max-width: 310px; color: #c3cbbf; font-size: 16px; line-height: 1.55; }
 .bottomline { position: absolute; left: 48px; right: 48px; bottom: 80px; display: flex; justify-content: space-between; align-items: center; gap: 24px; z-index: 3; }
@@ -26,7 +26,12 @@
 .journey[data-cinematic="false"] { height: 100svh; min-height: 650px; }
 .journey[data-cinematic="false"] .chapter:not(:first-child) { display: none; }
 .journey a:focus-visible { outline: 2px solid #f18b66; outline-offset: 5px; }
-@media (min-width: 1600px) { .chapters { padding-left: max(48px, calc((100vw - 1400px)/2)); } .journey[data-cinematic="true"] .chapter { left: max(48px, calc((100vw - 1400px)/2)); } }
+/* Move the fixed-width copy column as a whole: viewport-sized inner padding
+   previously consumed its width on ultrawide screens. */
+@media (min-width: 1600px) {
+  .chapters { margin-left: max(0px, calc((100vw - 1496px) / 2)); }
+  .topline, .bottomline { left: max(48px, calc((100vw - 1400px) / 2)); right: max(48px, calc((100vw - 1400px) / 2)); }
+}
 @media (max-width: 767px) {
   .coordinate { display: none; }
   .topline { top: 100px; left: 22px; right: 22px; font-size: 9px; }

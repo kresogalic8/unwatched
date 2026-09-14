@@ -1,4 +1,5 @@
 "use client";
+import { Icon } from "./icons";
 import { BuildingInterior, hasInterior } from "./BuildingInterior";
 import { Footfall } from "./world/footfall";
 import { PlaceMemory } from "./PlaceMemory";
@@ -86,7 +87,10 @@ function lookSvg(hash: string): Promise<string | null> {
 type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Citizen; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
 export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
-export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot }: { mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; onSnapshot?: (snapshot: WorldSnapshot) => void }) {
+export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange }: { mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void }) {
+  const viewChange = useRef(onViewChange); viewChange.current = onViewChange;
+  const focusRef = useRef(focusId); focusRef.current = focusId;
+  const navigateMini = useRef<((x:number,y:number)=>void) | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const cameraControl = useRef<((action: "in" | "out" | "reset") => void) | null>(null);
   const [labels, setLabels] = useState<{ id: string; name: string; x: number; y: number; mine: boolean; shown: boolean; bubble?: string }[]>([]);
@@ -132,7 +136,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const clean = typeof location !== "undefined" && new URLSearchParams(location.search).get("clean") === "1"; setCleanUi(clean); // ?clean=1: the island with nothing over it, for pictures
       const atParam = typeof location !== "undefined" ? new URLSearchParams(location.search).get("at") : null; const zoomParam = typeof location !== "undefined" ? previewZoom(new URLSearchParams(location.search).get("zoom")) : NaN;
       const parkAt = (spec: string | null) => { if (!spec) return null; const [id, dx, dy] = spec.split(","); const p = places.get(id ?? ""); return p ? { x: p.x + (Number(dx) || 0), y: p.y + (Number(dy) || 0) } : null; };
-      const parked = parkAt(atParam);
+      let parked = parkAt(atParam);
       // a filmed move: ?to=place,dx,dy&zoomTo=1.8&over=8&delay=1 glides the camera from `at` to `to` over that many seconds, eased both ends
       const q = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
       const moveTo_ = parkAt(q?.get("to") ?? null); const zoomToParam = previewZoom(q?.get("zoomTo")); const moveOver = Number(q?.get("over")) || 8; const moveDelay = Number(q?.get("delay")) || 0.8; const moveStart = performance.now();
@@ -477,16 +481,21 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // a hand on the camera in the street view: drag to look around, wheel to zoom, a little inertia after letting go
       const canvas = app.canvas; let press: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null; let lastMove = { x: 0, y: 0, t: 0 };
       const handOn = () => { const c = camera.current; if (!c.hand) { const Wd = app!.screen.width, Hd = app!.screen.height; c.hand = { x: (Wd / 2 - c.x) / c.zoom, y: (Hd / 2 - c.y) / c.zoom, zoom: c.zoom, vx: 0, vy: 0 }; c.follow = null; } return c.hand; };
+      const fitZoom = () => Math.min(app!.screen.width / (W * 1.12), Math.max(180,app!.screen.height - (observer ? 150 : 0)) / (H * 1.12));
+      if (observer && !parked && !focusRef.current) camera.current.hand = {x:W/2,y:H/2+(observer ? 65/fitZoom() : 0),zoom:fitZoom(),vx:0,vy:0};
+      navigateMini.current = (x,y) => { parked=null;viewRef.current="street";viewChange.current?.("street");camera.current.follow=null;camera.current.hand={x,y,zoom:Math.max(.7,camera.current.zoom),vx:0,vy:0}; };
       cameraControl.current = action => {
-        if (action === "reset") { camera.current.hand = null; camera.current.follow = mineId; return; }
+        parked=null;
+        if (action === "reset") { camera.current.hand = {x:W/2,y:H/2+(observer ? 65/fitZoom() : 0),zoom:fitZoom(),vx:0,vy:0}; camera.current.follow=null;viewRef.current="street";viewChange.current?.("street");return; }
+        if(viewRef.current !== "street") {viewRef.current="street";viewChange.current?.("street");}
         const hand = handOn(); hand.vx = 0; hand.vy = 0;
-        hand.zoom = Math.min(1.9, Math.max(0.55, hand.zoom * (action === "in" ? 1.2 : 1 / 1.2)));
+        hand.zoom = Math.min(1.9, Math.max(Math.min(.2,fitZoom()), hand.zoom * (action === "in" ? 1.2 : 1 / 1.2)));
       };
       canvas.addEventListener("pointerdown", (e) => { if (viewRef.current !== "street") return; press = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, moved: false }; lastMove = { x: e.clientX, y: e.clientY, t: performance.now() }; });
       canvas.addEventListener("pointermove", (e) => { if (!press) return; const dx = e.clientX - press.cx, dy = e.clientY - press.cy; if (!press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return; press.moved = true; suppressSelectUntil = performance.now() + 250; const h = handOn(); h.x -= dx / camera.current.zoom; h.y -= dy / camera.current.zoom; const now = performance.now(); const dt = Math.max(8, now - lastMove.t); h.vx = Math.max(-30, Math.min(30, -(e.clientX - lastMove.x) / dt * 16 / camera.current.zoom)); h.vy = Math.max(-30, Math.min(30, -(e.clientY - lastMove.y) / dt * 16 / camera.current.zoom)); lastMove = { x: e.clientX, y: e.clientY, t: now }; press.cx = e.clientX; press.cy = e.clientY; });
       const release = () => { if (press?.moved) suppressSelectUntil = performance.now() + 250; if (press?.moved && camera.current.hand && performance.now() - lastMove.t > 80) { camera.current.hand.vx = 0; camera.current.hand.vy = 0; } press = null; };
       canvas.addEventListener("pointerup", release); canvas.addEventListener("pointercancel", release); canvas.addEventListener("pointerleave", release);
-      canvas.addEventListener("wheel", (e) => { if (viewRef.current !== "street") return; e.preventDefault(); const h = handOn(); const before = h.zoom; h.zoom = Math.min(1.9, Math.max(0.55, h.zoom * Math.exp(-e.deltaY * 0.0012))); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left - app!.screen.width / 2, my = e.clientY - r.top - app!.screen.height / 2; h.x += mx / before - mx / h.zoom; h.y += my / before - my / h.zoom; }, { passive: false });
+      canvas.addEventListener("wheel", (e) => { if (viewRef.current !== "street") return; e.preventDefault(); const h = handOn(); const before = h.zoom; h.zoom = Math.min(1.9, Math.max(Math.min(.2,fitZoom()), h.zoom * Math.exp(-e.deltaY * 0.0012))); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left - app!.screen.width / 2, my = e.clientY - r.top - app!.screen.height / 2; h.x += mx / before - mx / h.zoom; h.y += my / before - my / h.zoom; }, { passive: false });
       let lastCut = ""; let cutAt = 0;
       // where the frame goes, for tuning: window.__ftperf holds milliseconds per section since load
       const perf: Record<string, number> = {}; let perfT = 0; let perfSection = "start"; (window as unknown as { __ftperf: Record<string, number>; __ftworld: Container; __ftscene: Container }).__ftperf = perf; (window as unknown as { __ftworld: Container }).__ftworld = world; (window as unknown as { __ftscene: Container }).__ftscene = scene;
@@ -500,9 +509,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const followed = viewRef.current === "street" && cam.follow ? figs.current.get(cam.follow) : null;
         const talking = followed ? followed.pose === "talk" : false;
         // the cinema breathes: the zoom swells and settles over half a minute; a followed conversation draws the camera in a step
-        const zoom = viewRef.current === "map" ? Math.min(Wd / (W * 1.1), Hd / (H * 1.24)) : viewRef.current === "cinema" ? 1.22 + Math.sin(tick / 1400) * 0.06 : hand ? hand.zoom : talking ? 1.16 : 1.05; // the map leaves sea around the island, so the horizon shows
-        const zoomAim = parked && !hand && Number.isFinite(zoomParam) ? (Number.isFinite(zoomToParam) ? zoomParam + (zoomToParam - zoomParam) * moveP() : zoomParam) : zoom; cam.zoom += (zoomAim - cam.zoom) * (hand ? 0.16 : parked ? 0.5 : 0.05);
-        let fx = W / 2, fy = H / 2 + 40;
+        const zoom = viewRef.current === "map" ? fitZoom() : viewRef.current === "cinema" ? 1.22 + Math.sin(tick / 1400) * 0.06 : hand ? hand.zoom : talking ? 1.16 : 1.05; // the map leaves sea around the island, so the horizon shows
+        const zoomAim = parked && !hand && !focusRef.current && viewRef.current === "street" && Number.isFinite(zoomParam) ? (Number.isFinite(zoomToParam) ? zoomParam + (zoomToParam - zoomParam) * moveP() : zoomParam) : zoom; cam.zoom += (zoomAim - cam.zoom) * (hand ? 0.16 : parked ? 0.5 : 0.05);
+        let fx = W / 2, fy = H / 2 + (observer && viewRef.current === "map" ? 65/zoom : 40);
         if (hand) { hand.vx = Math.max(-22, Math.min(22, hand.vx)); hand.vy = Math.max(-22, Math.min(22, hand.vy)); hand.x = Math.max(-200, Math.min(W + 200, hand.x + (press ? 0 : coast(hand.vx, app.ticker.deltaTime).distance))); hand.y = Math.max(-150, Math.min(H + 150, hand.y + (press ? 0 : coast(hand.vy, app.ticker.deltaTime).distance))); if (!press) { hand.vx = coast(hand.vx, app.ticker.deltaTime).velocity; hand.vy = coast(hand.vy, app.ticker.deltaTime).velocity; } fx = hand.x; fy = hand.y; } // the hand stays over the island and never flings it
         else if (viewRef.current === "street") { if (followed) { const lead = Math.max(-70, Math.min(70, (followed.tx - followed.x) * 0.7)); fx = followed.x + lead; fy = followed.y - 60; } else { const mk = places.get("market"); if (mk) { fx = mk.x; fy = mk.y; } } }
         // the camera follows the day: the latest moment that mattered, or the busiest place when nothing has happened for a while
@@ -510,7 +519,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (viewRef.current === "cinema" && stagedNow) { fx = stagedNow.x; fy = stagedNow.y + 20; }
         else if (viewRef.current === "cinema") { const cn = cinema.current; if (cn && Date.now() - cn.at < 120000) { const f = cn.ids[0] ? figs.current.get(cn.ids[0]) : null; fx = f?.x ?? cn.x; fy = (f?.y ?? cn.y) - 50; } else { let best: PlaceView | null = null; for (const p of places.values()) if (!best || p.crowd > best.crowd) best = p; if (best) { fx = best.x; fy = best.y - 20; } } }
         if (viewRef.current === "cinema") { const key = stagedNow ? `s:${stagedNow.place}` : cinema.current ? `c:${cinema.current.at}` : "idle"; if (key !== lastCut) { lastCut = key; cutAt = tick; } fx += Math.sin(tick / 900) * 36; fy += Math.cos(tick / 1100) * 18; } // a slow drift while the moment plays
-        if (parked && !hand) { const k = moveTo_ ? moveP() : 0; fx = parked.x + (moveTo_ ? (moveTo_.x - parked.x) * k : 0); fy = parked.y + (moveTo_ ? (moveTo_.y - parked.y) * k : 0); }
+        if (parked && !hand && !focusRef.current && viewRef.current === "street") { const k = moveTo_ ? moveP() : 0; fx = parked.x + (moveTo_ ? (moveTo_.x - parked.x) * k : 0); fy = parked.y + (moveTo_ ? (moveTo_.y - parked.y) * k : 0); }
+        if (observer && focusRef.current && followed && !hand && viewRef.current === "street") fy += Math.min(160, Hd * .25) / cam.zoom;
         const tx = Wd / 2 - fx * cam.zoom, ty = Hd / 2 - fy * cam.zoom;
         const cutting = viewRef.current === "cinema" && tick - cutAt < 90; // a new moment is a cut, not a crawl
         const ease = hand ? 1 : viewRef.current === "cinema" ? (cutting ? 0.09 : 0.02) : 0.08; cam.x += (tx - cam.x) * ease; cam.y += (ty - cam.y) * ease;
@@ -739,13 +749,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         perfMark("end");
       });
     })().catch(() => { if(alive) setLoadError(true); });
-    return () => { alive = false; cameraControl.current = null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
+    return () => { alive = false; cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineId]);
 
   useEffect(() => { onSnapshot?.({ clock, feed, citizens: [...agents.current.values()], ready, error: loadError }); }, [clock, feed, ready, loadError, onSnapshot]);
 
-  useEffect(() => { camera.current.follow = mineId; camera.current.hand = null; }, [mineId]);
+  useEffect(() => { camera.current.follow = focusId ?? (observer ? null : mineId); if (focusId || !observer) camera.current.hand = null; }, [mineId, focusId, observer]);
+  useEffect(() => { if(view !== "street") camera.current.hand=null; },[view]);
   const z = camera.current.zoom;
   const showLabels = view === "street" || z > 0.6;
 
@@ -755,10 +766,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       {!ready && <div className="absolute inset-0 flex flex-col gap-3 items-center justify-center text-teal font-bold">{loadError ? <>The island could not be loaded.<button className="underline" onClick={()=>window.location.reload()}>Try again</button></> : "Crossing to the island…"}</div>}
       <div className="absolute inset-0 pointer-events-none crossfade" style={{ background: "radial-gradient(ellipse at center, rgba(30,42,43,0) 55%, rgba(30,42,43,0.22) 100%)", opacity: view === "map" ? 0.5 : view === "cinema" ? 1 : 0.7 }} />
       <button data-world-control="sound" hidden={cleanUi} onClick={() => { const a = ambienceRef.current; if (!a) return; if (sound) { void a.disable(); setSound(false); } else { void a.enable().then(() => setSound(true)); } }} className="absolute right-3 top-3 sm:right-6 sm:top-6 h-9 px-3.5 rounded-full bg-shell text-teal text-[13px] font-bold pointer-events-auto transition-colors" aria-pressed={sound}>{sound ? "Sound on" : "Sound off"}</button>
-      {ready && view === "street" && !cleanUi && !placeInfo && <div data-world-control="camera" role="group" aria-label="Camera controls" className="absolute right-3 top-16 sm:right-6 sm:top-20 flex flex-col rounded-2xl bg-shell text-teal shadow-sm overflow-hidden">
+      {ready && !cleanUi && !placeInfo && <div data-world-control="camera" role="group" aria-label="Camera controls" className="absolute right-3 top-16 sm:right-6 sm:top-20 flex flex-col rounded-2xl bg-shell text-teal shadow-sm overflow-hidden">
         <button aria-label="Zoom in" title="Zoom in" onClick={() => cameraControl.current?.("in")} className="w-11 h-11 text-2xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">+</button>
         <button aria-label="Zoom out" title="Zoom out" onClick={() => cameraControl.current?.("out")} className="w-11 h-11 text-2xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">−</button>
-        <button aria-label="Recenter camera" title="Recenter camera" onClick={() => cameraControl.current?.("reset")} className="w-11 h-11 text-xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">⌖</button>
+        <button aria-label="Show whole island" title="Show whole island" onClick={() => cameraControl.current?.("reset")} className="w-11 h-11 text-xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4"><Icon name="map" size={20}/></button>
       </div>}
       <div hidden={cleanUi} className="absolute inset-0 pointer-events-none">
         {labels.map((l) => (
@@ -769,7 +780,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           </div>
         ))}
       </div>
-      {mini && !cleanUi && <svg data-world-control="mini" className="absolute right-3 bottom-3 sm:right-6 sm:bottom-6 hidden sm:block rounded-2xl bg-shell/90 pointer-events-none" width={180} height={Math.round(180 * mini.h / mini.w)} viewBox={`0 0 ${mini.w} ${mini.h}`} aria-hidden>
+      {mini && !cleanUi && <svg data-world-control="mini" className="absolute right-3 bottom-3 sm:right-6 sm:bottom-6 hidden sm:block rounded-2xl bg-shell/90 pointer-events-auto" width={180} height={Math.round(180 * mini.h / mini.w)} viewBox={`0 0 ${mini.w} ${mini.h}`} role="button" tabIndex={0} aria-label="Island minimap. Click to travel, or press Enter to show the whole island." onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();cameraControl.current?.("reset");}}} onClick={e=>{const matrix=e.currentTarget.getScreenCTM();if(!matrix)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());navigateMini.current?.(Math.max(0,Math.min(mini.w,p.x)),Math.max(0,Math.min(mini.h,p.y)));}}>
+        <rect width={mini.w} height={mini.h} fill="#d4ddcb" rx={80}/>
         {mini.places.filter((p) => p.kind !== "public" && p.kind !== "wild").map((p) => <circle key={p.id} cx={p.x} cy={p.y} r={p.kind === "plot" ? 22 : 34} fill={p.kind === "plot" ? "#B9CFC8" : "#1F5F5B"} opacity={0.55} />)}
         {mini.people.map((pp, i) => <circle key={i} cx={pp.x} cy={pp.y} r={pp.mine ? 30 : 16} fill={pp.mine ? "#E8735A" : "#1E2A2B"} />)}
         <rect x={mini.view.x} y={mini.view.y} width={mini.view.w} height={mini.view.h} fill="none" stroke="#1F5F5B" strokeWidth={18} rx={40} />

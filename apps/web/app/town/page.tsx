@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  ExploreHeader,
   Label,
   Button,
   LinkButton,
 } from "@/components/explore/ExplorePage";
-import { Bubble, Tide } from "@/components/ui";
+import { SessionLink } from "@/components/auth/SessionLink";
+import { Wordmark, Bubble, Tide } from "@/components/ui";
 import { api, hhmm, type PublicAgent, type OwnerAgent } from "@/lib/api";
 import { useMyAgent } from "@/lib/useAgent";
 import type { WorldSnapshot } from "@/components/World";
@@ -31,7 +31,9 @@ export default function Town() {
   const [detailError, setDetailError] = useState(false);
   const [clean, setClean] = useState(false);
   const [view, setView] = useState<"street" | "map" | "cinema">("street");
-  const [follow, setFollow] = useState(true);
+  const [follow, setFollow] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [tracking, setTracking] = useState<string | null>(null);
   const [effects, setEffects] = useState(true);
   const [nudge, setNudge] = useState(false);
   const [tab, setTab] = useState<"activity" | "people">("activity");
@@ -77,10 +79,10 @@ export default function Town() {
     return () => {
       alive = false;
     };
-  }, [sel]);
+  }, [sel?.id]);
   useEffect(() => {
     if (sel) heading.current?.focus();
-  }, [sel]);
+  }, [sel?.id]);
   useEffect(() => { if (journalScroll.current) journalScroll.current.scrollTop = 0; }, [sel, tab]);
   function dismiss() {
     setNudge(false);
@@ -115,68 +117,21 @@ export default function Town() {
       actionPending.current = false;
     }
   }
+  useEffect(() => {setSel(current => current ? snapshot.citizens.find(p=>p.id===current.id) ?? current : null);}, [snapshot.citizens]);
   const rel = agent?.people.find((p) => p.id === sel?.id);
   const c = snapshot.clock;
   return (
     <main className={`${theme.page} ${s.page} ${clean ? s.clean : ""}`}>
       {!clean && (
         <>
-          <a className={theme.skip} href="#town-journal">
+          <a className={theme.skip} href="#town-journal" onClick={()=>setJournalOpen(true)}>
             Skip to the town journal
           </a>
-          <ExploreHeader />
-          <div className={s.toolbar}>
-            <div className={s.title}>
-              <h1>Watch the town.</h1>
-              <p className={s.clock}>
-                {c
-                  ? `Day ${c.day} · ${String(c.hour).padStart(2, "0")}:${String(c.minute % 60).padStart(2, "0")} · ${c.weather}${typeof c.temperatureC === "number" ? ` · ${Math.round(c.temperatureC)}°` : ""} · ${c.population} citizens`
-                  : snapshot.error
-                    ? "The island is out of reach."
-                    : "Finding our way to the island…"}
-              </p>
-            </div>
-            <div className={s.controls}>
-              <div
-                className={s.segment}
-                role="group"
-                aria-label="View of the town"
-              >
-                {(
-                  [
-                    ["street", "Street"],
-                    ["map", "Map"],
-                    ["cinema", "Follow the day"],
-                  ] as const
-                ).map(([v, label]) => (
-                  <button
-                    key={v}
-                    aria-pressed={view === v}
-                    onClick={() => changeView(v)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {agent && (
-                <div
-                  className={s.segment}
-                  role="group"
-                  aria-label="Camera follows"
-                >
-                  <button aria-pressed={follow} onClick={() => setFollow(true)}>
-                    Follow {agent.name.split(" ")[0]}
-                  </button>
-                  <button
-                    aria-pressed={!follow}
-                    onClick={() => setFollow(false)}
-                  >
-                    Free camera
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <header className={s.topbar}>
+            <div className={s.brand}><Wordmark dark size={18} /></div>
+            <div className={s.islandClock}><span className={s.liveDot} /><span>{c ? `Day ${c.day}` : "Connecting"}</span><span className={s.clock}>{c ? `${String(c.hour).padStart(2,"0")}:${String(c.minute%60).padStart(2,"0")}` : "—"}</span><span className={s.weather}>{c?.weather}{typeof c?.temperatureC === "number" ? ` · ${Math.round(c.temperatureC)}°` : ""}</span></div>
+            <div className={s.topActions}><button onClick={()=>{setSel(null);setTab("people");setJournalOpen(true);}}><ArrowIcon name="people" size={16}/><span>{snapshot.citizens.length} citizens</span></button><Link href="/feedback?from=%2Ftown" aria-label="Give feedback" title="Give feedback"><ArrowIcon name="letter" size={16}/></Link><SessionLink /></div>
+          </header>
         </>
       )}
       <div className={s.stage}>
@@ -186,7 +141,9 @@ export default function Town() {
           aria-describedby={clean ? undefined : "town-camera-help"}
         >
           <World
-            mineId={follow && agent ? agent.id : null}
+            mineId={agent?.id ?? null}
+            focusId={tracking ?? (follow ? agent?.id ?? null : null)}
+            onViewChange={changeView}
             onSelect={setSel}
             view={view}
             effects={effects}
@@ -197,6 +154,8 @@ export default function Town() {
         {!clean && (
           <aside
             className={s.journal}
+            data-selected={!!sel}
+            hidden={!sel && !journalOpen}
             id="town-journal"
             aria-label="Town journal"
           >
@@ -205,11 +164,9 @@ export default function Town() {
                 {sel ? "A life on the island" : "The town journal"}
               </h2>
               {sel ? (
-                <button onClick={() => setSel(null)}>Close profile</button>
+                <button aria-label="Close profile" onClick={() => {setSel(null);setTracking(null);}}><ArrowIcon name="close" size={20}/></button>
               ) : (
-                <Label>
-                  {snapshot.ready ? "From the record" : "Connecting"}
-                </Label>
+                <button aria-label="Close journal" onClick={()=>setJournalOpen(false)}><ArrowIcon name="close" size={20}/></button>
               )}
             </div>
             {!sel && (
@@ -235,7 +192,7 @@ export default function Town() {
               {!sel && tab === "activity" && (
                 <div aria-label="Recent island events">
                   {snapshot.feed.length ? (
-                    snapshot.feed.map((e) => (
+                    snapshot.feed.slice(0, 12).map((e) => (
                       <article
                         key={e.id}
                         className={s.event}
@@ -351,6 +308,7 @@ export default function Town() {
                     </section>
                   )}
                   <div className={s.detailActions}>
+                    <Button kind="secondary" onClick={()=>{setTracking(tracking === sel.id ? null : sel.id);setFollow(false);changeView("street");}}>{tracking === sel.id ? "Stop following" : `Follow ${sel.name.split(" ")[0]}`}</Button>
                     {agent && !possessed && (
                       <Button
                         onClick={() => {
@@ -455,18 +413,11 @@ export default function Town() {
           </aside>
         )}
       </div>
-      {!clean && (
-        <div className={s.ownerBar}>
-          <span id="town-camera-help">
-            Drag to explore · Use + / − to zoom · Select a person or a
-            building
-          </span>
-          <nav aria-label="More from the island">
-            <Link href="/evolution">What changed ↗</Link>
-            <Link href="/gazette">Read the Gazette ↗</Link>
-          </nav>
-        </div>
-      )}
+      {!clean && <footer className={s.dock}>
+        <div className={s.dockIdentity}><span className={s.eyebrow}>UNWATCHED / THE LIVING ISLAND</span><strong>{sel ? sel.name : "Their world. Unfolding."}</strong><span className={s.hint} id="town-camera-help">Drag to explore · Scroll to zoom · Click to discover</span></div>
+        <div className={s.segment} role="group" aria-label="View of the town">{([["street","Explore","street"],["map","Whole island","map"],["cinema","Follow the day","watch"]] as const).map(([v,label,icon])=><button key={v} aria-pressed={view===v} onClick={()=>{setTracking(null);setFollow(false);changeView(v);}}><ArrowIcon name={icon} size={20}/><span>{label}</span></button>)}</div>
+        <nav className={s.dockLinks} aria-label="Island activity"><button aria-expanded={journalOpen&&!sel&&tab==="activity"} onClick={()=>{setSel(null);setTab("activity");setJournalOpen(!(journalOpen&&tab==="activity"));}}><ArrowIcon name="digest" size={20}/>Journal</button><button aria-expanded={journalOpen&&!sel&&tab==="people"} onClick={()=>{setSel(null);setTab("people");setJournalOpen(!(journalOpen&&tab==="people"));}}><ArrowIcon name="people" size={20}/>People</button>{agent&&<button onClick={()=>{setSel(agent);setTracking(agent.id);changeView("street");}}><ArrowIcon name="follow" size={20}/>My citizen</button>}<Link href="/evolution"><ArrowIcon name="time" size={20}/>History</Link></nav>
+      </footer>}
     </main>
   );
 }
