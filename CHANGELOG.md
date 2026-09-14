@@ -4,6 +4,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+## [0.14.1] - 2026-09-14
 ### Changed
 
 - Full-window town observation with compact navigation, a collapsible journal, lower citizen details and responsive mobile controls.
@@ -345,7 +352,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/kresogalic8/unwatched/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/kresogalic8/unwatched/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/kresogalic8/unwatched/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/kresogalic8/unwatched/compare/v0.11.0...v0.12.0
