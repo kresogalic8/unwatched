@@ -6,7 +6,15 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- The town view answers a tap: click an event or a person in the journal and the camera flies there and marks who it means; the cinema view carries a lower third naming who is on screen and what the record says.
+- Desire-lines wear into the grass where people cross off the roads, faint at first and deeper the more they are walked.
+
 ### Changed
+
+- The island now reads as raised land, with a living tide line washing the shore and soft light shafts falling through the pinewood at dawn and dusk.
+- Trees and props cast the sun's shadow and sit on the ground; the low sun catches the roofs, and at night each lit building spills warm light onto the street.
+- The common houses come in colour-and-roof variants, differ a little building to building, and age with moss creeping up their feet.
+- Each citizen now walks in their own way — their build, their years and a load in the hands shape the step — leaning into a quickening pace and slowing behind a crowd rather than walking through it.
 
 ### Fixed
 
