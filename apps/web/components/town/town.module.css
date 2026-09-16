@@ -133,6 +133,26 @@
 .event:last-child {
   border: 0;
 }
+.eventBtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background 0.15s ease;
+  border-radius: 6px;
+}
+.eventBtn:last-child {
+  border-bottom: 0;
+}
+.eventBtn:hover,
+.eventBtn:focus-visible {
+  background: #ffffff0d;
+}
 .event time {
   font-size: 11px;
   letter-spacing: 0.04em;

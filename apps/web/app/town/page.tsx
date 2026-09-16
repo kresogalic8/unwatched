@@ -45,6 +45,7 @@ export default function Town() {
     ready: false,
     error: false,
   });
+  const [spotlight, setSpotlight] = useState<{ id: number; actors: string[]; place: string | null; at: number } | null>(null);
   const [possessed, setPossessed] = useState(false);
   const [say, setSay] = useState("");
   const [busy, setBusy] = useState(false);
@@ -146,6 +147,8 @@ export default function Town() {
             focusId={tracking ?? (follow ? agent?.id ?? null : null)}
             onViewChange={changeView}
             onSelect={setSel}
+            selectedId={sel?.id ?? null}
+            spotlight={spotlight}
             view={view}
             effects={effects}
             observer
@@ -194,16 +197,26 @@ export default function Town() {
                 <div aria-label="Recent island events">
                   {snapshot.feed.length ? (
                     snapshot.feed.slice(0, 12).map((e) => (
-                      <article
+                      <button
+                        type="button"
                         key={e.id}
-                        className={s.event}
+                        className={`${s.event} ${s.eventBtn}`}
                         data-important={e.importance >= 0.45}
+                        onClick={() =>
+                          setSpotlight({
+                            id: e.id,
+                            actors: e.actors,
+                            place: e.place ?? null,
+                            at: Date.now(),
+                          })
+                        }
+                        title="Show this on the island"
                       >
                         <time>
                           Day {e.day} · {hhmm(e.t)}
                         </time>
                         <p>{e.text}</p>
-                      </article>
+                      </button>
                     ))
                   ) : (
                     <p className={s.empty}>

@@ -87,9 +87,11 @@ function lookSvg(hash: string): Promise<string | null> {
 type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Citizen; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
 export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
-export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API }: { apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void }) {
+export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API, selectedId = null, spotlight = null }: { apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void; selectedId?: string | null; spotlight?: { id: number; actors: string[]; place: string | null; at: number } | null }) {
   const viewChange = useRef(onViewChange); viewChange.current = onViewChange;
   const focusRef = useRef(focusId); focusRef.current = focusId;
+  const selRef = useRef(selectedId); selRef.current = selectedId;
+  const spotRef = useRef(spotlight); spotRef.current = spotlight;
   const navigateMini = useRef<((x:number,y:number)=>void) | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const cameraControl = useRef<((action: "in" | "out" | "reset") => void) | null>(null);
@@ -107,12 +109,13 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
   const effectsRef = useRef(effects); effectsRef.current = effects;
   const hoverRef = useRef<string | null>(null);
   /** Where the day is happening: the latest moment that mattered, for the camera to follow. */
-  const cinema = useRef<{ x: number; y: number; ids: string[]; at: number } | null>(null);
+  const cinema = useRef<{ x: number; y: number; ids: string[]; at: number; text?: string } | null>(null);
   /** A scene on the street: a gathering being held, or a fire, for the camera and the music to follow. */
   const staged = useRef<{ kind: string; place: string; x: number; y: number; actors: string[]; until: number } | null>(null);
   const clockRef = useRef<Clock | null>(null);
   const ambienceRef = useRef<Ambience | null>(null);
   const [sound, setSound] = useState(false);
+  const [caption, setCaption] = useState<{ text: string; who: string } | null>(null);
   const [cleanUi, setCleanUi] = useState(false);
   const placePast = useRef<{place:string;through:number} | null>(null);
   const [placeInfo, setPlaceInfo] = useState<{ decorations?: Decoration[]; community?: CommunityView; stock?: Record<string,number>; hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
@@ -191,23 +194,41 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const scene = new Container(); scene.sortableChildren = true; world.addChild(scene);
       // everything standing on the ground is drawn in code, in one projection, at its natural size; props may be scaled
       const shadows = new Graphics(); shadows.zIndex = 0.5; scene.addChild(shadows);
+      // the ring under a selected person, and the pulse that marks the actors of a picked event
+      const emphasis = new Graphics(); emphasis.zIndex = 0.55; scene.addChild(emphasis);
+      const pulses = new Map<string, number>();
       const shadowSpecs: { x: number; y: number; w: number }[] = [];
+      // trees and bushes are replanted each season, so their sun-cast specs live apart and are rebuilt, never piled up
+      const treeSpecs: { x: number; y: number; w: number }[] = [];
       // shadows sit under things at noon and lean away from the sun: long to the west in the morning, long to the east in the evening, warm when the sun is low.
       // Each is a pool at the foot and a cast from the walls, so buildings and trees read as standing in one light.
       const redrawShadows = (elev: number, dir: number, low: number) => {
         shadows.clear(); const L = 0.12 + Math.pow(1 - elev, 2) * 0.9; const color = low > 0.05 ? LIGHT.lowSunShadow : C.kelp; const a = 0.08 + low * 0.05;
-        for (const sp of shadowSpecs) {
+        for (const sp of [...shadowSpecs, ...treeSpecs]) {
           const rx = sp.w * 0.5, ry = Math.max(6, sp.w * 0.16), bx = sp.x + sp.w * 0.12, by = sp.y + 4; const len = sp.w * L * 0.7;
           shadows.moveTo(bx - rx * 0.75, by).lineTo(bx + rx * 0.75, by).lineTo(bx + rx * 0.75 + dir * len, by - len * 0.22).lineTo(bx - rx * 0.75 + dir * len, by - len * 0.22).closePath().fill({ color, alpha: a * 0.8 });
           shadows.ellipse(bx + dir * len, by - len * 0.22, rx * 0.75, ry * 0.8).fill({ color, alpha: a * 0.8 });
           shadows.ellipse(bx, by, rx, ry).fill({ color, alpha: a });
+          // a tighter, darker core where the thing meets the ground, so buildings and trees sit rather than float
+          shadows.ellipse(bx, by, rx * 0.5, ry * 0.55).fill({ color, alpha: a * 0.7 });
         }
       };
       const shadowUnder = (x: number, y: number, w: number) => { if (w < 30) return; shadowSpecs.push({ x, y, w }); shadows.ellipse(x + w * 0.12, y + 4, w * 0.5, Math.max(6, w * 0.16)).fill({ color: C.kelp, alpha: 0.09 }); };
+      // each natural thing varies a little by where it stands, so a wood or a shore of one drawing never reads as clones; stable per position, so it does not jump between seasons
+      const ORGANIC = /^(tree-small|tree-large|bush|olive|cypress|rock|searocks)$/;
+      const vhash = (x: number, y: number, s: number) => { const h = Math.sin(x * 12.9898 + y * 78.233 + s * 37.719) * 43758.5453; return h - Math.floor(h); };
+      const VARY_TINTS = [0xffffff, 0xf3eede, 0xebf0e3, 0xf8f1e2, 0xe6ede0, 0xfcf6e9];
+      const mulTint = (a: number, f: number) => (Math.round(((a >> 16) & 255) * ((f >> 16) & 255) / 255) << 16) | (Math.round(((a >> 8) & 255) * ((f >> 8) & 255) / 255) << 8) | Math.round((a & 255) * (f & 255) / 255);
       const put = (name: string, x: number, y: number, w?: number, flip = false) => {
         const d = drawThing(name); if (!d) return null;
         const c = d.c; if (w) c.scale.set(w / d.w); if (flip) c.scale.x *= -1; c.position.set(x, y); c.zIndex = y; scene.addChild(c);
-        if (!/^(lamp|fence|field|pier|tree-small|tree-large|bush)$/.test(name)) shadowUnder(x, y, w ?? d.w);
+        if (ORGANIC.test(name)) {
+          const s = 0.87 + vhash(x, y, 1) * 0.26; c.scale.x *= s; c.scale.y *= s;
+          const t = VARY_TINTS[Math.floor(vhash(x, y, 2) * VARY_TINTS.length)] ?? 0xffffff;
+          for (const ch of c.children) if ("tint" in ch) (ch as { tint: number }).tint = mulTint((ch as { tint: number }).tint, t);
+          if (/rock|searocks/.test(name)) c.rotation = (vhash(x, y, 3) - 0.5) * 0.16;
+        }
+        if (!/^(lamp|fence|field|pier|tree-small|tree-large|bush|olive|cypress)$/.test(name)) shadowUnder(x, y, w ?? d.w);
         return c;
       };
       // a place's name on the ground: ink with a paper edge, so it reads on sand, grass, stone and in the dark alike
@@ -278,8 +299,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const decor = keepOffRoads(decorFor([...places.values()]), segs);
       let trees: Container[] = [];
       const plantTrees = () => {
+        treeSpecs.length = 0; // rebuilt from scratch each replant, so season changes never pile shadows up
         for (const t of trees) t.destroy({ children: true }); trees = [];
-        for (const d of decor) { if (!/tree|bush|olive|cypress/.test(d.sprite)) continue; const sp = put(d.sprite, d.x, d.y, d.w, d.flip); if (!sp) continue; const sh = new Graphics(); sh.ellipse(d.w ? d.w * 0.12 : 8, 3, d.sprite === "tree-large" ? 40 : d.sprite === "bush" ? 12 : 26, d.sprite === "tree-large" ? 12 : d.sprite === "bush" ? 4 : 8).fill({ color: C.kelp, alpha: 0.09 }); sp.addChildAt(sh, 0); trees.push(sp); }
+        for (const d of decor) { if (!/tree|bush|olive|cypress/.test(d.sprite)) continue; const sp = put(d.sprite, d.x, d.y, d.w, d.flip); if (!sp) continue; const sw = sp.width; if (sw >= 30) treeSpecs.push({ x: sp.x, y: sp.y, w: sw }); const sh = new Graphics(); sh.ellipse(d.w ? d.w * 0.12 : 8, 3, d.sprite === "tree-large" ? 40 : d.sprite === "bush" ? 12 : 26, d.sprite === "tree-large" ? 12 : d.sprite === "bush" ? 4 : 8).fill({ color: C.kelp, alpha: 0.09 }); sp.addChildAt(sh, 0); trees.push(sp); }
       };
       setSeason(forcedSeason ?? clockRef.current?.season ?? townView.season ?? "summer");
       for (const d of decor) { if (/tree|bush|olive|cypress/.test(d.sprite)) continue; put(d.sprite, d.x, d.y, d.w, d.flip); }
@@ -459,7 +481,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
             return {...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))};
           });
           if ((e.kind === "town.gathering" || e.kind === "town.fire") && e.place) { const pl = places.get(e.place); const pay = (e.payload ?? {}) as { kind?: string; crowd?: string[]; held?: boolean; stage?: string }; if (pl && pay.held !== false) { const kind = e.kind === "town.fire" ? "fire" : (pay.kind ?? "feast"); staged.current = { kind, place: e.place, x: pl.x, y: pl.y, actors: e.actors, until: Date.now() + (kind === "fire" ? 180000 : 150000) }; const crowd = (pay.crowd ?? []).map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place); const leads = e.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place && !f.asleep); const g = gather(pl); const cxp = g.x + g.w / 2, cyp = g.y + 10; leads.forEach((f, i) => { releaseSeat(f); f.tx = cxp - 14 + i * 28; f.ty = cyp; f.facing = i === 0 ? 1 : -1; }); const others = crowd.filter((f) => !leads.includes(f)); others.forEach((f, i) => { const n = Math.max(1, others.length); const ang = Math.PI * 0.15 + (Math.PI * 0.7 * i) / n; const r = 70 + (i % 2) * 22; releaseSeat(f); f.tx = cxp + Math.cos(ang) * r * 1.6; f.ty = cyp + 30 + Math.sin(ang) * r * 0.5; }); if (kind === "wedding" || kind === "funeral") ambienceRef.current?.toll(kind === "wedding" ? 6 : 3); } }
-          if (e.importance >= 0.45 && e.kind !== "agent.move" && e.kind !== "agent.reflect") { const f = e.actors[0] ? figs.current.get(e.actors[0]) : null; const p = e.place ? places.get(e.place) : null; const x = f?.x ?? p?.x, y = f?.y ?? p?.y; if (x !== undefined && y !== undefined) cinema.current = { x, y: y - 40, ids: e.actors, at: Date.now() }; }
+          if (e.importance >= 0.45 && e.kind !== "agent.move" && e.kind !== "agent.reflect") { const f = e.actors[0] ? figs.current.get(e.actors[0]) : null; const p = e.place ? places.get(e.place) : null; const x = f?.x ?? p?.x, y = f?.y ?? p?.y; if (x !== undefined && y !== undefined) cinema.current = { x, y: y - 40, ids: e.actors, at: Date.now(), text: e.text }; }
           if (e.kind === "agent.move" && eventActor) eventActor.activity = null;
           if (e.kind === "agent.move" && e.place) moveTo(e.actors[0]!, e.place);
           if (e.kind === "agent.sleep") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = true; f.pose = "sleep"; } }
@@ -503,6 +525,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       };
 
       let tick = 0;
+      // a filmed pan to a selected person or a picked event, eased both ends; the hand takes over once it lands
+      let glide: { fromX: number; fromY: number; toX: number; toY: number; start: number; dur: number } | null = null;
+      let lastSel: string | null = null; let lastSpotAt = 0; let lastCaptionKey = "";
       // a hand on the camera in the street view: drag to look around, wheel to zoom, a little inertia after letting go
       const canvas = app.canvas; let press: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null; let lastMove = { x: 0, y: 0, t: 0 };
       const handOn = () => { const c = camera.current; if (!c.hand) { const Wd = app!.screen.width, Hd = app!.screen.height; c.hand = { x: (Wd / 2 - c.x) / c.zoom, y: (Hd / 2 - c.y) / c.zoom, zoom: c.zoom, vx: 0, vy: 0 }; c.follow = null; } return c.hand; };
@@ -515,6 +540,12 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if(viewRef.current !== "street") {viewRef.current="street";viewChange.current?.("street");}
         const hand = handOn(); hand.vx = 0; hand.vy = 0;
         hand.zoom = Math.min(1.9, Math.max(Math.min(.2,fitZoom()), hand.zoom * (action === "in" ? 1.2 : 1 / 1.2)));
+      };
+      // fly the free camera to a world point, easing from wherever it is now; the street view is where this can be seen
+      const startGlide = (x: number, y: number) => {
+        if (viewRef.current !== "street") { viewRef.current = "street"; viewChange.current?.("street"); }
+        const h = handOn(); h.vx = 0; h.vy = 0;
+        glide = { fromX: h.x, fromY: h.y, toX: x, toY: y, start: performance.now(), dur: 900 };
       };
       canvas.addEventListener("pointerdown", (e) => { if (viewRef.current !== "street") return; press = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, moved: false }; lastMove = { x: e.clientX, y: e.clientY, t: performance.now() }; });
       canvas.addEventListener("pointermove", (e) => { if (!press) return; const dx = e.clientX - press.cx, dy = e.clientY - press.cy; if (!press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return; press.moved = true; suppressSelectUntil = performance.now() + 250; const h = handOn(); h.x -= dx / camera.current.zoom; h.y -= dy / camera.current.zoom; const now = performance.now(); const dt = Math.max(8, now - lastMove.t); h.vx = Math.max(-30, Math.min(30, -(e.clientX - lastMove.x) / dt * 16 / camera.current.zoom)); h.vy = Math.max(-30, Math.min(30, -(e.clientY - lastMove.y) / dt * 16 / camera.current.zoom)); lastMove = { x: e.clientX, y: e.clientY, t: now }; press.cx = e.clientX; press.cy = e.clientY; });
@@ -529,8 +560,23 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       app.ticker.add(() => {
         if (!app) return; if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000; tick++; perfT = performance.now(); perfSection = "camera"; perf.frames = (perf.frames ?? 0) + 1;
         const Wd = app.screen.width, Hd = app.screen.height; const cam = camera.current;
+        // a person was selected, or an event was picked from the journal: fly there, and pulse the actors
+        {
+          const selNow = selRef.current;
+          if (selNow !== lastSel) { lastSel = selNow; const f = selNow ? figs.current.get(selNow) : null; if (f && !cam.follow) startGlide(f.x, f.y - 20); }
+          const sp = spotRef.current;
+          if (sp && sp.at !== lastSpotAt) {
+            lastSpotAt = sp.at;
+            const ids = sp.actors ?? [];
+            const tf = ids.map((id) => figs.current.get(id)).find((x): x is Fig => !!x);
+            const tp = sp.place ? places.get(sp.place) : null;
+            if (tf) startGlide(tf.x, tf.y - 20); else if (tp) startGlide(tp.x, tp.y - 20);
+            const until = Date.now() + 4200; for (const id of ids) pulses.set(id, until);
+          }
+        }
         const hand = viewRef.current === "street" ? cam.hand : null;
         if (viewRef.current !== "street" && cam.hand) cam.hand = null;
+        if (glide && hand && !press) { const t = Math.min(1, (performance.now() - glide.start) / glide.dur); const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; hand.x = glide.fromX + (glide.toX - glide.fromX) * e; hand.y = glide.fromY + (glide.toY - glide.fromY) * e; if (t >= 1) glide = null; } else if (glide && press) glide = null;
         const followed = viewRef.current === "street" && cam.follow ? figs.current.get(cam.follow) : null;
         const talking = followed ? followed.pose === "talk" : false;
         // the cinema breathes: the zoom swells and settles over half a minute; a followed conversation draws the camera in a step
@@ -544,6 +590,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (viewRef.current === "cinema" && stagedNow) { fx = stagedNow.x; fy = stagedNow.y + 20; }
         else if (viewRef.current === "cinema") { const cn = cinema.current; if (cn && Date.now() - cn.at < 120000) { const f = cn.ids[0] ? figs.current.get(cn.ids[0]) : null; fx = f?.x ?? cn.x; fy = (f?.y ?? cn.y) - 50; } else { let best: PlaceView | null = null; for (const p of places.values()) if (!best || p.crowd > best.crowd) best = p; if (best) { fx = best.x; fy = best.y - 20; } } }
         if (viewRef.current === "cinema") { const key = stagedNow ? `s:${stagedNow.place}` : cinema.current ? `c:${cinema.current.at}` : "idle"; if (key !== lastCut) { lastCut = key; cutAt = tick; } fx += Math.sin(tick / 900) * 36; fy += Math.cos(tick / 1100) * 18; } // a slow drift while the moment plays
+        // the lower third: who is on screen and what the record says is happening, while the cinema plays
+        if (viewRef.current === "cinema" && tick % 12 === 0) {
+          let capText: string | null = null, capIds: string[] = [];
+          if (stagedNow) { capText = stagedNow.kind === "fire" ? "A fire on the island" : `The town gathers · ${stagedNow.kind}`; capIds = stagedNow.actors; }
+          else if (cinema.current && Date.now() - cinema.current.at < 120000 && cinema.current.text) { capText = cinema.current.text; capIds = cinema.current.ids; }
+          const who = capIds.map((id) => agents.current.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ");
+          const key = capText ?? "";
+          if (key !== lastCaptionKey) { lastCaptionKey = key; setCaption(capText ? { text: capText, who } : null); }
+        }
         if (parked && !hand && !focusRef.current && viewRef.current === "street") { const k = moveTo_ ? moveP() : 0; fx = parked.x + (moveTo_ ? (moveTo_.x - parked.x) * k : 0); fy = parked.y + (moveTo_ ? (moveTo_.y - parked.y) * k : 0); }
         if (observer && focusRef.current && followed && !hand && viewRef.current === "street") fy += Math.min(160, Hd * .25) / cam.zoom;
         const tx = Wd / 2 - fx * cam.zoom, ty = Hd / 2 - fy * cam.zoom;
@@ -770,6 +825,19 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const inScene = viewRef.current === "cinema" && !!cinema.current?.ids.includes(f.id) && Date.now() - (cinema.current?.at ?? 0) < 120000;
           next.push({ id: f.id, name: f.name, activity: activity ? fishing ? moving ? "Walking to the pier" : "Fishing · line in the water" : "At work" : undefined, x: f.x * cam.zoom + cam.x, y: (f.y - 66) * cam.zoom + cam.y, mine: f.mine, shown: f.mine || !!b || hoverRef.current === f.id || inScene || (near && viewRef.current === "street"), ...(b ? { bubble: b.text } : {}) });
         }
+        // the ring under the selected person, and the fading pulse under the actors of a picked event
+        if (tick % 2 === 0) {
+          emphasis.clear();
+          const selF = selRef.current ? figs.current.get(selRef.current) : null;
+          if (selF && selF.g.visible) { emphasis.ellipse(selF.x, selF.y + 2, 30, 30 * 0.42).stroke({ width: 2.5, color: C.coral, alpha: 0.9 }); emphasis.ellipse(selF.x, selF.y + 2, 34, 34 * 0.42).stroke({ width: 1.5, color: C.coral, alpha: 0.35 }); }
+          const nowP = Date.now();
+          for (const [id, until] of pulses) {
+            if (until < nowP) { pulses.delete(id); continue; }
+            const f = figs.current.get(id); if (!f || !f.g.visible) continue;
+            const life = (until - nowP) / 4200; const ph = ((nowP / 900) % 1); const r = 20 + ph * 30;
+            emphasis.ellipse(f.x, f.y + 2, r, r * 0.42).stroke({ width: 2.5, color: C.coral, alpha: (1 - ph) * life * 0.85 });
+          }
+        }
         // names stack upward when people stand shoulder to shoulder, so none is written over another
         perfMark("labels");
         next.sort((a, b) => a.x - b.x);
@@ -787,7 +855,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
   useEffect(() => { onSnapshot?.({ clock, feed, citizens: [...agents.current.values()], ready, error: loadError }); }, [clock, feed, ready, loadError, onSnapshot]);
 
   useEffect(() => { camera.current.follow = focusId ?? (observer ? null : mineId); if (focusId || !observer) camera.current.hand = null; }, [mineId, focusId, observer]);
-  useEffect(() => { if(view !== "street") camera.current.hand=null; },[view]);
+  useEffect(() => { if(view !== "street") camera.current.hand=null; if (view !== "cinema") setCaption(null); },[view]);
   const z = camera.current.zoom;
   const showLabels = view === "street" || z > 0.6;
 
@@ -811,6 +879,12 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           </div>
         ))}
       </div>
+      {caption && !cleanUi && view === "cinema" && <div data-world-control="caption" className="absolute left-1/2 -translate-x-1/2 bottom-[98px] sm:bottom-[135px] w-[min(560px,calc(100%-32px))] pointer-events-none rise" style={{ zIndex: 5 }}>
+        <div className="rounded-2xl px-4 py-3 shadow-sm" style={{ background: "rgba(20,22,26,0.82)", color: "#F7F6F3" }}>
+          {caption.who && <div className="text-[11px] font-semibold uppercase mb-1" style={{ letterSpacing: "0.06em", opacity: 0.7 }}>{caption.who}</div>}
+          <div className="text-[14px] leading-snug">{caption.text}</div>
+        </div>
+      </div>}
       {mini && !cleanUi && <svg data-world-control="mini" className="absolute right-3 bottom-3 sm:right-6 sm:bottom-6 hidden sm:block rounded-2xl bg-shell/90 pointer-events-auto" width={180} height={Math.round(180 * mini.h / mini.w)} viewBox={`0 0 ${mini.w} ${mini.h}`} role="button" tabIndex={0} aria-label="Island minimap. Click to travel, or press Enter to show the whole island." onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();cameraControl.current?.("reset");}}} onClick={e=>{const matrix=e.currentTarget.getScreenCTM();if(!matrix)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());navigateMini.current?.(Math.max(0,Math.min(mini.w,p.x)),Math.max(0,Math.min(mini.h,p.y)));}}>
         <rect width={mini.w} height={mini.h} fill="#d4ddcb" rx={80}/>
         {mini.places.filter((p) => p.kind !== "public" && p.kind !== "wild").map((p) => <circle key={p.id} cx={p.x} cy={p.y} r={p.kind === "plot" ? 22 : 34} fill={p.kind === "plot" ? "#B9CFC8" : "#1F5F5B"} opacity={0.55} />)}
