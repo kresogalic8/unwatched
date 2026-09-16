@@ -233,10 +233,13 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const vhash = (x: number, y: number, s: number) => { const h = Math.sin(x * 12.9898 + y * 78.233 + s * 37.719) * 43758.5453; return h - Math.floor(h); };
       const VARY_TINTS = [0xffffff, 0xf3eede, 0xebf0e3, 0xf8f1e2, 0xe6ede0, 0xfcf6e9];
       // ordinary houses come from a handful of drawings; a faint per-building shade keeps a row from reading as identical. Landmarks (council, mill, chapel, lighthouse) stay canonical.
-      const BUILDING = /^(house|cottage|shop|inn|tavern|bakery|chandlery|harbor-office|smithy|fishhouse|boatshed)$/;
+      const BUILDING = /^(house|cottage|shop|inn|tavern|bakery|chandlery|harbor-office|smithy|fishhouse|boatshed)\d*$/;
       const BLD_TINTS = [0xffffff, 0xf7f3ea, 0xf2f2ee, 0xfbf5ec, 0xeef0ee, 0xf9f4e6];
       // roughly where the roof of each building sits above its foot, shared by the golden-hour roof light and the foundation moss
       const ROOF_Y: Record<string, number> = { house: -150, cottage: -120, shop: -150, inn: -195, tavern: -150, bakery: -155, chandlery: -155, "harbor-office": -140, smithy: -130, fishhouse: -115, boatshed: -115, council: -195, mill: -165, chapel: -165, lighthouse: -225 };
+      // the common houses come in a few colour-and-roof variants in the atlas; each building keeps the same one by its position
+      const VARIANTS_OF: Record<string, string[]> = { house: ["house", "house2", "house3"], cottage: ["cottage", "cottage2", "cottage3"], shop: ["shop", "shop2", "shop3"] };
+      const bldVariant = (sprite: string, x: number, y: number) => { const v = VARIANTS_OF[sprite]; return v ? v[Math.floor(vhash(x, y, 13) * v.length)]! : sprite; };
       const mulTint = (a: number, f: number) => (Math.round(((a >> 16) & 255) * ((f >> 16) & 255) / 255) << 16) | (Math.round(((a >> 8) & 255) * ((f >> 8) & 255) / 255) << 8) | Math.round((a & 255) * (f & 255) / 255);
       const put = (name: string, x: number, y: number, w?: number, flip = false) => {
         const d = drawThing(name); if (!d) return null;
@@ -289,10 +292,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const t = new Text({ text: `${p.site.name} · ${p.site.done} of ${p.site.of}`, style: smallStyle }); t.anchor.set(0.5, 0); t.position.set(0, 6); g.addChild(t);
         } else if (p.sprite.startsWith("look:")) {
           // a building someone described: the plain kind stands in until the island's drawing of it arrives
-          const stand = local(p.kind === "shop" ? "shop" : "house");
+          const stand = local(bldVariant(p.kind === "shop" ? "shop" : "house", p.x, p.y));
           void lookSvg(p.sprite.slice(5)).then((svg) => { if (!svg || g.destroyed) return; const d = new Graphics(); try { d.svg(svg); } catch { return; } const b = d.getLocalBounds(); if (b.width < 1) return; const target = p.kind === "shop" ? 120 : 104; const sc = target / b.width; d.scale.set(sc); d.position.set(-(b.x + b.width / 2) * sc, -(b.y + b.height) * sc); d.zIndex = 0; stand?.destroy(); g.addChild(d); });
         } else {
-          local(p.sprite);
+          local(bldVariant(p.sprite, p.x, p.y));
           // #3: moss and lichen creep up the foot of a building, a little on every one and more on some, so the stone reads as lived-in and aged
           if (ROOF_Y[p.sprite] !== undefined) { const moss = new Graphics(); const n = 8 + Math.floor(vhash(p.x, p.y, 7) * 11); for (let i = 0; i < n; i++) { const mx = -54 + vhash(p.x + i, p.y, 8) * 108, mz = vhash(p.x, p.y + i, 9) * 30; moss.ellipse(mx, -mz, 3.5 + vhash(i, p.y, 10) * 5, 2.2 + vhash(i, p.x, 11) * 3).fill({ color: i % 3 ? 0x6f8158 : 0x8a9470, alpha: 0.2 + vhash(i, i + 3, 12) * 0.16 }); } moss.zIndex = 0.3; g.addChild(moss); }
           if (p.stock) { const st = drawStock(p.sprite, p.stock); if (st) { st.zIndex = 1; g.addChild(st); } }

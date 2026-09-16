@@ -28,7 +28,11 @@ for(const [name,w,d,h,cafe,color,side] of [
  ['smithy',132,100,102,true,'#d7ccb4','#afa991'],['fishhouse',125,85,90,true,'#d9d8be','#b4bca4'],
  ['boatshed',145,100,88,true,'#ddd5b8','#b8bca2'],['council',175,115,177,false,'#ece3cc','#c4c5ac'],
  ] as const) { add(name,<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={color} side={side}/>,(w+d)*.95,P(w,d),.72);
-add(name+'-lit',<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={color} side={side} lit/>,(w+d)*.95,P(w,d),.72); }
+add(name+'-lit',<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={color} side={side} lit/>,(w+d)*.95,P(w,d),.72);
+// A few colour-and-roof variants of the common houses, so a row of them never reads as clones. Base names are unchanged.
+(({house:[['#e6d3b0','#c9c0a0',2],['#dbe0d2','#b6bfa8',4]],cottage:[['#e7d0ba','#c6bda0',3],['#d3dccd','#b2bca6',1]],shop:[['#e0d6c0','#bcb69a',5],['#e8cbb0','#c4b79a',2]]} as Record<string,[string,string,number][]>)[name]??[]).forEach(([vc,vs,vr],vi)=>{const vn=name+(vi+2);
+add(vn,<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={vc} side={vs} roof={vr}/>,(w+d)*.95,P(w,d),.72);
+add(vn+'-lit',<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={vc} side={vs} roof={vr} lit/>,(w+d)*.95,P(w,d),.72);}); }
 add('tree-large',<Tree u={0} v={0}/>,110,P(0,0),1.3);
 add('tree-small',<Tree u={0} v={0}/>,110,P(0,0),.8);
 add('olive',<Tree u={0} v={0}/>,110,P(0,0),.85);
