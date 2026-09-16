@@ -58,6 +58,11 @@ export function drawGround(o: TerrainOptions, season: string): Graphics {
   poly(outline(1).map(([x,y])=>[x+9,y+22] as [number,number])).fill({color:0x527d70,alpha:.15});
   poly(outline(1)).fill(0xc3c6a8);poly(outline(.98)).fill(0xded7bb);
   poly(outline(.92)).fill(season==="winter"?0xc8cbbd:season==="autumn"?0xcac6a4:0xc4c9a6);
+  // The land reads as raised, not a flat cut-out: a soft slope-shadow just inside the shore where the ground falls to the sea,
+  // a gentle lift over the interior, and a brighter knoll where the hill actually is. Static, following the real coastline.
+  for(let k=0;k<18;k++)poly(outline(.99-k*.011)).stroke({width:32,color:0x93997f,alpha:.052*(1-k/18),join:"round"});
+  poly(outline(.62)).fill({color:0xfbf5e6,alpha:.06});poly(outline(.42)).fill({color:0xfdf8ec,alpha:.06});poly(outline(.24)).fill({color:0xfffbef,alpha:.05});
+  const hill=places.get("hill");if(hill)for(let k=0;k<5;k++)g.ellipse(hill.x,hill.y-20,280-k*44,164-k*26).fill({color:0xfaf3e2,alpha:.05});
   // Broad overlapping color washes have soft, irregular boundaries, never hard tiles.
   for(let n=0;n<380;n++) {
     const x=hash2(n,31)*W,y=hash2(n,67)*H,rx=25+hash2(n,19)*50,ry=rx*.42;
