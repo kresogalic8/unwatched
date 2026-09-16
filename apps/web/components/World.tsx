@@ -179,7 +179,21 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const wear = new Wear(segs, (sg) => { const [a, b] = sg.key.split("|"); const hub = (id?: string) => id === "market" || id === "harbor" || id === "lane"; return (hub(a) ? 30 : 0) + (hub(b) ? 30 : 0) + (sg.cobbled ? 20 : 6); }); world.addChild(wear);
       const harborSurface=harborGround(places.values(),inside);world.addChild(harborSurface.root);
       // the water's edge, alive: foam that breathes along the shore, whitecaps in wind and storm, rings where the rain hits
-      const shoreLine = outline(1.012), shoreOut = outline(1.05); const foam = new Graphics(); world.addChild(foam);
+      const shoreLine = outline(1.012), shoreOut = outline(1.05); const tideMid = outline(1.0), tideIn = outline(0.984); const shallowLine = outline(1.03);
+      const tide = new Graphics(); world.addChild(tide); // the wet sand the sea washes over, and light on the shallows, both under the white foam edge
+      const foam = new Graphics(); world.addChild(foam);
+      const tlerp = (p: [number, number], q: [number, number], f: number): [number, number] => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+      const drawTide = (t: number) => {
+        tide.clear();
+        for (let k = 0; k < tideMid.length; k++) {
+          const wet = Math.max(0, Math.sin(t / 30 + k * 0.35)); if (wet < 0.05) continue; // in step with the foam, so the wet reaches where the wave breaks
+          const a = tideMid[k]!, b = tideMid[(k + 1) % tideMid.length]!, ia = tideIn[k]!, ib = tideIn[(k + 1) % tideIn.length]!;
+          const wa = tlerp(a, ia, 0.3 + wet * 0.7), wb = tlerp(b, ib, 0.3 + wet * 0.7);
+          tide.moveTo(a[0], a[1]).lineTo(b[0], b[1]).lineTo(wb[0], wb[1]).lineTo(wa[0], wa[1]).closePath().fill({ color: C.wetSand, alpha: 0.3 * wet });
+        }
+        // caustics: a soft moving glint on the shallow water just off the sand
+        for (let k = 0; k < shallowLine.length; k += 3) { const ph = Math.sin(t / 20 + k * 0.7); if (ph < 0.45) continue; const a = shallowLine[k]!, b = shallowLine[(k + 1) % shallowLine.length]!; tide.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2, color: C.foam, alpha: 0.14 * (ph - 0.45), cap: "round" }); }
+      };
       const seaLife = new Graphics(); world.addChild(seaLife);
       const coastalLife = new CoastalLife((a, r) => ({ x: cx + Rx * wobble(a) * r * Math.cos(a), y: cy + Ry * wobble(a) * r * Math.sin(a) }), inside);
       world.addChild(coastalLife.root);
@@ -623,7 +637,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const wind = weather === "storm" ? 1 : weather === "wind" ? 0.8 : weather === "rain" ? 0.45 : weather === "fog" ? 0.1 : 0.2;
         // the sea itself: the foam breathes, the water darkens and breaks white in a blow, rain rings the surface
         const rough = weather === "storm" ? 1 : weather === "wind" ? 0.5 : 0;
-        if (tick % 3 === 0) drawFoam(tick, rough);
+        if (tick % 3 === 0) { drawFoam(tick, rough); drawTide(tick); }
         sea.tint = weather === "storm" ? 0x8fa9a6 : weather === "rain" || weather === "fog" ? 0xb9cfcb : 0xffffff;
         if (tick % 3 === 0) {
           seaLife.clear();
