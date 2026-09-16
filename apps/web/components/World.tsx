@@ -339,6 +339,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const aboard: Container[] = []; // figures riding the boat, parented to it
       const gulls = new Graphics(); gulls.zIndex = 180000; scene.addChild(gulls);
       const rays = new Graphics(); rays.zIndex = 148000; rays.blendMode = "add"; scene.addChild(rays); // soft light shafts through the pinewood at dawn and dusk; additive, so they glow where they cross shade and vanish over the brightest sand
+      const roofGlow = new Graphics(); roofGlow.zIndex = 155000; roofGlow.blendMode = "add"; scene.addChild(roofGlow); // the low sun catching the upper walls and roofs on the side it stands
+      const ROOF_Y: Record<string, number> = { house: -150, cottage: -120, shop: -150, inn: -195, tavern: -150, bakery: -155, chandlery: -155, "harbor-office": -140, smithy: -130, fishhouse: -115, boatshed: -115, council: -195, mill: -165, chapel: -165, lighthouse: -225 };
       const CHIMNEYS: Record<string, [number, number]> = { smithy: [44, -150], bakery: [30, -180], inn: [60, -210], mill: [0, -220], tavern: [40, -150], fishhouse: [30, -120] };
       const litHearths = new Set<string>();
       const HEARTHS: Record<string, [number, number]> = { inn: [60, -210], tavern: [40, -150], chandlery: [30, -150], boatshed: [20, -120], council: [50, -190] }; // where a fire is kept for the people inside, not the work
@@ -719,7 +721,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         life.update({ tick, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn });
         for (const snd of life.sounds) ambience.cue(snd.name, Math.hypot(snd.x - cam.x, snd.y - cam.y), snd.x - cam.x, snd.level ?? 1);
         if (effectsRef.current !== effectsOn) { effectsOn = effectsRef.current; sea.filters = effectsOn && !nofx.has("water") ? [water] : null; ripples.visible = !effectsOn; lamps.visible = !effectsOn; night.visible = !effectsOn; dusk.visible = !effectsOn; rain.visible = !effectsOn; if (!effectsOn) { sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; } fog.visible = !effectsOn; if (!effectsOn) { lighting.dark.visible = false; lighting.glow.visible = false; weatherFx.rain.visible = false; weatherFx.snow.visible = false; weatherFx.fog.visible = false; clouds.puffs.visible = false; clouds.shadows.visible = false; } }
-        rays.clear();
+        rays.clear(); roofGlow.clear();
         if (effectsOn) {
           const up = hour > rise && hour < set; let lx: number, ly: number, ls: number;
           if (up) { const f = (hour - rise) / Math.max(1, set - rise); const ang = Math.PI * (1 - f); lx = cx - Rx * 1.05 * Math.cos(ang); ly = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(ang)) - 30; ls = 0.9; }
@@ -747,6 +749,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
               rays.moveTo(bx - nx * wid, by - ny * wid).lineTo(bx + nx * wid, by + ny * wid).lineTo(rex + nx * wid * 0.35, rey + ny * wid * 0.35).lineTo(rex - nx * wid * 0.35, rey - ny * wid * 0.35).closePath().fill({ color: warm, alpha: a });
             }
           }
+          // #2: the low sun catches the upper walls and roofs on the side it stands, warm and additive so it lifts the roofs without muddying them
+          if (golden > 0.12 && (1 - cover) > 0.2 && night.alpha < 0.5) {
+            const sd = phase === "rise" ? 1 : -1; const gs = golden * (1 - cover) * Math.max(0.35, 1 - night.alpha / 0.5);
+            const rwarm = mix(0x66502a, phase === "rise" ? 0x63501f : 0x6a4620, 0.5);
+            for (const p of places.values()) { const ry = ROOF_Y[p.sprite]; if (ry === undefined) continue; const gx = p.x + sd * 24, gy = p.y + ry + 22;
+              roofGlow.ellipse(gx, gy, 62, 32).fill({ color: rwarm, alpha: gs * 0.55 });
+              roofGlow.ellipse(gx + sd * 14, gy - 6, 36, 19).fill({ color: rwarm, alpha: gs * 0.7 });
+            }
+          }
           const shadeTint = mix(LIGHT.night, 0x1b2140, blue * (1 - cover));
           water.update({ time: tick / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
           const sources: LightSource[] = [];
@@ -755,7 +766,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
               sources.push({ x: d.x + 14, y: d.y - 58, r: 90, color: LIGHT.lamp, strength: .72, flicker: .025 });
               sources.push({ x: d.x + 18, y: d.y + 2, r: 62, aspect: .38, color: LIGHT.lamp, strength: .42 });
             }
-            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && p.kind !== "harbor" && p.kind !== "market") sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 });
+            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && p.kind !== "harbor" && p.kind !== "market") { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
           sources.push(...life.lights);
