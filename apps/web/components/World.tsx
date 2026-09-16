@@ -24,7 +24,7 @@ import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } fr
 import { Life, type Critter } from "./world/life";
 import { Post } from "./world/post";
 import { Particles } from "./world/particles";
-import { drawGround, drawRoads, segmentsOf, keepOffRoads, Wear } from "./world/terrain";
+import { drawGround, drawRoads, segmentsOf, keepOffRoads, Wear, noise } from "./world/terrain";
 import { Interior, type InteriorPerson } from "./Interior";
 import { Portrait } from "./Portrait";
 import townStyle from "./town/town.module.css";
@@ -177,6 +177,16 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // roads: an edge, a centre, cobbles in courses in the old town; and over them the wear, pale where feet actually go
       const segs = segmentsOf(places, OLD_TOWN); world.addChild(drawRoads(segs));
       const wear = new Wear(segs, (sg) => { const [a, b] = sg.key.split("|"); const hub = (id?: string) => id === "market" || id === "harbor" || id === "lane"; return (hub(a) ? 30 : 0) + (hub(b) ? 30 : 0) + (sg.cobbled ? 20 : 6); }); world.addChild(wear);
+      // T2: desire-lines. Where feet cross the grass off the roads, the ground wears to a pale path — a light baseline for the shortcuts near each place, deepening with real traffic.
+      const trails = new Graphics(); world.addChild(trails);
+      const trailCount = new Map<string, number>(); const roadKeys = new Set(segs.map((s) => s.key)); let trailsDirty = true;
+      const trailKey = (a: string, b: string) => [a, b].sort().join("|");
+      const trailStep = (from: string, to: string) => { if (from === to) return; const key = trailKey(from, to); if (roadKeys.has(key)) return; trailCount.set(key, (trailCount.get(key) ?? 0) + 1); trailsDirty = true; };
+      { const list = [...places.values()].filter((p) => p.kind !== "wild" && p.kind !== "plot"); for (const p of list) { let best: { id: string; d: number } | null = null; for (const q of list) { if (q.id === p.id) continue; if (roadKeys.has(trailKey(p.id, q.id))) continue; const dd = Math.hypot(p.x - q.x, p.y - q.y); if (dd < 360 && (!best || dd < best.d)) best = { id: q.id, d: dd }; } if (best) { const key = trailKey(p.id, best.id); trailCount.set(key, Math.max(trailCount.get(key) ?? 0, 2)); } } }
+      const trailPath = (ax: number, ay: number, bx: number, by: number) => { const L = Math.hypot(bx - ax, by - ay) || 1; const n = Math.max(2, Math.round(L / 40)); const nx = -(by - ay) / L, ny = (bx - ax) / L; trails.moveTo(ax, ay); for (let i = 1; i <= n; i++) { const t = i / n; const off = i === n ? 0 : (noise(ax * 0.01 + t * 6, ay * 0.01 + 3) - 0.5) * 12; trails.lineTo(ax + (bx - ax) * t + nx * off, ay + (by - ay) * t + ny * off); } };
+      const drawTrail = (ax: number, ay: number, bx: number, by: number, width: number, alpha: number) => { trailPath(ax, ay, bx, by); trails.stroke({ width, color: 0xccb890, alpha: alpha * 0.6, cap: "round", join: "round" }); trailPath(ax, ay, bx, by); trails.stroke({ width: width * 0.5, color: 0xbba475, alpha, cap: "round", join: "round" }); };
+      const redrawTrails = () => { if (!trailsDirty) return; trailsDirty = false; trails.clear(); for (const [key, n] of trailCount) { if (n < 2) continue; const [a, b] = key.split("|") as [string, string]; const pa = places.get(a), pb = places.get(b); if (!pa || !pb) continue; const k = Math.min(1, Math.log2(1 + n) / 6); drawTrail(pa.x, pa.y + 22, pb.x, pb.y + 22, 6 + 11 * k, 0.13 + 0.15 * k); } };
+      redrawTrails();
       const harborSurface=harborGround(places.values(),inside);world.addChild(harborSurface.root);
       // the water's edge, alive: foam that breathes along the shore, whitecaps in wind and storm, rings where the rain hits
       const shoreLine = outline(1.012), shoreOut = outline(1.05); const tideMid = outline(1.0), tideIn = outline(0.984); const shallowLine = outline(1.03);
@@ -463,7 +473,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (!f.asleep && a.activity?.kind !== "fish" && ["idle","sit","eat","drink"].includes(f.pose) && !f.bench) { const b = benchAt(f.place); if (b && !takenBenches.has(b.key)) { takenBenches.add(b.key); f.bench = true; f.seat=b; f.tx = b.x; f.ty = b.y; } }
         return f;
       };
-      const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) wear.step(f.place, place); f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
+      const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) { wear.step(f.place, place); trailStep(f.place, place); } f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
       const refreshPlaces = async () => { try { const t = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock) || old.storedCount !== p.storedCount || old.looseCount !== p.looseCount) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
       // Full population snapshots are authoritative, including citizens who were moved off island.
@@ -694,7 +704,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           prints_.clear(); for (const pr of prints) { const ageT = (tick - pr.at) / 900; if (ageT > 1) continue; prints_.ellipse(pr.x, pr.y, 3, 1.6).fill({ color: C.kelp, alpha: 0.18 * (1 - ageT) * snowiness }); }
         }
         if (tick % 60 === 0 && c && setSeason(forcedSeason ?? c.season)) { plantTrees(); }
-        if (tick % 120 === 0) wear.redraw();
+        if (tick % 120 === 0) { wear.redraw(); redrawTrails(); }
         if (tick % 60 === 0) ground.tint = SEASON_CAST[forcedSeason ?? c?.season ?? "summer"] ?? 0xffffff;
         // the short season: the fields turn to lavender
         if (tick % 60 === 0) { const bloom = !!c?.inSeason?.includes("lavender"); if (bloom !== lavender.visible) { lavender.visible = bloom; } }
