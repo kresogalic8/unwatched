@@ -218,6 +218,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const ORGANIC = /^(tree-small|tree-large|bush|olive|cypress|rock|searocks)$/;
       const vhash = (x: number, y: number, s: number) => { const h = Math.sin(x * 12.9898 + y * 78.233 + s * 37.719) * 43758.5453; return h - Math.floor(h); };
       const VARY_TINTS = [0xffffff, 0xf3eede, 0xebf0e3, 0xf8f1e2, 0xe6ede0, 0xfcf6e9];
+      // ordinary houses come from a handful of drawings; a faint per-building shade keeps a row from reading as identical. Landmarks (council, mill, chapel, lighthouse) stay canonical.
+      const BUILDING = /^(house|cottage|shop|inn|tavern|bakery|chandlery|harbor-office|smithy|fishhouse|boatshed)$/;
+      const BLD_TINTS = [0xffffff, 0xf7f3ea, 0xf2f2ee, 0xfbf5ec, 0xeef0ee, 0xf9f4e6];
       const mulTint = (a: number, f: number) => (Math.round(((a >> 16) & 255) * ((f >> 16) & 255) / 255) << 16) | (Math.round(((a >> 8) & 255) * ((f >> 8) & 255) / 255) << 8) | Math.round((a & 255) * (f & 255) / 255);
       const put = (name: string, x: number, y: number, w?: number, flip = false) => {
         const d = drawThing(name); if (!d) return null;
@@ -240,7 +243,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const drawPlace = (p: PlaceView) => {
         drawn.get(p.id)?.destroy({ children: true });
         const g = new Container(); g.sortableChildren = true; g.zIndex = p.y; scene.addChild(g); drawn.set(p.id, g);
-        const local = (name: string, w?: number) => { const d=drawThing(name);if(!d)return null;const s=d.c;if(w)s.scale.set(w/d.w);s.zIndex=0;g.addChild(s);shadowUnder(p.x,p.y,w??d.w);return s; };
+        const local = (name: string, w?: number) => { const d=drawThing(name);if(!d)return null;const s=d.c;if(w)s.scale.set(w/d.w);s.zIndex=0;g.addChild(s);shadowUnder(p.x,p.y,w??d.w); if(BUILDING.test(name)){const t=BLD_TINTS[Math.floor(vhash(p.x,p.y,5)*BLD_TINTS.length)]??0xffffff;for(const ch of s.children)if("tint" in ch)(ch as {tint:number}).tint=mulTint((ch as {tint:number}).tint,t);} return s; };
         if (p.kind === "plot" && !p.site) {
           // pegged-out land: a dashed rectangle and four stakes
           const r = new Graphics(); r.rect(-80, -60, 160, 70).fill({ color: C.sage, alpha: 0.3 });
