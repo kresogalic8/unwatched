@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.15.0] - 2026-09-16
+### Added
+
 - Another Life onboarding: create yourself or an imagined citizen through five situations, personal habits, strengths, flaws and aspirations, with a reviewable portrait and saved progress.
 - An audited operations preview for reducing ownerless NPCs to a target of 5–10, protecting families, property owners, civic roles, close user relationships and occupied jobs.
 
@@ -361,7 +368,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/kresogalic8/unwatched/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/kresogalic8/unwatched/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/kresogalic8/unwatched/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/kresogalic8/unwatched/compare/v0.12.0...v0.13.0
