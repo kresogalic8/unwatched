@@ -119,6 +119,7 @@ export default function OpsRoom() {
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [npcPlan,setNpcPlan]=useState<{target:number;current:number;remaining:number;protected:number;canReachTarget:boolean;selected:{id:string;name:string;job:string|null}[]}|null>(null);
   const [loaded, setLoaded] = useState("");
   const generation = useRef(0);
   const [search, setSearch] = useState("");
@@ -857,6 +858,11 @@ export default function OpsRoom() {
             <>
               <section className={`${s.panel} ${s.danger}`}>
                 <h2>World controls</h2>
+                <h3>Island residents · target 10 NPCs</h3>
+                <p className={s.muted}>Review departures for ownerless citizens only. Parents, property owners, the mayor and close connections of user citizens are protected. Departures keep historical records; they are not deletions.</p>
+                <Button kind="secondary" disabled={busy||!writable} onClick={()=>void action(async()=>setNpcPlan(await api("/api/ops/npc-population?target=10")))}>Review NPC population</Button>
+                {npcPlan&&<div role="status"><p>{npcPlan.current} NPCs → {npcPlan.remaining}. {npcPlan.protected} protected.</p><ul>{npcPlan.selected.map(a=><li key={a.id}>{a.name} · {a.job??"No job"}</li>)}</ul>{!npcPlan.canReachTarget&&<p>Cannot reach 10 without affecting protected citizens. No changes will be applied.</p>}<Button disabled={busy||!writable||!npcPlan.canReachTarget||!npcPlan.selected.length} onClick={()=>void action(async()=>{await api("/api/ops/npc-population",{method:"POST",body:JSON.stringify({target:npcPlan.target,ids:npcPlan.selected.map(a=>a.id)})});setNpcPlan(null);})}>Confirm these departures</Button><Button kind="secondary" onClick={()=>setNpcPlan(null)}>Cancel</Button></div>}
+
                 <p className={s.muted}>
                   Changes affect everyone. Every request is attributed to your
                   account. Successful world switches also appear in the Gazette.

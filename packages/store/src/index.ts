@@ -76,7 +76,7 @@ export class TownStore {
   }
 
   /** Snapshot every agent and the clock. Called at the end of each sim hour and on shutdown. */
-  async snapshot(town: Town): Promise<void> {
+  async snapshot(town: Town, strict = false): Promise<void> {
     await this.flush();
     const snap = town.snapshot();
     const agents = [...town.agents.values()].map((a) => this.agentRow(a));
@@ -84,11 +84,12 @@ export class TownStore {
       this.sb.from("agents").upsert(agents, { onConflict: "id" }),
       this.sb.from("towns").update({ sim_t: town.t, day: town.day, weather: town.weather, flour_shortage: town.flourShortage, places: snap.places ?? [], jobs: snap.jobs ?? [], children: snap.children ?? [], civic: snap.civic ?? { mayor: null, elected: 0, works: [] } }).eq("id", this.townId),
     ]);
+    if (strict && (e1 || e2)) throw new Error(`Snapshot failed: ${(e1 || e2)!.message}`);
     if (e1) console.error("agents upsert failed:", e1.message);
     if (e2) console.error("town update failed:", e2.message);
     const rels: { agent_id: string; town_id: string; other_id: string; trust: number; affection: number; last_seen: number; opinion: string }[] = [];
     for (const a of town.agents.values()) for (const [other, r] of a.relationships) rels.push({ agent_id: a.id, town_id: this.townId, other_id: other, trust: r.trust, affection: r.affection, last_seen: r.lastSeen, opinion: r.opinion });
-    if (rels.length) { const { error } = await this.sb.from("relationships").upsert(rels, { onConflict: "agent_id,other_id" }); if (error) console.error("relationships upsert failed:", error.message); }
+    if (rels.length) { const { error } = await this.sb.from("relationships").upsert(rels, { onConflict: "agent_id,other_id" }); if (error && strict) throw new Error(`Relationships snapshot failed: ${error.message}`); if (error) console.error("relationships upsert failed:", error.message); }
   }
 
   /** Memories are appended, never rewritten. Pass only the ones written since the last call. */
@@ -150,7 +151,8 @@ export class TownStore {
   }
 
   async markLeft(agentId: string, t: number): Promise<void> {
-    await this.sb.from("agents").update({ left_t: t }).eq("id", agentId);
+    const { error } = await this.sb.from("agents").update({ left_t: t }).eq("id", agentId);
+    if(error)throw new Error(`Could not record departure: ${error.message}`);
   }
   async saveInstructions(agentId: string, text: string): Promise<void> {
     await this.sb.from("standing_instructions").upsert({ agent_id: agentId, text, updated_at: new Date().toISOString() }, { onConflict: "agent_id" });

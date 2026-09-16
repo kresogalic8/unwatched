@@ -6,9 +6,18 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- Another Life onboarding: create yourself or an imagined citizen through five situations, personal habits, strengths, flaws and aspirations, with a reviewable portrait and saved progress.
+- An audited operations preview for reducing ownerless NPCs to a target of 5–10, protecting families, property owners, civic roles, close user relationships and occupied jobs.
+
 ### Changed
 
+- Personality, appearance, brain selection and boarding share one animated layout and progress indicator. Answers become the citizen's actual persona; existing brain activation and billing requirements remain in place.
+- New islands default to ten seed citizens. Existing populations are unchanged until an administrator reviews and confirms departures.
+
 ### Fixed
+
+- Hosted plans appear only for the hosted brain option; feedback no longer overlaps onboarding controls.
+- Persona enrichment preserves user-supplied skills and flaws. Population adjustments require successful snapshots and checked departure persistence.
 
 ## [0.14.1] - 2026-09-14
 ### Changed

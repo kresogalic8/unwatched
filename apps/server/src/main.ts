@@ -1,3 +1,4 @@
+import { npcReduction } from "./npc-population.ts";
 import { DigestCache } from "./digest-cache.ts";
 import { BoardingConnections, verifyBoardingKey } from "./boarding.ts";
 import { adminResolver, backofficeRoutes } from "./backoffice.ts";
@@ -41,7 +42,7 @@ const PORT = Number(process.env.PORT ?? 4000);
 const SEED = Number(process.env.UW_SEED ?? 42);
 const MS_PER_SIM_MINUTE = Number(process.env.UW_MS_PER_SIM_MINUTE ?? 1000); // 60000 is real time
 const BRAIN = process.env.UW_BRAIN ?? "mock";
-const CITIZENS = Number(process.env.UW_CITIZENS ?? 20);
+const CITIZENS = Number(process.env.UW_CITIZENS ?? 10);
 const log = (l: string) => console.log(`[town] ${l}`);
 
 const townBrain: Brain = BRAIN === "openrouter" ? new OpenRouterBrain({ log, allowFallback: false }) : BRAIN === "anthropic" ? new AnthropicBrain({ log }) : new MockBrain(SEED);
@@ -271,7 +272,7 @@ type Enricher = { enrich(p: Persona, island: string): Promise<Partial<PersonaDep
 function enricherOf(b: Brain): Enricher | null { return "enrich" in b && typeof (b as { enrich?: unknown }).enrich === "function" ? (b as unknown as Enricher) : null; }
 async function deepen(a: AgentState): Promise<void> {
   const mind = enricherOf(townBrain); if (!mind || a.persona.habit) return;
-  try { const d = await mind.enrich(a.persona, TOWN_NAME); if (d) { const own = a.persona.voice ?? []; const voice = [...own, ...(d.voice ?? [])].slice(0, 3); a.persona = { ...a.persona, ...(d.habit ? { habit: d.habit } : {}), ...(d.skill ? { skill: d.skill } : {}), ...(d.flaw ? { flaw: d.flaw } : {}), ...(a.persona.cameBecause || d.cameBecause ? { cameBecause: a.persona.cameBecause || d.cameBecause! } : {}), ...(voice.length ? { voice } : {}) }; log(`depth for ${a.persona.name}: ${d.habit ?? "written"}`); } }
+  try { const d = await mind.enrich(a.persona, TOWN_NAME); if (d) { const own = a.persona.voice ?? []; const voice = [...own, ...(d.voice ?? [])].slice(0, 3); a.persona = { ...a.persona, ...(d.habit ? { habit: d.habit } : {}), ...(!a.persona.skill && d.skill ? { skill: d.skill } : {}), ...(!a.persona.flaw && d.flaw ? { flaw: d.flaw } : {}), ...(a.persona.cameBecause || d.cameBecause ? { cameBecause: a.persona.cameBecause || d.cameBecause! } : {}), ...(voice.length ? { voice } : {}) }; log(`depth for ${a.persona.name}: ${d.habit ?? "written"}`); } }
   catch (err) { log(`depth failed for ${a.persona.name}: ${(err as Error).message}`); }
 }
 async function deepenAll(): Promise<void> {
@@ -619,6 +620,31 @@ app.post("/api/ops/park-unfunded",async(c)=>{
   await store.snapshot(town);
   broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(publicEvent)});
   return c.json({moved:ids.size,remaining:town.agents.size});
+ }finally{worldTransition=false;}
+});
+app.get("/api/ops/npc-population",c=>{
+ const target=Number(c.req.query("target")??10);
+ if(!Number.isInteger(target)||target<5||target>10)return c.json({error:"Choose a target between 5 and 10."},400);
+ return c.json(npcReduction(town,target));
+});
+app.post("/api/ops/npc-population",async c=>{
+ const body=z.object({target:z.number().int().min(5).max(10),ids:z.array(z.string()).max(100)}).safeParse(await c.req.json());
+ if(!body.success)return c.json({error:"Review a population proposal first."},400);
+ if(ticking||worldTransition||boardingLocks.size)return c.json({error:"The world is updating. Review and retry."},409);
+ if(!store)return c.json({error:"Persistent storage is required."},503);
+ const plan=npcReduction(town,body.data.target);
+ if(!plan.canReachTarget)return c.json({error:"Protected citizens prevent this target. No citizens were moved."},409);
+ if(JSON.stringify([...body.data.ids].sort())!==JSON.stringify(plan.selected.map(a=>a.id).sort()))return c.json({error:"The population changed. Review a fresh proposal."},409);
+ worldTransition=true;
+ try{
+  await store.snapshot(town,true);
+  for(const selected of plan.selected){
+   await store.markLeft(selected.id,town.t);
+   town.removeAgent(selected.id,"left","Returned to the mainland as part of the island population adjustment.");
+  }
+  await store.snapshot(town,true);
+  broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(publicEvent)});
+  return c.json({moved:plan.selected.length,remaining:plan.remaining});
  }finally{worldTransition=false;}
 });
 app.get("/api/ops", async (c) => {

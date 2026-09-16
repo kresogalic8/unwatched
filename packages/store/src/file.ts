@@ -53,7 +53,7 @@ export class FileStore {
   async ensureTown(name: string, seed: number): Promise<void> { if (!this.d.town) { this.d.town = { id: this.townId, name, seed, sim_t: 0, day: 1, weather: "clear", flour_shortage: false, places: [], jobs: [], created_at: new Date().toISOString() }; this.save(); } }
   sink(e: TownEvent): void { this.pending.push(e); }
   async flush(): Promise<void> { if (!this.pending.length) return; this.d.events.push(...this.pending); this.pending = []; if (this.d.events.length > 20000) this.d.events = this.d.events.slice(-20000); this.dirty = true; }
-  async snapshot(town: Town): Promise<void> {
+  async snapshot(town: Town, _strict = false): Promise<void> {
     await this.flush();
     const snap = town.snapshot();
     const rows = new Map(this.d.agents.map((a) => [a.id, a]));

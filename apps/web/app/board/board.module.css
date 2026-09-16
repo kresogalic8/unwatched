@@ -80,3 +80,16 @@
  .departureName h2 { font-size:30px; }
  .readinessHeading { flex-wrap:wrap; }
 }
+
+/* The real appearance, funding and boarding forms live inside Another Life's shell. */
+.unified { padding:0; margin:0; min-height:0; max-width:none; background:transparent; --paper:#f2f1eb; --surface:#e7e7dd; --ink:#20291f; --muted:#606557; --rule:#cdd0c4; }
+.unified .layout { display:flex; flex-direction:column; gap:26px; }
+.unified .layout > div { width:100%; }
+.unified .layout > div[class*="bg-shell"] { border:0; padding:0; background:transparent; }
+.unified h1 { font-size:clamp(36px,4vw,58px); font-weight:500; }
+.unified .mind > div:first-child > div:nth-child(2) { grid-template-columns:1fr; }
+.unified .mind { display:flex; }
+.unified .mind > div:first-child { display:contents; }
+.unified :is(button,a)[class*="bg-teal"] { color:#f2f1eb; }
+.unified .ticket { padding:24px; }
+.unified .mind > .hostedPlans { padding:20px 0; border-top:1px solid var(--rule); }
