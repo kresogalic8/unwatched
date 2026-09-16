@@ -338,6 +338,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const wake = new Graphics(); wake.zIndex = 0.6; scene.addChild(wake);
       const aboard: Container[] = []; // figures riding the boat, parented to it
       const gulls = new Graphics(); gulls.zIndex = 180000; scene.addChild(gulls);
+      const rays = new Graphics(); rays.zIndex = 148000; rays.blendMode = "add"; scene.addChild(rays); // soft light shafts through the pinewood at dawn and dusk; additive, so they glow where they cross shade and vanish over the brightest sand
       const CHIMNEYS: Record<string, [number, number]> = { smithy: [44, -150], bakery: [30, -180], inn: [60, -210], mill: [0, -220], tavern: [40, -150], fishhouse: [30, -120] };
       const litHearths = new Set<string>();
       const HEARTHS: Record<string, [number, number]> = { inn: [60, -210], tavern: [40, -150], chandlery: [30, -150], boatshed: [20, -120], council: [50, -190] }; // where a fire is kept for the people inside, not the work
@@ -718,6 +719,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         life.update({ tick, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn });
         for (const snd of life.sounds) ambience.cue(snd.name, Math.hypot(snd.x - cam.x, snd.y - cam.y), snd.x - cam.x, snd.level ?? 1);
         if (effectsRef.current !== effectsOn) { effectsOn = effectsRef.current; sea.filters = effectsOn && !nofx.has("water") ? [water] : null; ripples.visible = !effectsOn; lamps.visible = !effectsOn; night.visible = !effectsOn; dusk.visible = !effectsOn; rain.visible = !effectsOn; if (!effectsOn) { sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; } fog.visible = !effectsOn; if (!effectsOn) { lighting.dark.visible = false; lighting.glow.visible = false; weatherFx.rain.visible = false; weatherFx.snow.visible = false; weatherFx.fog.visible = false; clouds.puffs.visible = false; clouds.shadows.visible = false; } }
+        rays.clear();
         if (effectsOn) {
           const up = hour > rise && hour < set; let lx: number, ly: number, ls: number;
           if (up) { const f = (hour - rise) / Math.max(1, set - rise); const ang = Math.PI * (1 - f); lx = cx - Rx * 1.05 * Math.cos(ang); ly = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(ang)) - 30; ls = 0.9; }
@@ -729,6 +731,22 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const golden = Math.max(0, 1 - Math.min(nearRise, nearSet) / 1.1);
           const blue = Math.max(0, 1 - Math.abs(hour - (phase === "rise" ? rise - 0.7 : set + 0.7)) / 0.7);
           { const f = Math.max(0, Math.min(1, (hour - rise) / Math.max(1, set - rise))); const ang = Math.PI * (1 - f); const sx = cx - Rx * 1.05 * Math.cos(ang), sy = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(ang)) - 30; const [ex, ey] = par(0.7); sunGrade.update({ golden, blue, phase, sun: { x: sx + ex, y: sy + ey }, cover }); }
+          // L2: the low sun throws soft shafts through the pinewood at dawn and dusk, from the horizon it stands on
+          const pw = places.get("pinewood");
+          if (pw && golden > 0.15 && (1 - cover) > 0.2 && night.alpha < 0.4) {
+            const sunX = phase === "rise" ? cx + Rx * 1.05 : cx - Rx * 1.05, sunY = cy - Ry * 1.12;
+            const dx = pw.x - sunX, dy = pw.y - sunY, dl = Math.hypot(dx, dy) || 1; const ux = dx / dl, uy = dy / dl, nx = -uy, ny = ux;
+            const strength = golden * (1 - cover) * Math.max(0.3, 1 - night.alpha / 0.4);
+            const warm = mix(0x6b5a34, phase === "rise" ? 0x6a5530 : 0x6e4e2c, 0.5); // dim warm; additive blend turns it to glowing gold over shade
+            for (let i = -4; i <= 4; i++) {
+              const off = i * 66 + Math.sin(tick / 220 + i * 1.3) * 12;
+              const bx = pw.x + nx * off - ux * 220, by = pw.y - 150 + ny * off - uy * 220;
+              const L = 460 + (i % 2) * 90, wid = 11 + Math.abs(Math.sin(tick / 260 + i * 1.7)) * 10;
+              const rex = bx + ux * L, rey = by + uy * L;
+              const a = strength * (0.32 + 0.28 * Math.max(0, Math.sin(tick / 150 + i * 2)));
+              rays.moveTo(bx - nx * wid, by - ny * wid).lineTo(bx + nx * wid, by + ny * wid).lineTo(rex + nx * wid * 0.35, rey + ny * wid * 0.35).lineTo(rex - nx * wid * 0.35, rey - ny * wid * 0.35).closePath().fill({ color: warm, alpha: a });
+            }
+          }
           const shadeTint = mix(LIGHT.night, 0x1b2140, blue * (1 - cover));
           water.update({ time: tick / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
           const sources: LightSource[] = [];
