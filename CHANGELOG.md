@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.16.0] - 2026-09-16
+### Added
+
 - The town view answers a tap: click an event or a person in the journal and the camera flies there and marks who it means; the cinema view carries a lower third naming who is on screen and what the record says.
 - Desire-lines wear into the grass where people cross off the roads, faint at first and deeper the more they are walked.
 
@@ -16,7 +23,6 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 - The common houses come in colour-and-roof variants, differ a little building to building, and age with moss creeping up their feet.
 - Each citizen now walks in their own way — their build, their years and a load in the hands shape the step — leaning into a quickening pace and slowing behind a crowd rather than walking through it.
 
-### Fixed
 
 ## [0.15.0] - 2026-09-16
 ### Added
@@ -376,7 +382,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/kresogalic8/unwatched/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/kresogalic8/unwatched/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/kresogalic8/unwatched/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/kresogalic8/unwatched/compare/v0.13.0...v0.14.0
