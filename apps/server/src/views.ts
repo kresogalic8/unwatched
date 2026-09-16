@@ -1,4 +1,4 @@
-import type { Town, AgentState, Place } from "@unwatched/engine";
+import { bagView, equipped, capacity, syncItems, type Town, type AgentState, type Place } from "@unwatched/engine";
 import type { TownEvent } from "@unwatched/protocol";
 
 /** What anyone may see about a person: what the town knows. */
@@ -6,6 +6,8 @@ import type { TownEvent } from "@unwatched/protocol";
 let perksOf: (a: AgentState) => boolean = () => true;
 export function setPerks(fn: (a: AgentState) => boolean): void { perksOf = fn; }
 export function publicAgent(town: Town, a: AgentState) {
+  syncItems(a, town.t);
+  const tool = equipped(a);
   const job = a.job ? town.jobs.get(a.job)?.title ?? a.job : null;
   return {
     sharedKnowledge: (a.foodAdvice ?? []).map(x => ({ from: x.from, name: town.agents.get(x.from)?.persona.name ?? x.from, place: town.places.get(x.place)?.name ?? x.place, item: x.item, confidence: x.confidence, sourceT: x.sourceT, sharedT: x.sharedT, eventId: x.eventId })),
@@ -16,8 +18,11 @@ export function publicAgent(town: Town, a: AgentState) {
     id: a.id, name: a.persona.name, age: a.persona.age, origin: a.persona.origin, summary: a.persona.summary,
     location: a.location, place: town.places.get(a.location)?.name ?? a.location, asleep: a.asleep,
     job, home: a.home?.place ?? null, arrivedDay: Math.floor(a.arrivedAt / 1440) + 1, funded: a.funded,
+    gear: tool ? {name: tool.name, condition: tool.condition} : null,
+    packCount: a.inventory.length, packCapacity: capacity(a),
     ownerId: a.owner, appearance: a.appearance ?? null, carrying: a.inventory.length ? a.inventory[a.inventory.length - 1]! : null,
     pose: poseOf(town, a), weak: a.starving >= 2, daysHungry: a.starving, perks: perksOf(a),
+    activity: a.activity && a.activity.place === a.location && a.activity.until > town.t && !a.asleep ? a.activity : null,
     // what shows on a person in the street: the patches of the broke, the waistcoat of someone with a roof of their own
     broke: a.coins <= 2, roof: !!a.home && town.places.get(a.home.place)?.owner === a.id, roofless: !a.home,
   };
@@ -27,6 +32,7 @@ export function publicAgent(town: Town, a: AgentState) {
 export function ownerAgent(town: Town, a: AgentState) {
   return {
     ...publicAgent(town, a),
+    belongings: bagView(a, town.t),
     desires: a.desires ?? [],
     foodAdvice: a.foodAdvice ?? [],
     foodLessons: a.foodLessons ?? [], foodRoutineDecisions: a.foodRoutineDecisions ?? [],
@@ -59,9 +65,7 @@ export function clockOf(town: Town) {
 export function poseOf(town: Town, a: AgentState): "sleep" | "work" | "sit" | "idle" {
   if (a.asleep) return "sleep";
   const here = town.places.get(a.location);
-  if (here?.site && town.hour >= 8 && town.hour < 18 && (here.site.by === a.id || here.community?.members.some(m => m.id === a.id && m.help) || town.dueStep(a)?.place === here.id)) return "work";
-  const job = a.job ? town.jobs.get(a.job) : null;
-  if (job && job.place === a.location && town.hour >= job.hours[0] && town.hour < job.hours[1]) return "work";
+  if (a.activity?.kind === "work" && a.activity.place === a.location && a.activity.until > town.t) return "work";
   if (here && (here.kind === "inn" || here.kind === "public") && town.hour >= 17) return "sit";
   return "idle";
 }

@@ -12,3 +12,5 @@ export type { WorldPack, PlaceSpec, JobSpec, ProduceSpec, SupplySpec, ExportSpec
 export { sha256, canonicalEvent } from "./hash.ts";
 
 export { desiresForMind } from "./desires.ts";
+
+export { bagView, equipped, capacity, syncItems } from "./items.ts";

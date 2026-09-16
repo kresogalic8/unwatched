@@ -4,6 +4,9 @@ import type { AgentId, PlaceId, Persona, TownEvent, Perception, ActionProposal, 
 export type PlaceKind = "harbor" | "inn" | "market" | "shop" | "workplace" | "public" | "home" | "civic" | "plot" | "wild";
 
 export interface Place {
+  looseItems?: import("@unwatched/protocol").ItemInstance[];
+  stockItems?: import("@unwatched/protocol").ItemInstance[];
+  keptStorage?: {owner: string; name: string; items: import("@unwatched/protocol").ItemInstance[]}[];
   decorations?: import("@unwatched/protocol").Decoration[];
   /** Public building milestones, retained with the place after the rolling event log expires. */
   history?: import("@unwatched/protocol").BuildingHistory;
@@ -97,6 +100,10 @@ export interface Budget {
 export interface OwnerLetter { id: number; text: string; t: number; read: boolean; /** set once the citizen has written back to this letter; one answer per letter */ answered?: boolean }
 
 export interface AgentState {
+  itemInstances?: import("@unwatched/protocol").ItemInstance[];
+  nextItemId?: number;
+  equippedItem?: string | null;
+  storage?: {place: string; items: import("@unwatched/protocol").ItemInstance[]}[];
   desires?: import("@unwatched/protocol").Desire[];
   skills?: import("./skills.ts").LearnedSkill[];
   practice?: import("./skills.ts").SkillPractice | null;
@@ -126,6 +133,8 @@ export interface AgentState {
   lastThought: number;
   heard: { from: AgentId; name: string; text: string; t: number }[];
   workedToday: boolean;
+  activity?: { kind: "fish" | "work"; place: string; started: number; until: number } | null;
+  lastFishingDay?: number;
   rumors: string[];
   appearance: Record<string, unknown> | null;
   /** Read every morning. Advice, not orders. */
@@ -284,6 +293,12 @@ export interface AgentSnapshot {
   appearance: Record<string, unknown> | null;
   arrivedAt: number;
   state: {
+    itemInstances?: AgentState["itemInstances"];
+    nextItemId?: number;
+    equippedItem?: string | null;
+    storage?: AgentState["storage"];
+    activity?: AgentState["activity"];
+    lastFishingDay?: number;
     desires?: import("@unwatched/protocol").Desire[];
     skills?: import("./skills.ts").LearnedSkill[];
     practice?: import("./skills.ts").SkillPractice | null;

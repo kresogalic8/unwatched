@@ -89,7 +89,7 @@ export class Citizen extends Container {
   private nose = new Graphics(); private eyes = new Graphics(); private brows = new Graphics(); private mouth = new Graphics(); private backHair = new Graphics();
   private facingMode: Facing = "right"; private moodState = { hunger: 0, joy: 0, grief: 0, anger: 0, surprise: 0, tired: 0 }; private gaze = 0; private talking = false;
   private thighH = 0; private shinH = 0; private upperH = 0; private foreH = 0; private headR = 11;
-  private held = new Graphics(); private heldItem: string | null = null; private tradeName: string | null = null; private workStyle: "swing" | "push" | "haul" | "sweep" | "knead" = "swing"; private years = 30;
+  private held = new Graphics(); private heldItem: string | null = null; private tradeName: string | null = null; private workStyle: "swing" | "push" | "haul" | "sweep" | "knead" | "angle" = "swing"; private years = 30;
   private carry = new Graphics(); private tool = new Graphics();
   private hood = new Graphics(); private umbrella = new Graphics(); private breath = new Graphics(); private coat = new Graphics(); private scarf = new Graphics(); private gear = { rain: false, cold: false };
   private patches = new Graphics(); private vest = new Graphics(); private bundle = new Graphics(); private strap = new Graphics(); private apron = new Graphics(); private beard = new Graphics(); private glasses = new Graphics(); private letter = new Graphics(); private cup = new Graphics(); private bowl = new Graphics(); private spoon = new Graphics(); private pen = new Graphics(); private state = { broke: false, roof: false, roofless: false };
@@ -345,7 +345,8 @@ export class Citizen extends Container {
   trade(title: string | null): void {
     const t = (title ?? "").toLowerCase(); if (t === this.tradeName) return; this.tradeName = t; const g = this.tool; g.clear(); this.apron.visible = /cook|bak|inn|help|smith|forge|keep|clerk/.test(t);
     const handle = (len: number, w = 3.5) => g.roundRect(-w / 2, -len + 4, w, len, w / 2).fill(WOOD_H).stroke(STROKE);
-    if (/smith|forge|iron/.test(t)) { this.workStyle = "swing"; handle(22); g.roundRect(-7, -24, 14, 7, 2).fill(KELP).stroke(STROKE); }
+    if (t === "angling") { this.workStyle = "angle"; g.moveTo(0, 3).quadraticCurveTo(18, -24, 38, -36).stroke({width: 1.8, color: WOOD_H}); g.moveTo(38, -36).quadraticCurveTo(43, -8, 46, 36).stroke({width: .7, color: CREAM, alpha: .8}); g.ellipse(46, 37, 2, 3).fill(CORAL); }
+    else if (/smith|forge|iron/.test(t)) { this.workStyle = "swing"; handle(22); g.roundRect(-7, -24, 14, 7, 2).fill(KELP).stroke(STROKE); }
     else if (/cook|bak/.test(t)) { this.workStyle = "knead"; g.roundRect(-9, 0, 18, 5, 2.5).fill(0xe3d3a2).stroke(STROKE); g.roundRect(-11, 1, 3, 3, 1.5).fill(WOOD_H); g.roundRect(8, 1, 3, 3, 1.5).fill(WOOD_H); }
     else if (/fish|gutter|net/.test(t)) { this.workStyle = "haul"; g.moveTo(-4, 2).lineTo(-9, 16).lineTo(9, 16).lineTo(4, 2).closePath().fill({ color: 0x9fc2ad, alpha: 0.7 }).stroke(STROKE); for (let x = -6; x <= 6; x += 4) g.moveTo(x, 4).lineTo(x * 1.3, 16).stroke({ width: 0.8, color: KELP, alpha: 0.5 }); }
     else if (/saw/.test(t)) { this.workStyle = "push"; g.roundRect(-2, -2, 4, 8, 2).fill(WOOD_H).stroke(STROKE); g.moveTo(0, 6).lineTo(0, 26).stroke({ width: 4, color: 0xdcd9cf }); g.moveTo(0, 6).lineTo(0, 26).stroke({ width: 1, color: KELP }); for (let y = 8; y < 26; y += 3) g.moveTo(2, y).lineTo(3.5, y + 1.5).stroke({ width: 1, color: KELP }); }
@@ -360,7 +361,10 @@ export class Citizen extends Container {
   /** A thing in the free hand: a loaf, a fish, an apple, planks on the shoulder, a bundle of lavender, a lantern. Nothing drawn for what has no shape. */
   hold(item: string | null): void {
     const it = (item ?? "").toLowerCase(); if (it === this.heldItem) return; this.heldItem = it; const g = this.held; g.clear();
-    if (/bread|loaf/.test(it)) g.ellipse(0, 4, 7, 4).fill(0xd9b26a).stroke(STROKE);
+    if (it === "fishing rod") {g.moveTo(0,8).lineTo(4,-35).stroke({width:2,color:WOOD_H});g.moveTo(4,-35).lineTo(9,6).stroke({width:.6,color:CREAM});}
+    else if (it === "hammer" || it === "axe") {g.roundRect(-1.5,-16,3,24,1).fill(WOOD_H).stroke(STROKE);g.roundRect(-6,-20,it === "axe" ? 13 : 10,7,1).fill(KELP).stroke(STROKE);}
+    else if (it === "basket") {g.roundRect(-7,0,14,12,3).fill(WOOD_H).stroke(STROKE);g.moveTo(-5,0).quadraticCurveTo(0,-10,5,0).stroke({width:1.5,color:WOOD_H});}
+    else if (/bread|loaf/.test(it)) g.ellipse(0, 4, 7, 4).fill(0xd9b26a).stroke(STROKE);
     else if (/fish/.test(it)) { g.ellipse(0, 4, 8, 3).fill(0x9fc2ad).stroke(STROKE); g.moveTo(7, 4).lineTo(11, 1).lineTo(11, 7).closePath().fill(0x9fc2ad).stroke(STROKE); }
     else if (/apple/.test(it)) g.circle(0, 4, 4).fill(CORAL).stroke(STROKE);
     else if (/soup|drink|wine|beer/.test(it)) { g.roundRect(-4, -2, 8, 10, 2).fill(0xdcebe3).stroke(STROKE); }
@@ -481,6 +485,7 @@ export class Citizen extends Container {
       case "work": {
         const s = Math.sin(k * 1.4);
         switch (this.workStyle) {
+          case "angle": armR = -.7; foreR = -1; armL = .15; foreL = -.5; bob = Math.sin(k * .3) * .35; break;
           case "swing": armR = -1.9 + Math.max(0, s) * 1.6; foreR = -0.6 + Math.max(0, s) * 0.6; armL = 0.15; foreL = 0.5; bob = Math.max(0, -s) * -1.5; break;
           case "push": armR = -1.2 + s * 0.5; foreR = -0.4 + s * 0.4; armL = -1.0 + s * 0.5; foreL = -0.3; bob = Math.abs(s) * -0.8; headTilt = 0.1; break;
           case "haul": armR = -0.8 + Math.max(0, -s) * 0.9; foreR = -1.1; armL = -0.8 + Math.max(0, -s) * 0.9; foreL = -1.1; bob = Math.max(0, -s) * -2; this.body.rotation = 0.06 * this.facing; break;
@@ -555,7 +560,7 @@ export class Citizen extends Container {
     this.bowl.rotation=leftLevel;
     this.spoon.rotation=rightLevel;
     this.pen.rotation=rightLevel;
-    this.tool.rotation=this.pose === "work" && (this.workStyle === "knead" || this.workStyle === "haul") ? rightLevel : 0;
+    this.tool.rotation=this.pose === "work" && (this.workStyle === "knead" || this.workStyle === "haul" || this.workStyle === "angle") ? rightLevel : 0;
     // Ankle articulation keeps shoes flat while the knee bends. During a walk,
     // the lowest sole stays on the ground instead of both feet floating above it.
     const planted = ["idle", "walk", "talk", "work", "greet", "argue"].includes(this.pose);

@@ -1,4 +1,5 @@
 "use client";
+import { Inventory } from "@/components/citizen/Inventory";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, Label, Bubble, Tide } from "@/components/ui";
@@ -101,6 +102,7 @@ export default function Profile() {
           </p>
         </div>
       </section>
+      {"belongings" in a && a.belongings && <Inventory data={a.belongings}/>}
       <div className={s.profileGrid}>
         <section>
           <div className={s.sectionHead}>

@@ -1,4 +1,5 @@
 "use client";
+import { Inventory } from "@/components/citizen/Inventory";
 import { Icon as ArrowIcon } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -66,7 +67,7 @@ export default function Town() {
   }, []);
   useEffect(() => {
     let alive = true;
-    setSelFull(null);
+    setSelFull(current => current?.id === sel?.id ? current : null);
     setDetailError(false);
     if (sel)
       void api<OwnerAgent | PublicAgent>(`/api/agents/${sel.id}`)
@@ -79,7 +80,7 @@ export default function Town() {
     return () => {
       alive = false;
     };
-  }, [sel?.id]);
+  }, [sel?.id, snapshot.feed.find(e => e.actors.includes(sel?.id ?? ""))?.id]);
   useEffect(() => {
     if (sel) heading.current?.focus();
   }, [sel?.id]);
@@ -307,6 +308,7 @@ export default function Town() {
                       </p>
                     </section>
                   )}
+                  {selFull && "belongings" in selFull && selFull.belongings && <Inventory data={selFull.belongings}/>}
                   <div className={s.detailActions}>
                     <Button kind="secondary" onClick={()=>{setTracking(tracking === sel.id ? null : sel.id);setFollow(false);changeView("street");}}>{tracking === sel.id ? "Stop following" : `Follow ${sel.name.split(" ")[0]}`}</Button>
                     {agent && !possessed && (

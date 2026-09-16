@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { InventoryView, ItemInstance } from "./items";
+export * from "./items";
 
 /** Identifiers */
 export const AgentId = z.string().regex(/^ag_[a-z0-9]+$/);
@@ -42,6 +44,7 @@ export type PersonaDepth = z.infer<typeof PersonaDepth>;
 
 /** Bounded reusable procedures: no recursion, code execution, messages or privileged actions. */
 export const SkillStep = z.discriminatedUnion("kind", [
+  z.object({kind:z.literal("craft"), recipe:z.string().min(1).max(40)}),
   z.object({kind:z.literal("move"),to:PlaceId}),
   z.object({kind:z.literal("trade"),buy:z.string().min(1).max(30).optional(),sell:z.string().min(1).max(30).optional()}),
   z.object({kind:z.literal("repair")}),
@@ -56,6 +59,8 @@ export const TravellingSkill = z.object({recipe:SkillRecipe,origin:z.object({isl
 
 /** The action kinds the town can carry out. Nothing else exists. */
 export const ActionKind = z.enum([
+  "craft", "equip", "stow", "retrieve", "drop", "pickup", "repair_tool",
+  "fish",
   "decorate", "move", "say", "give", "take", "use", "work", "apply", "quit", "trade",
   "propose", "vote", "write", "build", "message_owner", "sleep", "wait",
   "hire", "lend", "lodge", "leave",
@@ -77,6 +82,15 @@ export const Decoration = z.object({ kind: z.enum(["flowers", "bench", "cairn"])
 export type Decoration = z.infer<typeof Decoration>;
 
 export const Action = z.discriminatedUnion("kind", [
+  z.object({kind:z.literal("craft"),recipe:z.string().min(1).max(40)}),
+  z.object({kind:z.literal("equip"),item:z.string().nullable()}),
+  z.object({kind:z.literal("stow"),item:z.string()}),
+  z.object({kind:z.literal("retrieve"),item:z.string()}),
+  z.object({kind:z.literal("drop"),item:z.string()}),
+  z.object({kind:z.literal("pickup"),item:z.string()}),
+  z.object({kind:z.literal("repair_tool"),item:z.string()}),
+  /** A twenty-minute attempt at the harbor, once a day. The engine decides the catch. */
+  z.object({ kind: z.literal("fish") }),
   z.object({kind:z.literal("decorate"),what:z.enum(["flowers","bench","cairn"]),why:z.string().trim().min(3).max(200)}),
   z.object({kind:z.literal("found_institution"),name:z.string().trim().min(3).max(60),charter:z.string().trim().min(10).max(400)}),
   z.object({kind:z.literal("join_institution")}),z.object({kind:z.literal("leave_institution")}),
@@ -187,6 +201,7 @@ export const Passenger = z.object({
   from: z.object({ id: z.string(), name: z.string(), url: z.string().optional() }),
   persona: Persona, appearance: z.record(z.string(), z.unknown()).nullable(), owner: z.string().nullable(),
   coins: z.number().int().min(0), inventory: z.array(z.string()),
+  carriedItems: z.array(ItemInstance).optional(), equippedItem: z.string().nullable().optional(),
   memories: z.array(z.object({ t: z.number(), text: z.string(), importance: z.number(), kind: z.string() })).max(240),
   opinions: z.array(z.object({ name: z.string(), trust: z.number(), opinion: z.string() })).max(40),
   instructions: z.string(), why: z.string().nullable(),
@@ -205,6 +220,7 @@ export const Perception = z.object({
   town: z.object({ rules: z.array(z.string()), sayings: z.array(z.string()), people: z.array(z.object({ name: z.string(), place: PlaceId, asleep: z.boolean() })).optional(), projects: z.array(CommunityProject.extend({ place: PlaceId })).optional() }).optional(),
   time: z.object({ sim: z.string(), day: z.number().int(), minute: z.number().int(), season: z.string(), weather: z.string(), weekday: z.string().optional(), occasion: z.string().optional(), gathering: z.string().optional(), temperature_c: z.number().optional() }),
   self: z.object({
+    belongings: InventoryView.optional(),
     learned_food: z.array(z.object({ place: PlaceId, item: z.string(), confidence: z.number(), observations: z.number() })).optional(),
     location: PlaceId,
     needs: z.object({ hunger: z.number(), rest: z.number(), social: z.number() }),
@@ -241,7 +257,7 @@ export const Perception = z.object({
     relation: z.object({ trust: z.number(), affection: z.number(), opinion: z.string().optional() }).optional(),
     asleep: z.boolean().optional(),
   })),
-  place: z.object({ id: PlaceId, name: z.string(), kind: z.string(), for_sale: z.array(z.object({ item: z.string(), price: z.number() })), jobs_open: z.array(z.string()), exits: z.array(PlaceId),
+  place: z.object({ loose_items: z.array(ItemInstance).optional(), id: PlaceId, name: z.string(), kind: z.string(), for_sale: z.array(z.object({ item: z.string(), price: z.number() })), jobs_open: z.array(z.string()), exits: z.array(PlaceId),
     institution: z.object({name:z.string(),charter:z.string(),founder:z.string(),members:z.array(z.string()),founded:z.number()}).optional(),
     community: CommunityProject.optional(),
     decorations: z.array(Decoration).optional(),
@@ -272,6 +288,8 @@ export type Perception = z.infer<typeof Perception>;
 
 /** Everything that happens is one of these. */
 export const EventKind = z.enum([
+  "item.crafted", "item.equipped", "item.stored", "item.retrieved", "item.dropped", "item.picked-up", "item.repaired",
+  "agent.fishing", "agent.fishing-ended", "agent.activity",
   "tick.day", "boat.dock", "boat.depart", "agent.arrive", "agent.leave",
   "institution.founded", "institution.joined", "institution.left", "building.repaired", "skill.proposed", "skill.tested", "skill.practiced", "skill.shared",
   "town.wonder", "place.decorated", "project.proposed", "project.contributed", "project.withdrawn", "garden.harvest", "knowledge.shared",

@@ -14,7 +14,7 @@ import { constructionStage } from "@unwatched/protocol";
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef, useState } from "react";
 import { Application, Container, Graphics, Rectangle, Text, TextStyle } from "pixi.js";
-import { API, WS, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
+import { API, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
 import { Citizen, lookFor, aged, type Look, type Pose } from "./world/citizen";
 import { Ambience } from "./world/ambience";
 import { ProjectDetails, type CommunityView } from "./CommunityProjects";
@@ -36,7 +36,7 @@ import townStyle from "./town/town.module.css";
  */
 const C = { ...GROUND, shell: CREAM, sage: SAGE, teal: TEAL, kelp: KELP, coral: CORAL, drift: DRIFT };
 
-type PlaceView = { decorations?: Decoration[]; community?: CommunityView; hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
+type PlaceView = { storedCount?: number; looseCount?: number; decorations?: Decoration[]; community?: CommunityView; hasHistory?: boolean; id: string; name: string; kind: string; exits: string[]; x: number; y: number; district: string; sprite: string; stock?: Record<string, number>; look?: string; owner: string | null; site: { what: string; name: string; by: string; done: number; of: number } | null; crowd: number };
 type TownView = Clock & { size: { w: number; h: number }; places: PlaceView[] };
 
 
@@ -87,13 +87,13 @@ function lookSvg(hash: string): Promise<string | null> {
 type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Citizen; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
 export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
-export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange }: { mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void }) {
+export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API }: { apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void }) {
   const viewChange = useRef(onViewChange); viewChange.current = onViewChange;
   const focusRef = useRef(focusId); focusRef.current = focusId;
   const navigateMini = useRef<((x:number,y:number)=>void) | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const cameraControl = useRef<((action: "in" | "out" | "reset") => void) | null>(null);
-  const [labels, setLabels] = useState<{ id: string; name: string; x: number; y: number; mine: boolean; shown: boolean; bubble?: string }[]>([]);
+  const [labels, setLabels] = useState<{ id: string; name: string; x: number; y: number; mine: boolean; shown: boolean; activity?: string; bubble?: string }[]>([]);
   const [feed, setFeed] = useState<TownEvent[]>([]);
   const [clock, setClock] = useState<Clock | null>(null);
   const [ready, setReady] = useState(false);
@@ -126,7 +126,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
     let app: Application | null = null; let ws: WebSocket | null = null; let alive = true; let inited = false; let poll: ReturnType<typeof setInterval> | null = null;
     (async () => {
       const el = host.current!;
-      const townView = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView;
+      const townView = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView;
       const W = townView.size?.w ?? 3000, H = townView.size?.h ?? 1800;
       const places = new Map<string, PlaceView>(townView.places.map((p) => [p.id, p]));
       const hourParam = typeof location !== "undefined" ? new URLSearchParams(location.search).get("hour") : null; const forcedHour = hourParam === null ? NaN : Number(hourParam); // ?hour=23 previews the light without waiting for it
@@ -258,6 +258,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (p.stock && (p.kind === "shop" || p.kind === "workplace" || p.kind === "market") && Object.values(p.stock).every((v) => v <= 0)) { const sg = drawSign("nothing left"); sg.position.set(-58, -10); sg.zIndex = 2; g.addChild(sg); const st = new Text({ text: "Sold out", style: { ...smallStyle, fontSize: 7, stroke: { color: 0xeee3cc, width: 0 } } }); st.anchor.set(0.5, 0.5); st.position.set(-58, -33); st.zIndex = 3; g.addChild(st); }
           // owned: the owner's name on a board by the door
           if (p.owner && p.kind !== "plot") { const nb = new Graphics(); nb.roundRect(-30, -12, 60, 11, 2).fill(C.shell).stroke({ width: 1.2, color: C.kelp }); nb.position.set(48, -6); nb.zIndex = 2; g.addChild(nb); const nt = new Text({ text: p.owner.split(" ").slice(-1)[0]!.toUpperCase(), style: { ...smallStyle, fontSize: 7 } }); nt.anchor.set(0.5, 0.5); nt.position.set(48, -12.5); nt.zIndex = 3; g.addChild(nt); }
+        }
+        const possessions = (p.storedCount ?? 0) + (p.looseCount ?? 0);
+        if (possessions > 0) {
+          const chest = new Graphics();
+          for (let i=0;i<Math.min(3,Math.ceil(possessions/4));i++) {
+            chest.roundRect(55+i*15,5-i*5,22,15,2).fill(0xb28e63).stroke({width:1,color:C.kelp});
+            chest.moveTo(56+i*15,10-i*5).lineTo(76+i*15,10-i*5).stroke({width:1,color:C.kelp,alpha:.5});
+          }
+          chest.zIndex=3;g.addChild(chest);
         }
         const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(0, p.site ? 22 : 6); t.zIndex = 100000; g.addChild(t);
         const marks = drawPlaceMarks(p.decorations ?? [], i=>markPosition(i,p,{x:cx,y:cy},inside)); g.addChild(marks); drawnMarks.set(p.id, marks);
@@ -395,13 +404,19 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           f = { id: a.id, g, rig, x: sp.x, y: sp.y, tx: sp.x, ty: sp.y, place: a.location, asleep: a.asleep, home: a.home ?? null, mine: a.id === mineId, name: a.name, pose: a.pose ?? (a.asleep ? "sleep" : "idle"), facing: 1, weak: !!a.weak, bench: false };
           figs.current.set(a.id, f);
         } else { f.asleep = a.asleep; f.home = a.home ?? null; f.weak = !!a.weak; f.rig.wear({ broke: !!a.broke, roof: !!a.roof, roofless: !!a.roofless }); f.pose = a.pose ?? (a.asleep ? "sleep" : "idle"); f.rig.trade(a.job); f.rig.hold(a.carrying ?? null); f.rig.age(a.age); if (a.location !== f.place) moveTo(a.id, a.location); }
+        // Fishing is placed at the actual pier, only while the server confirms the attempt.
+        if (a.activity?.kind === "fish" && a.activity.place === a.location && a.activity.until > (clockRef.current?.t ?? 0) && !a.asleep) {
+          releaseSeat(f);
+          const pier = decor.find(d => d.sprite === "pier");
+          if (pier) { const slot = [...agents.current.values()].filter(p => p.activity?.kind === "fish").findIndex(p => p.id === a.id); f.tx = pier.x - 70 + Math.max(0, slot) * 24; f.ty = pier.y + 16; f.facing = -1; }
+        }
         // someone idle where there is a bench takes it
         if (f.seat && (f.asleep || !["idle","sit","talk","eat","drink","read"].includes(f.pose))) releaseSeat(f);
-        if (!f.asleep && ["idle","sit","eat","drink"].includes(f.pose) && !f.bench) { const b = benchAt(f.place); if (b && !takenBenches.has(b.key)) { takenBenches.add(b.key); f.bench = true; f.seat=b; f.tx = b.x; f.ty = b.y; } }
+        if (!f.asleep && a.activity?.kind !== "fish" && ["idle","sit","eat","drink"].includes(f.pose) && !f.bench) { const b = benchAt(f.place); if (b && !takenBenches.has(b.key)) { takenBenches.add(b.key); f.bench = true; f.seat=b; f.tx = b.x; f.ty = b.y; } }
         return f;
       };
       const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) wear.step(f.place, place); f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
-      const refreshPlaces = async () => { try { const t = (await (await fetch(`${API}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock)) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
+      const refreshPlaces = async () => { try { const t = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock) || old.storedCount !== p.storedCount || old.looseCount !== p.looseCount) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
       // Full population snapshots are authoritative, including citizens who were moved off island.
       const syncPopulation = (list: PublicAgent[]) => {
@@ -419,8 +434,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         setPlaceInfo(info=>info?{...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))}:info);
         if (removed) setFeed(feed => [...feed]);
       };
-      poll = setInterval(() => { void fetch(`${API}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
-      ws = new WebSocket(WS);
+      poll = setInterval(() => { void fetch(`${apiUrl}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
+      ws = new WebSocket(apiUrl.replace(/^http/, "ws") + "/stream");
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data as string) as { type: string; agents?: PublicAgent[]; recent?: TownEvent[]; event?: TownEvent; clock?: Clock };
         if (msg.type === "hello") { if(msg.agents)syncPopulation(msg.agents); setFeed((msg.recent ?? []).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move").slice(-12).reverse()); if (msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; } setReady(true); }
@@ -428,6 +443,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (msg.type === "event" && msg.event) {
           const e = msg.event;
           const eventActor=agents.current.get(e.actors[0]!);
+          if (eventActor && (e.kind === "agent.fishing" || e.kind === "agent.activity")) {
+            const activity = (e.payload as {activity?: PublicAgent["activity"]} | undefined)?.activity;
+            ensure({...eventActor, activity: activity ?? null, pose: activity?.kind === "work" ? "work" : "idle"});
+          }
+          if (eventActor && e.kind === "agent.fishing-ended") {
+            const caught = (e.payload as {caught?: number} | undefined)?.caught;
+            ensure({...eventActor, activity: null, pose: "idle", ...(caught ? {carrying: "fish"} : {})});
+          }
           if(eventActor && e.kind==="agent.sleep"){eventActor.asleep=true;eventActor.pose="sleep";}
           if(eventActor && e.kind==="agent.wake"){eventActor.asleep=false;eventActor.pose="idle";}
           if(["agent.move","agent.sleep","agent.wake","agent.work"].includes(e.kind)) setPlaceInfo(info=>{
@@ -437,6 +460,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           });
           if ((e.kind === "town.gathering" || e.kind === "town.fire") && e.place) { const pl = places.get(e.place); const pay = (e.payload ?? {}) as { kind?: string; crowd?: string[]; held?: boolean; stage?: string }; if (pl && pay.held !== false) { const kind = e.kind === "town.fire" ? "fire" : (pay.kind ?? "feast"); staged.current = { kind, place: e.place, x: pl.x, y: pl.y, actors: e.actors, until: Date.now() + (kind === "fire" ? 180000 : 150000) }; const crowd = (pay.crowd ?? []).map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place); const leads = e.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place && !f.asleep); const g = gather(pl); const cxp = g.x + g.w / 2, cyp = g.y + 10; leads.forEach((f, i) => { releaseSeat(f); f.tx = cxp - 14 + i * 28; f.ty = cyp; f.facing = i === 0 ? 1 : -1; }); const others = crowd.filter((f) => !leads.includes(f)); others.forEach((f, i) => { const n = Math.max(1, others.length); const ang = Math.PI * 0.15 + (Math.PI * 0.7 * i) / n; const r = 70 + (i % 2) * 22; releaseSeat(f); f.tx = cxp + Math.cos(ang) * r * 1.6; f.ty = cyp + 30 + Math.sin(ang) * r * 0.5; }); if (kind === "wedding" || kind === "funeral") ambienceRef.current?.toll(kind === "wedding" ? 6 : 3); } }
           if (e.importance >= 0.45 && e.kind !== "agent.move" && e.kind !== "agent.reflect") { const f = e.actors[0] ? figs.current.get(e.actors[0]) : null; const p = e.place ? places.get(e.place) : null; const x = f?.x ?? p?.x, y = f?.y ?? p?.y; if (x !== undefined && y !== undefined) cinema.current = { x, y: y - 40, ids: e.actors, at: Date.now() }; }
+          if (e.kind === "agent.move" && eventActor) eventActor.activity = null;
           if (e.kind === "agent.move" && e.place) moveTo(e.actors[0]!, e.place);
           if (e.kind === "agent.sleep") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = true; f.pose = "sleep"; } }
           if (e.kind === "agent.wake") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = false; f.pose = "idle"; } }
@@ -471,8 +495,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (e.kind === "agent.fired") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "idle", until: Date.now() + 6000, mood: { anger: 0.5 } }; }
           if (e.kind === "boat.dock") { if (/docked/.test(e.text)) { boat.position.x = awayX; boatTarget = dockX; ambience.horn(); } }
           if (e.kind === "boat.depart") boatTarget = awayX;
-          if (e.kind === "agent.arrive") { void fetch(`${API}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } }); }
-          if (e.kind === "agent.build" || e.kind === "town.built" || (e.kind === "agent.work" && /mornings done/.test(e.text))) void refreshPlaces();
+          if ((e.kind.startsWith("item.") || ["agent.trade", "agent.give", "agent.take", "agent.eat"].includes(e.kind)) && e.actors[0]) void fetch(`${apiUrl}/api/agents/${e.actors[0]}`, {cache: "no-store"}).then(r => r.ok ? r.json() : null).then((a: PublicAgent | null) => { if (alive && a?.id) ensure(a); }).catch(() => {});
+          if (e.kind === "agent.arrive") { void fetch(`${apiUrl}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } }); }
+          if (e.kind.startsWith("item.") || e.kind === "town.recipe" || e.kind === "agent.trade" || e.kind === "agent.make" || e.kind === "place.decorated" || e.kind === "garden.harvest" || e.kind === "agent.build" || e.kind === "town.built" || (e.kind === "agent.work" && /mornings done/.test(e.text))) void refreshPlaces();
           if (e.importance >= 0.1 && e.kind !== "agent.move") setFeed((f) => [e, ...f].slice(0, 12));
         }
       };
@@ -557,7 +582,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         for (let i = 0; i < boats.length; i++) { const bt = boats[i]!; const breeze=harborBreeze(detailSeconds,bt.x,bt.userData,wind);bt.position.y=bt.userData+Math.sin(detailSeconds*1.35+i*2)*(quietMotion.matches?0:.7+breeze*1.2);bt.rotation=quietMotion.matches?0:Math.sin(detailSeconds*.9+i)*(.007+breeze*.018); }
         updateMoorings();
         // the mill turns while it is worked; the chapel bell swings at ten on Sunday; the washing sways in the wind
-        const millP = places.get("mill"); const millOn = !!millP && millP.crowd > 0 && (c?.hour ?? 12) >= 7 && (c?.hour ?? 12) < 15 && c?.weekday !== "Sunday";
+        const workingPlaces = new Set([...agents.current.values()].filter(a => !a.asleep && a.activity?.kind === "work" && a.activity.place === a.location && a.activity.until > (c?.t ?? 0)).map(a => a.location));
+        const millOn = workingPlaces.has("mill");
         millSpeed += ((millOn ? 0.012 : 0) - millSpeed) * 0.01; for (const sl of sails) sl.rotation += millSpeed;
         const bellOn = c?.weekday === "Sunday" && c.hour === 10 && c.minute % 60 < 3; for (const bl of bells) bl.rotation = bellOn ? Math.sin(tick / 4) * 0.5 : bl.rotation * 0.95;
         for (const cl of cloths) {const parent=cl.parent;const breeze=harborBreeze(detailSeconds,parent?.x??0,parent?.y??0,wind);cl.skew.x=quietMotion.matches?0:Math.sin(detailSeconds*2.1)*.075*breeze+Math.sin(detailSeconds*5)*.02*breeze;}
@@ -681,7 +707,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (tick % 2 === 0) { moths.clear(); if (night.alpha > 0.15) for (const d of decor) { if (d.sprite !== "lamp") continue; for (let i = 0; i < 3; i++) { const t = tick / (9 + i * 3) + i * 2; moths.circle(d.x + Math.cos(t) * (10 + i * 4) + Math.sin(t * 2.3) * 3, d.y - 58 + Math.sin(t * 1.7) * (7 + i * 2), 1.3).fill({ color: LIGHT.star, alpha: 0.8 }); } } }
         // smoke from a chimney where someone works
         perfMark("smoke");
-        if (tick % 2 === 0) { smoke.clear(); const sn = forcedSeason ?? c?.season; const cold = sn === "winter" || sn === "autumn"; const evening = hour >= 16.5 || hour < 8; litHearths.clear(); for (const [id, [ox, oy]] of [...Object.entries(CHIMNEYS).filter(([, ]) => hour >= 6 && hour <= 20), ...Object.entries(HEARTHS).filter(() => cold || evening)]) { const p = places.get(id); if (!p || p.crowd === 0) continue; if (id in HEARTHS && (cold || evening)) litHearths.add(id); for (let i = 0; i < 6; i++) { const age = ((tick / 3 + i * 17) % 60) / 60; smoke.circle(p.x + ox + Math.sin(age * 6 + i) * 6 + age * wind * 30, p.y + oy - age * 70, 4 + age * 10).fill({ color: C.shell, alpha: 0.5 * (1 - age) }); } } }
+        if (tick % 2 === 0) { smoke.clear(); const sn = forcedSeason ?? c?.season; const cold = sn === "winter" || sn === "autumn"; const evening = hour >= 16.5 || hour < 8; litHearths.clear(); for (const [id, [ox, oy]] of [...Object.entries(CHIMNEYS).filter(([id]) => workingPlaces.has(id)), ...Object.entries(HEARTHS).filter(() => cold || evening)]) { const p = places.get(id); if (!p || p.crowd === 0) continue; if (id in HEARTHS && (cold || evening)) litHearths.add(id); for (let i = 0; i < 6; i++) { const age = ((tick / 3 + i * 17) % 60) / 60; smoke.circle(p.x + ox + Math.sin(age * 6 + i) * 6 + age * wind * 30, p.y + oy - age * 70, 4 + age * 10).fill({ color: C.shell, alpha: 0.5 * (1 - age) }); } } }
         // sound follows the camera
         if (tick % 30 === 0 && c) { const f = cam.follow ? figs.current.get(cam.follow) : null; const p = places.get(f?.place ?? "market"); ambience.tick({ mood: stagedNow ? (stagedNow.kind === "wedding" || stagedNow.kind === "feast" ? "tavern" : stagedNow.kind === "funeral" ? "night" : stagedNow.kind === "fire" ? "storm" : "day") : null, weather, hour: c.hour, season: c.season, district: p?.district ?? "old town", place: p?.id ?? "market", crowd: p?.crowd ?? 0, hearth: !!p && litHearths.has(p.id), walking: !!f && !f.asleep && Math.hypot(f.tx - f.x, f.ty - f.y) > 1.5, wind }); }
         // people
@@ -722,9 +748,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           }
           if (f.moment && (Date.now() > f.moment.until || moving || f.asleep)) f.moment = undefined;
           const moment = f.moment;
+          const actual = agents.current.get(f.id);
+          const activity = actual?.activity && actual.activity.place === f.place && actual.activity.until > (c?.t ?? 0) && !f.asleep ? actual.activity : null;
+          const fishing = activity?.kind === "fish";
+          f.rig.trade(fishing ? "angling" : actual?.gear?.name === "hammer" ? "smith" : actual?.gear?.name === "axe" ? "axe" : actual?.job ?? null);
+          f.rig.hold(fishing ? null : actual?.gear?.name ?? actual?.carrying ?? null);
           f.rig.seatAt(!moving && f.seat ? f.seat.height / .82 : null);
           if (!moving && f.seat) { f.facing=f.seat.facing; f.rig.face(f.facing, true); }
-          f.rig.setPose(f.asleep ? "sleep" : running ? "run" : moving ? "walk" : petting ? "crouch" : moment && moment.pose !== "idle" ? moment.pose : b ? "talk" : f.bench ? "sit" : f.pose === "sit" ? "idle" : f.pose);
+          f.rig.setPose(f.asleep ? "sleep" : running ? "run" : moving ? "walk" : fishing ? "work" : petting ? "crouch" : moment && moment.pose !== "idle" ? moment.pose : b ? "talk" : f.bench ? "sit" : f.pose === "sit" || (f.pose === "work" && !activity) ? "idle" : f.pose);
           // the face: hunger shows, a wedding or a feast lifts it, a funeral lowers it; the eyes go to whoever they are talking to
           const inStage = !!stagedNow && f.place === stagedNow.place; const ag = agents.current.get(f.id);
           f.rig.mood({ hunger: Math.min(1, (ag?.daysHungry ?? 0) / 3), joy: inStage && (stagedNow.kind === "wedding" || stagedNow.kind === "feast") ? 0.8 : (moment?.mood?.joy ?? 0), grief: inStage && stagedNow.kind === "funeral" ? 0.8 : 0, anger: moment?.mood?.anger ?? 0, surprise: moment?.mood?.surprise ?? 0, tired: f.weak ? 0.6 : 0 });
@@ -737,7 +768,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const subjectX = viewRef.current === "cinema" ? (cinema.current?.x ?? fx) : fx, subjectY = viewRef.current === "cinema" ? (cinema.current?.y ?? fy) : fy;
           const near = viewRef.current !== "map" && Math.hypot(f.x - subjectX, f.y - subjectY) < (viewRef.current === "cinema" ? 170 : 260);
           const inScene = viewRef.current === "cinema" && !!cinema.current?.ids.includes(f.id) && Date.now() - (cinema.current?.at ?? 0) < 120000;
-          next.push({ id: f.id, name: f.name, x: f.x * cam.zoom + cam.x, y: (f.y - 66) * cam.zoom + cam.y, mine: f.mine, shown: f.mine || !!b || hoverRef.current === f.id || inScene || (near && viewRef.current === "street"), ...(b ? { bubble: b.text } : {}) });
+          next.push({ id: f.id, name: f.name, activity: activity ? fishing ? moving ? "Walking to the pier" : "Fishing · line in the water" : "At work" : undefined, x: f.x * cam.zoom + cam.x, y: (f.y - 66) * cam.zoom + cam.y, mine: f.mine, shown: f.mine || !!b || hoverRef.current === f.id || inScene || (near && viewRef.current === "street"), ...(b ? { bubble: b.text } : {}) });
         }
         // names stack upward when people stand shoulder to shoulder, so none is written over another
         perfMark("labels");
@@ -751,7 +782,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
     })().catch(() => { if(alive) setLoadError(true); });
     return () => { alive = false; cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mineId]);
+  }, [mineId, apiUrl]);
 
   useEffect(() => { onSnapshot?.({ clock, feed, citizens: [...agents.current.values()], ready, error: loadError }); }, [clock, feed, ready, loadError, onSnapshot]);
 
@@ -776,7 +807,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           <div key={l.id} className="absolute flex flex-col items-center gap-1 -translate-x-1/2 -translate-y-full" style={{ left: l.x, top: l.y }}>
             {l.bubble && <div className="bg-glass px-3 py-2 italic text-[13px] max-w-[260px] leading-[1.3] pointer-events-auto shadow-none" style={{ borderRadius: "16px 16px 16px 4px" }}>“{l.bubble}”</div>}
             {/* a name tag: ink on the drawn ground whatever the theme, since the street is always sand; yours in the signal colour */}
-            <div className="crossfade display text-[12px] font-semibold leading-none whitespace-nowrap rounded-[6px] px-1.5 py-[3px]" style={{ opacity: l.shown ? 1 : 0, background: l.mine ? "#E4572E" : "rgba(20,22,26,0.82)", color: "#F7F6F3", letterSpacing: "0.01em" }}>{l.name.split(" ")[0]}{l.mine ? " · you" : ""}</div>
+            <div className="crossfade display text-[12px] font-semibold leading-none whitespace-nowrap rounded-[6px] px-1.5 py-[3px]" style={{ opacity: l.shown ? 1 : 0, background: l.mine ? "#E4572E" : "rgba(20,22,26,0.82)", color: "#F7F6F3", letterSpacing: "0.01em" }}>{l.name.split(" ")[0]}{l.mine ? " · you" : ""}{l.activity && <span className="block text-[10px] font-normal mt-1 opacity-80">{l.activity}</span>}</div>
           </div>
         ))}
       </div>

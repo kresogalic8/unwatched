@@ -1,4 +1,5 @@
 import { skillId } from "./skills.ts";
+import { capacity, equipped, itemVerdict, recipe } from "./items.ts";
 import { teachable } from "./learning.ts";
 import { gardenReady } from "./community.ts";
 import type { Action } from "@unwatched/protocol";
@@ -28,7 +29,19 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
   const here = v.places.get(a.location);
   if (!here) return { ok: false, reason: "nowhere" };
   if (a.asleep && action.kind !== "sleep" && action.kind !== "wait") return { ok: false, reason: "asleep" };
+  if ((action.kind === "take" || action.kind === "write" || action.kind === "trade" && action.buy && !action.sell) && a.inventory.length >= capacity(a)) return {ok:false, reason:"your backpack is full; store, give or drop something first"};
   switch (action.kind) {
+    case "craft": case "equip": case "stow": case "retrieve": case "drop": case "pickup": case "repair_tool": {
+      const reason = itemVerdict(a, action, here, v.places);
+      return reason ? {ok:false, reason} : {ok:true};
+    }
+    case "fish": {
+      if (here.kind !== "harbor") return { ok: false, reason: "fish from the harbor pier" };
+      if (v.weather === "storm" || a.starving >= 2) return { ok: false, reason: "too stormy or weak to fish safely" };
+      if (a.lastFishingDay === v.day || a.activity?.kind === "fish") return { ok: false, reason: "one fishing attempt per day" };
+      if (a.inventory.length >= capacity(a)) return { ok: false, reason: "make room for a catch first" };
+      return { ok: true };
+    }
     case "found_institution": return here.owner===a.id&&!here.institution&&!a.asleep ? {ok:true}:{ok:false,reason:"found an institution at your own place, which must not already have one"};
     case "join_institution": return here.institution&&!here.institution.members.includes(a.id)&&here.institution.members.length<100?{ok:true}:{ok:false,reason:"no institution to join here, already a member, or full"};
     case "leave_institution": return here.institution?.members.includes(a.id)?{ok:true}:{ok:false,reason:"not a member here"};
@@ -40,7 +53,7 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if(a.coins < cost || (action.what === "bench" && a.inventory.filter(i=>i==="planks").length<2)) return {ok:false,reason:"flowers need 2 coins; a bench needs 3 coins and two carried planks; a cairn uses loose local stones"};
       return {ok:true};
     }
-    case "repair": return here.brokenUntil && here.brokenUntil>(v.day??0) && a.inventory.filter(i=>i==="planks").length>=2 ? {ok:true} : {ok:false,reason:"stand at a damaged building with two planks to reduce its repair time by one day"};
+    case "repair": return here.brokenUntil && here.brokenUntil>(v.day??0) && a.inventory.filter(i=>i==="planks").length>=(equipped(a)?.name === "hammer" ? 1 : 2) ? {ok:true} : {ok:false,reason:"stand at a damaged building with two planks, or one plank and an equipped usable hammer"};
     case "propose_skill": {
       if(v.learning===false)return {ok:false,reason:"learning is disabled"};
       if((a.skills?.length??0)>=12)return {ok:false,reason:"the procedure library is full"};
@@ -108,6 +121,7 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
     }
     case "give": {
       const other = v.agents.get(action.to);
+      if (action.item && other && other.inventory.length >= capacity(other)) return {ok:false,reason:"their backpack is full"};
       if (!other || other.location !== a.location) return { ok: false, reason: "not here" };
       if (action.coins !== undefined && action.coins > a.coins) return { ok: false, reason: "not enough coins" };
       if (action.item !== undefined && !a.inventory.includes(action.item)) return { ok: false, reason: "does not have it" };
@@ -161,6 +175,7 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       const w = action.with ?? a.location; const coins = action.coins ?? 0;
       if (v.agents.has(w)) {
         const other = v.agents.get(w)!;
+        if (action.sell && !action.buy && other.inventory.length >= capacity(other)) return {ok:false,reason:"their backpack is full"};
         if (other.location !== a.location) return { ok: false, reason: "not here" };
         if (action.buy && !other.inventory.includes(action.buy)) return { ok: false, reason: "they do not have it" };
         if (action.sell && !a.inventory.includes(action.sell)) return { ok: false, reason: "does not have it" };
@@ -196,6 +211,8 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
     case "write": return { ok: true };
     case "stock": { if (here.owner !== a.id) return { ok: false, reason: "not your place to stock" }; const item = action.item.toLowerCase().trim(); if (!item) return { ok: false, reason: "name the thing" }; if (action.price > 0 && !(v.knownItem?.(item) ?? true) && !a.inventory.includes(item) && !(here.stock[item] !== undefined)) return { ok: false, reason: `the island has no ${item} to sell` }; return { ok: true }; }
     case "make": {
+      const physical = recipe(action.item.toLowerCase().replace(/[^a-z ]/g, "").trim());
+      if (physical && [...physical.from].sort().join("|") !== action.from.map(i => i.toLowerCase().trim()).sort().join("|")) return {ok:false,reason:`${physical.item} requires ${physical.from.join(", ")}`};
       if (here.kind !== "workplace" && here.kind !== "shop") return { ok: false, reason: "things are made at a workplace or a shop" };
       const job = a.job ? v.jobs.get(a.job) : undefined; if (here.owner !== a.id && job?.place !== here.id) return { ok: false, reason: "you neither own nor work here" };
       if (here.brokenUntil && here.brokenUntil > (v.day ?? 0)) return { ok: false, reason: `${here.name} is not standing` };

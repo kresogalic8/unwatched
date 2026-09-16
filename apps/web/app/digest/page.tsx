@@ -1,5 +1,6 @@
 "use client";
 import { Desires } from "@/components/digest/Desires";
+import { AnotherYou } from "@/components/digest/AnotherYou";
 import { Icon as ArrowIcon } from "@/components/icons";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -355,8 +356,8 @@ export default function DigestPage() {
             )}
           </Card>
           <Desires desires={agent.desires ?? []} name={first ?? agent.name} />
+          <AnotherYou agent={agent} />
           {agent.watch?.length ||
-          agent.selves?.length ||
           agent.projects?.length ||
           agent.beliefs?.length ? (
             <Card>
@@ -386,32 +387,6 @@ export default function DigestPage() {
                     )
                     .join("; ")}
                 </div>
-              ) : null}
-              {agent.selves?.length ? (
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-ink2">
-                    {agent.selves.length === 1
-                      ? "Rewrote themself once"
-                      : `Rewrote themself ${agent.selves.length} times`}
-                    ; now wants {String(agent.persona.want ?? "")}
-                  </summary>
-                  {agent.selves
-                    .slice()
-                    .reverse()
-                    .map((sv) => (
-                      <div
-                        key={sv.day}
-                        className="mt-2 pl-3 border-l border-line"
-                      >
-                        <div className="text-xs text-drift">
-                          until day {sv.day}
-                        </div>
-                        <div>
-                          wanted {sv.want} · feared {sv.fear}
-                        </div>
-                      </div>
-                    ))}
-                </details>
               ) : null}
             </Card>
           ) : null}
