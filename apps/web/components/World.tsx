@@ -235,6 +235,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // ordinary houses come from a handful of drawings; a faint per-building shade keeps a row from reading as identical. Landmarks (council, mill, chapel, lighthouse) stay canonical.
       const BUILDING = /^(house|cottage|shop|inn|tavern|bakery|chandlery|harbor-office|smithy|fishhouse|boatshed)$/;
       const BLD_TINTS = [0xffffff, 0xf7f3ea, 0xf2f2ee, 0xfbf5ec, 0xeef0ee, 0xf9f4e6];
+      // roughly where the roof of each building sits above its foot, shared by the golden-hour roof light and the foundation moss
+      const ROOF_Y: Record<string, number> = { house: -150, cottage: -120, shop: -150, inn: -195, tavern: -150, bakery: -155, chandlery: -155, "harbor-office": -140, smithy: -130, fishhouse: -115, boatshed: -115, council: -195, mill: -165, chapel: -165, lighthouse: -225 };
       const mulTint = (a: number, f: number) => (Math.round(((a >> 16) & 255) * ((f >> 16) & 255) / 255) << 16) | (Math.round(((a >> 8) & 255) * ((f >> 8) & 255) / 255) << 8) | Math.round((a & 255) * (f & 255) / 255);
       const put = (name: string, x: number, y: number, w?: number, flip = false) => {
         const d = drawThing(name); if (!d) return null;
@@ -291,6 +293,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           void lookSvg(p.sprite.slice(5)).then((svg) => { if (!svg || g.destroyed) return; const d = new Graphics(); try { d.svg(svg); } catch { return; } const b = d.getLocalBounds(); if (b.width < 1) return; const target = p.kind === "shop" ? 120 : 104; const sc = target / b.width; d.scale.set(sc); d.position.set(-(b.x + b.width / 2) * sc, -(b.y + b.height) * sc); d.zIndex = 0; stand?.destroy(); g.addChild(d); });
         } else {
           local(p.sprite);
+          // #3: moss and lichen creep up the foot of a building, a little on every one and more on some, so the stone reads as lived-in and aged
+          if (ROOF_Y[p.sprite] !== undefined) { const moss = new Graphics(); const n = 8 + Math.floor(vhash(p.x, p.y, 7) * 11); for (let i = 0; i < n; i++) { const mx = -54 + vhash(p.x + i, p.y, 8) * 108, mz = vhash(p.x, p.y + i, 9) * 30; moss.ellipse(mx, -mz, 3.5 + vhash(i, p.y, 10) * 5, 2.2 + vhash(i, p.x, 11) * 3).fill({ color: i % 3 ? 0x6f8158 : 0x8a9470, alpha: 0.2 + vhash(i, i + 3, 12) * 0.16 }); } moss.zIndex = 0.3; g.addChild(moss); }
           if (p.stock) { const st = drawStock(p.sprite, p.stock); if (st) { st.zIndex = 1; g.addChild(st); } }
           // the shelf is bare: a board leans by the door until the cart or the work fills it again
           if (p.stock && (p.kind === "shop" || p.kind === "workplace" || p.kind === "market") && Object.values(p.stock).every((v) => v <= 0)) { const sg = drawSign("nothing left"); sg.position.set(-58, -10); sg.zIndex = 2; g.addChild(sg); const st = new Text({ text: "Sold out", style: { ...smallStyle, fontSize: 7, stroke: { color: 0xeee3cc, width: 0 } } }); st.anchor.set(0.5, 0.5); st.position.set(-58, -33); st.zIndex = 3; g.addChild(st); }
@@ -340,7 +344,6 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const gulls = new Graphics(); gulls.zIndex = 180000; scene.addChild(gulls);
       const rays = new Graphics(); rays.zIndex = 148000; rays.blendMode = "add"; scene.addChild(rays); // soft light shafts through the pinewood at dawn and dusk; additive, so they glow where they cross shade and vanish over the brightest sand
       const roofGlow = new Graphics(); roofGlow.zIndex = 155000; roofGlow.blendMode = "add"; scene.addChild(roofGlow); // the low sun catching the upper walls and roofs on the side it stands
-      const ROOF_Y: Record<string, number> = { house: -150, cottage: -120, shop: -150, inn: -195, tavern: -150, bakery: -155, chandlery: -155, "harbor-office": -140, smithy: -130, fishhouse: -115, boatshed: -115, council: -195, mill: -165, chapel: -165, lighthouse: -225 };
       const CHIMNEYS: Record<string, [number, number]> = { smithy: [44, -150], bakery: [30, -180], inn: [60, -210], mill: [0, -220], tavern: [40, -150], fishhouse: [30, -120] };
       const litHearths = new Set<string>();
       const HEARTHS: Record<string, [number, number]> = { inn: [60, -210], tavern: [40, -150], chandlery: [30, -150], boatshed: [20, -120], council: [50, -190] }; // where a fire is kept for the people inside, not the work
