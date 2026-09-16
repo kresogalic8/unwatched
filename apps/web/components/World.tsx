@@ -833,7 +833,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         for (const f of figs.current.values()) {
           const dx = f.tx - f.x, dy = f.ty - f.y, dist = Math.hypot(dx, dy);
           const fleeing = stagedNow?.kind === "fire" && f.place !== stagedNow.place;
-          const motion = advanceWalk(dist, f.speed ?? 0, fleeing ? 78 : f.weak ? 28 : 48, app.ticker.deltaMS / 1000);
+          // #5: people slow behind someone ahead of them rather than walking through a crowd
+          let crowd = 1;
+          if (dist > 8 && !fleeing) { const ix = dx / dist, iy = dy / dist; for (const o of figs.current.values()) { if (o === f || o.asleep || o.boarding) continue; const ox = o.x - f.x, oy = o.y - f.y; const ahead = ox * ix + oy * iy; if (ahead > 6 && ahead < 44 && Math.abs(-ox * iy + oy * ix) < 18) crowd = Math.min(crowd, Math.max(0.3, ahead / 44)); } }
+          const motion = advanceWalk(dist, f.speed ?? 0, (fleeing ? 78 : f.weak ? 28 : 48) * crowd, app.ticker.deltaMS / 1000);
           f.speed = motion.speed;
           const moving = dist > .01;
           if (motion.distance > 0) { f.x += dx / dist * motion.distance; f.y += dy / dist * motion.distance; }

@@ -383,6 +383,21 @@ export class Citizen extends Container {
     this.stoop = years >= 62 ? Math.min(0.22, (years - 60) * 0.012) : 0; this.wrapUp();
   }
   private stoop = 0;
+  private lastSpeed = 0; private leanNow = 0;
+  /** How this particular person walks: their build, their years and a little of themselves set the stride, the cadence, the roll and the bounce. */
+  private gaitStyle(): { speed: number; amp: number; sway: number; lift: number } {
+    let speed = 1.05, amp = 0.3, sway = 1, lift = 1;
+    if (this.look.build === "Tall") { speed = 0.92; amp = 0.37; sway = 0.82; lift = 0.9; }        // long, calm strides
+    else if (this.look.build === "Sturdy") { speed = 1.0; amp = 0.29; sway = 1.25; lift = 1.3; }  // a wider roll
+    else if (this.look.build === "Slight") { speed = 1.2; amp = 0.26; sway = 1.08; lift = 0.88; } // quick and light
+    if (this.years < 16) { speed *= 1.14; amp *= 0.88; lift *= 1.4; }                             // a child's bounce
+    else if (this.years >= 65) { speed *= 0.82; amp *= 0.7; sway *= 0.68; lift *= 0.66; }         // an elder's shuffle
+    const j = this.phase % 1, j2 = (this.phase * 1.7) % 1;                                        // a little of themselves, so two of a kind still differ
+    speed *= 0.94 + j * 0.12; amp *= 0.9 + j2 * 0.18;
+    const drag = Math.max(this.moodState.tired, this.moodState.hunger * 0.7);                     // tired or hungry, the step drags
+    speed *= 1 - drag * 0.24; amp *= 1 - drag * 0.2; lift *= 1 - drag * 0.3;
+    return { speed, amp, sway, lift };
+  }
   /** What the day is doing to their face. */
   mood(m: { hunger?: number; joy?: number; grief?: number; anger?: number; surprise?: number; tired?: number }): void { const next = { hunger: m.hunger ?? 0, joy: m.joy ?? 0, grief: m.grief ?? 0, anger: m.anger ?? 0, surprise: m.surprise ?? 0, tired: m.tired ?? 0 }; const keys = Object.keys(next) as (keyof typeof next)[]; if (keys.every((k) => Math.abs(next[k] - this.moodState[k]) < 0.05)) return; this.moodState = next; this.drawFace(); }
   /** What has come of them, on the body: patches when broke, a waistcoat once they hold a roof of their own. */
@@ -444,6 +459,11 @@ export class Citizen extends Container {
   update(t: number): void {
     const dt = this.lastUpdate === null ? 0 : Math.max(0, Math.min(0.1, t - this.lastUpdate));
     this.lastUpdate = t;
+    // #2: weight in the step. The body leans into a quickening pace and settles back as it slows, from the change in real speed.
+    const curSpeed = dt > 0 && this.travelDistance !== null ? this.travelDistance / dt : this.lastSpeed;
+    const leanTarget = Math.max(-0.13, Math.min(0.15, (dt > 0 ? (curSpeed - this.lastSpeed) / dt : 0) * 0.00035));
+    this.lastSpeed = curSpeed;
+    this.leanNow += (leanTarget - this.leanNow) * (1 - Math.exp(-9 * Math.max(dt, 0.001)));
     let turning = 0;
     if (this.turn) {
       this.turn.elapsed += dt;
@@ -462,13 +482,13 @@ export class Citizen extends Container {
 
     const k0 = this.years < 16 ? 0.62 + (this.years / 16) * 0.3 : this.years >= 70 ? 0.94 : 1; this.body.scale.set(this.facingMode === "left" ? -k0 : k0, k0); this.body.rotation = 0; this.body.position.set(0, 0); this.body.alpha = 1; this.torso.scale.y = this.torsoH / 18;
     let legL = 0, legR = 0, shinL = 0, shinR = 0, armL = 0, armR = 0, foreL = 0.15, foreR = 0.15, bob = 0, headTilt = 0;
-    const gait = (speed: number, amp: number) => { const stride = 4 * this.legH * Math.sin(amp) * k0;
+    const gait = (speed: number, amp: number, sway = 1, lift = 1) => { const stride = 4 * this.legH * Math.sin(amp) * k0;
       if (this.travelDistance !== null) this.gaitPhase = (this.gaitPhase + this.travelDistance / stride * Math.PI * 2) % (Math.PI * 2);
       const phase = this.travelDistance === null ? k * speed : this.gaitPhase;
-      const s = Math.sin(phase), c = Math.cos(phase); legL = s * amp; legR = -s * amp; shinL = Math.max(0, -c) * amp * 0.7; shinR = Math.max(0, c) * amp * 0.7; armL = 0.4 - s * amp * 0.2; armR = -0.33 + s * amp * 0.2; foreL = 0.15 + Math.max(0, -s) * 0.12; foreR = -0.95 - Math.max(0, s) * 0.12; bob = Math.abs(c) * -amp * 4; };
+      const s = Math.sin(phase), c = Math.cos(phase); legL = s * amp; legR = -s * amp; shinL = Math.max(0, -c) * amp * 0.7; shinR = Math.max(0, c) * amp * 0.7; armL = 0.4 - s * amp * 0.2 * sway; armR = -0.33 + s * amp * 0.2 * sway; foreL = 0.15 + Math.max(0, -s) * 0.12; foreR = -0.95 - Math.max(0, s) * 0.12; bob = Math.abs(c) * -amp * 4 * lift; };
     switch (this.pose) {
-      case "walk": gait(1.05, 0.30); break;
-      case "run": gait(1.9, 0.75); this.body.rotation = 0.12 * this.facing; bob *= 1.4; break;
+      case "walk": { const g = this.gaitStyle(); gait(g.speed, g.amp, g.sway, g.lift); break; }
+      case "run": { const g = this.gaitStyle(); gait(1.9 * Math.min(1.1, g.speed), 0.75 * (0.85 + g.amp), g.sway); this.body.rotation = 0.12 * this.facing; bob *= 1.4; break; }
       case "idle": {
         // small life between actions: a sway, and every few seconds a fidget: a shift of weight, a look around, a scratch of the head, a stretch
         bob = Math.sin(k * 0.35) * 0.25; armL = 0.35; armR = -0.3; foreR = -0.95;
@@ -546,6 +566,12 @@ export class Citizen extends Container {
     // hunger shows in the whole body: a slump, a hanging head
     if (this.moodState.hunger > 0.4 && this.pose !== "sleep") { const w = (this.moodState.hunger - 0.4) / 0.6; this.body.rotation += 0.1 * w * this.facing; headTilt += 0.18 * w; if (this.pose === "walk") bob *= 0.5; }
     if(this.look.carrying==="Basket" && (this.pose==="walk"||this.pose==="idle")){armL=.32;foreL=-.12;}
+    // #2: the acceleration lean, on the move
+    if (this.pose === "walk" || this.pose === "run") this.body.rotation += this.leanNow * this.facing;
+    // #3: bank into a turn taken at pace — lean toward the side being turned to
+    if (turning > 0.01 && this.turn && (this.pose === "walk" || this.pose === "run")) { const sign = this.turn.target === "left" ? -1 : this.turn.target === "right" ? 1 : 0; this.body.rotation += turning * 0.07 * sign; }
+    // #4: a heavy load in the hands makes a braced, labored walk — the body counters back, the head drops, the free arm steadies, the bounce goes out of it
+    if ((this.pose === "walk" || this.pose === "idle") && /plank|timber|wood|stone|flour|grain|sack|barrel|crate/.test(this.heldItem ?? "")) { this.body.rotation -= 0.08 * this.facing; headTilt += 0.07; armL = Math.min(armL, -0.15); bob *= 0.55; }
     this.legL.rotation = legL; this.legR.rotation = legR; this.shinL.rotation = shinL; this.shinR.rotation = shinR;
     this.armL.rotation = armL; this.armR.rotation = armR; this.foreL.rotation = foreL; this.foreR.rotation = foreR;
     if (this.glanceTilt) { headTilt += this.glanceTilt; this.glanceTilt *= Math.exp(-.97 * dt); if (Math.abs(this.glanceTilt) < 0.004) this.glanceTilt = 0; }
