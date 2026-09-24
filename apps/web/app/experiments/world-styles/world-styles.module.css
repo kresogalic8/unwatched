@@ -1,0 +1,75 @@
+.page {
+  --ui-bg: rgba(20, 22, 26, 0.82);
+  --ui-fg: #f7f6f3;
+  --ui-muted: rgba(247, 246, 243, 0.68);
+  --ui-line: rgba(247, 246, 243, 0.16);
+  --ui-on: #f7f6f3;
+  --ui-on-fg: #14161a;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #8fbfc0;
+  color: var(--ui-fg);
+  font-size: 14px;
+}
+.canvas { position: absolute; inset: 0; cursor: grab; }
+.canvas:active { cursor: grabbing; }
+.status {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center;
+  color: #1e5a63; font-weight: 700;
+}
+
+.top {
+  position: absolute; top: 16px; left: 16px; right: 16px;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  pointer-events: none;
+}
+.top > * { pointer-events: auto; }
+.back {
+  background: var(--ui-bg); color: var(--ui-fg); text-decoration: none;
+  padding: 9px 14px; border-radius: 999px; font-weight: 600;
+}
+.switch {
+  display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--ui-bg);
+  max-width: 100%; overflow-x: auto;
+}
+.switch button {
+  border: 0; background: transparent; color: var(--ui-muted); font: inherit; font-weight: 600;
+  padding: 8px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+.switch button:hover { color: var(--ui-fg); }
+.switch button.on { background: var(--ui-on); color: var(--ui-on-fg); }
+.switch button:focus-visible, .presets button:focus-visible, .back:focus-visible { outline: 2px solid var(--ui-fg); outline-offset: 2px; }
+
+.lens {
+  position: absolute; inset: 0; pointer-events: none;
+  /* the photograph of a model: the edges of the frame fall off, the way a macro lens darkens its corners */
+  background: radial-gradient(ellipse 75% 70% at 50% 54%, rgba(20, 14, 10, 0) 55%, rgba(20, 14, 10, 0.42) 100%);
+}
+
+.panel {
+  position: absolute; left: 16px; right: 16px; bottom: 16px;
+  max-width: 720px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--ui-bg); border-radius: 18px; padding: 14px 16px;
+}
+.note { margin: 0; line-height: 1.45; color: var(--ui-muted); }
+.note strong { color: var(--ui-fg); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.hour { display: flex; flex-direction: column; gap: 4px; flex: 1 1 220px; }
+.hour span { color: var(--ui-muted); }
+.hour b { color: var(--ui-fg); font-variant-numeric: tabular-nums; }
+.hour input { width: 100%; accent-color: var(--ui-fg); }
+.check, .select { display: flex; gap: 6px; align-items: center; color: var(--ui-muted); }
+.select select { font: inherit; background: transparent; color: var(--ui-fg); border: 1px solid var(--ui-line); border-radius: 8px; padding: 4px 6px; }
+.select option { color: #14161a; }
+.presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.presets button {
+  font: inherit; font-size: 13px; background: transparent; color: var(--ui-fg);
+  border: 1px solid var(--ui-line); border-radius: 999px; padding: 5px 11px; cursor: pointer;
+}
+.presets button:disabled, .hour input:disabled, .select select:disabled { opacity: 0.45; cursor: default; }
+
+@media (max-width: 640px) {
+  .note { font-size: 13px; }
+}
