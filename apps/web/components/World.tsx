@@ -324,6 +324,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       for (let i = 5; i >= 0; i--) plinthShadow.poly(rim.flatMap(([x, y]) => { const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1; return [x + 12 + (dx / d) * i * 14, y + PLINTH + 50 + (dy / d) * i * 9]; })).fill({ color: 0x1b140f, alpha: i ? 0.07 : 0.2 });
       const onTable = new Container(); onTable.addChild(table, plinthShadow); onTable.mask = tableCut; // the table and the plinth's shadow on it, only past the rim
       const model = new Container(); model.addChild(onTable, tableCut, plinth); model.visible = false; world.addChild(model);
+      // in the miniature nothing sails or swims past the resin: the scene and the life along the coast are cut to the bay's rim
+      const bayCut = new Graphics().poly(rim.flat()).fill(0xffffff), bayCut2 = new Graphics().poly(rim.flat()).fill(0xffffff); bayCut.visible = bayCut2.visible = false; world.addChild(bayCut, bayCut2);
       const scene = new Container(); scene.sortableChildren = true; world.addChild(scene);
       // place names ride above everything on the ground, so the cat by the door or a barrel in front never hides one; weather stays over them
       const names = new Container(); names.zIndex = 150000; scene.addChild(names); const nameOf = new Map<string, Text>();
@@ -896,7 +898,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         frameMs += (app.ticker.deltaMS - frameMs) * 0.03;
         if (every(120) && !nofx.has("governor")) { if (frameMs > 24 && lite < 2) { lite = (lite + 1) as 0 | 1 | 2; post.setLite(lite); calmSince = tick; } else if (frameMs < 15 && lite > 0 && tick - calmSince > 900) { lite = (lite - 1) as 0 | 1 | 2; post.setLite(lite); calmSince = tick; } else if (frameMs >= 15) calmSince = tick; }
         const mini = miniRef.current;
-        if (model.visible !== mini) { model.visible = mini; horizon.visible = celestial.visible = !mini; app.renderer.background.color = mini ? TABLE : C.water; }
+        if (model.visible !== mini) { model.visible = mini; horizon.visible = celestial.visible = !mini; app.renderer.background.color = mini ? TABLE : C.water; scene.mask = mini ? bayCut : null; coastalLife.root.mask = mini ? bayCut2 : null; bayCut.visible = bayCut2.visible = mini; }
         sky.visible = !mini; // no stars or moon over a table
         post.update(viewRef.current, night.alpha / 0.42, effectsOn && !nofx.has("post"), tick, nofx.has("grade") ? NEUTRAL : gradeNow, mini);
         if (nofx.size) { ground.visible = !nofx.has("ground"); scene.visible = !nofx.has("scene"); lighting.dark.visible = !nofx.has("dark"); lighting.glow.visible = !nofx.has("glow"); clouds.puffs.visible = clouds.shadows.visible = !nofx.has("clouds"); weatherFx.rain.visible = weatherFx.snow.visible = weatherFx.fog.visible = !nofx.has("weather"); if (nofx.has("sky")) sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; }
