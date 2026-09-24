@@ -10,8 +10,9 @@ import {
   LinkButton,
 } from "@/components/explore/ExplorePage";
 import { SessionLink } from "@/components/auth/SessionLink";
-import { Wordmark, Bubble, Tide } from "@/components/ui";
-import { api, hhmm, type PublicAgent, type OwnerAgent } from "@/lib/api";
+import { Bubble, Tide } from "@/components/ui";
+import { api, hhmm, PRIVATE_KINDS, type PublicAgent, type OwnerAgent, type TownEvent } from "@/lib/api";
+import { Portrait } from "@/components/Portrait";
 import { useMyAgent } from "@/lib/useAgent";
 import type { WorldSnapshot } from "@/components/World";
 import theme from "@/components/explore/explore.module.css";
@@ -37,7 +38,11 @@ export default function Town() {
   const [tracking, setTracking] = useState<string | null>(null);
   const [effects, setEffects] = useState(true);
   const [nudge, setNudge] = useState(false);
-  const [tab, setTab] = useState<"activity" | "people">("activity");
+  const [tab, setTab] = useState<"activity" | "people" | "places">("activity");
+  const [miniature, setMiniature] = useState(false);
+  const [hint, setHint] = useState(false);
+  const [sheet, setSheet] = useState<"peek" | "open">("peek");
+  const [selDay, setSelDay] = useState<TownEvent[]>([]);
   const [snapshot, setSnapshot] = useState<WorldSnapshot>({
     clock: null,
     feed: [],
@@ -60,6 +65,11 @@ export default function Town() {
     const v = q.get("view");
     if (v === "map" || v === "cinema") setView(v);
     if (q.get("fx") === "0") setEffects(false);
+    let saved: string | null = null, seen: string | null = null;
+    try { saved = localStorage.getItem("uw.look"); seen = localStorage.getItem("uw.townHint"); } catch {}
+    const look = q.get("look"); setMiniature(look ? look === "miniature" : saved === "miniature");
+    setHint(seen !== "1");
+    setJournalOpen(true); // a panel on a wide screen, a sheet peeking from the bottom on a phone
     try {
       setNudge(sessionStorage.getItem("ft.nudge") !== "1");
     } catch {
@@ -82,6 +92,13 @@ export default function Town() {
       alive = false;
     };
   }, [sel?.id, snapshot.feed.find(e => e.actors.includes(sel?.id ?? ""))?.id]);
+  // their day: what the record says they did since the island's morning, newest first; walking about is left out
+  const dayStart = snapshot.clock ? snapshot.clock.t - (snapshot.clock.hour * 60 + (snapshot.clock.minute % 60)) : null;
+  useEffect(() => {
+    let alive = true; setSelDay([]);
+    if (sel && dayStart !== null) void api<TownEvent[]>(`/api/agents/${sel.id}/events?since=${dayStart}`).then((evs) => { if (alive) setSelDay(evs.filter((e) => e.kind !== "agent.move" && e.text).reverse()); }).catch(() => {});
+    return () => { alive = false; };
+  }, [sel?.id, dayStart, snapshot.feed[0]?.id]);
   useEffect(() => {
     if (sel) heading.current?.focus();
   }, [sel?.id]);
@@ -121,318 +138,272 @@ export default function Town() {
   }
   useEffect(() => {setSel(current => current ? snapshot.citizens.find(p=>p.id===current.id) ?? current : null);}, [snapshot.citizens]);
   const rel = agent?.people.find((p) => p.id === sel?.id);
+  function toggleMiniature() { setMiniature((m) => { try { localStorage.setItem("uw.look", m ? "town" : "miniature"); } catch {} return !m; }); }
+  function dismissHint() { setHint(false); try { localStorage.setItem("uw.townHint", "1"); } catch {} }
+  function open(person: PublicAgent) { setSel(person); setJournalOpen(true); setSheet("open"); }
+  const feed = snapshot.feed.filter((e) => !PRIVATE_KINDS.has(e.kind) && e.text);
+  const byId = new Map(snapshot.citizens.map((p) => [p.id, p]));
+  const placeName = (id?: string) => (id ? snapshot.citizens.find((p) => p.location === id)?.place ?? id.replace(/[-_]/g, " ") : null);
+  const first = (name: string) => name.split(" ")[0];
+  const places = [...snapshot.citizens.reduce((m, p) => { const k = p.location; const e = m.get(k) ?? { id: k, name: p.place, people: [] as PublicAgent[] }; e.people.push(p); m.set(k, e); return m; }, new Map<string, { id: string; name: string; people: PublicAgent[] }>()).values()].sort((a, b) => b.people.length - a.people.length);
+  const dayOf = sel ? (selDay.length ? selDay : feed.filter((e) => e.actors.includes(sel.id))).filter((e) => !PRIVATE_KINDS.has(e.kind)).slice(0, 8) : [];
+  const status = sel ? (sel.asleep ? `Asleep at ${sel.place}` : sel.activity?.kind === "fish" ? `Fishing off ${sel.place}` : sel.activity ? `Working at ${sel.place}` : `At ${sel.place}`) : "";
+  const showEvent = (e: TownEvent) => setSpotlight({ id: e.id, actors: e.actors, place: e.place ?? null, at: Date.now() });
   const c = snapshot.clock;
+  const sunAt = c ? Math.max(0, Math.min(1, (c.hour + (c.minute % 60) / 60 - 6) / 14)) : 0.5, night = !!c && (c.hour < 6 || c.hour >= 20);
+  const views = [["street", "Explore", "street"], ["map", "Whole island", "map"], ["cinema", "Follow the day", "watch"]] as const;
   return (
     <main className={`${theme.page} ${s.page} ${clean ? s.clean : ""}`}>
       {!clean && (
-        <>
-          <a className={theme.skip} href="#town-journal" onClick={()=>setJournalOpen(true)}>
-            Skip to the town journal
-          </a>
-          <header className={s.topbar}>
-            <div className={s.brand}><Wordmark dark size={18} /></div>
-            <div className={s.islandClock}><span className={s.liveDot} /><span>{c ? `Day ${c.day}` : "Connecting"}</span><span className={s.clock}>{c ? `${String(c.hour).padStart(2,"0")}:${String(c.minute%60).padStart(2,"0")}` : "—"}</span><span className={s.weather}>{c?.weather}{typeof c?.temperatureC === "number" ? ` · ${Math.round(c.temperatureC)}°` : ""}</span></div>
-            <div className={s.topActions}><button onClick={()=>{setSel(null);setTab("people");setJournalOpen(true);}}><ArrowIcon name="people" size={16}/><span>{snapshot.citizens.length} citizens</span></button><Link href="/feedback?from=%2Ftown" aria-label="Give feedback" title="Give feedback"><ArrowIcon name="letter" size={16}/></Link><SessionLink /></div>
-          </header>
-        </>
+        <a className={theme.skip} href="#town-journal" onClick={() => setJournalOpen(true)}>
+          Skip to the town journal
+        </a>
       )}
-      <div className={s.stage}>
-        <section
-          className={s.viewport}
-          aria-label="The island"
-          aria-describedby={clean ? undefined : "town-camera-help"}
-        >
-          <World
-            mineId={agent?.id ?? null}
-            focusId={tracking ?? (follow ? agent?.id ?? null : null)}
-            onViewChange={changeView}
-            onSelect={setSel}
-            selectedId={sel?.id ?? null}
-            spotlight={spotlight}
-            view={view}
-            effects={effects}
-            observer
-            onSnapshot={setSnapshot}
-          />
-        </section>
-        {!clean && (
-          <aside
-            className={s.journal}
-            data-selected={!!sel}
-            hidden={!sel && !journalOpen}
-            id="town-journal"
-            aria-label="Town journal"
-          >
-            <div className={s.journalHeader}>
-              <h2 ref={heading} tabIndex={-1}>
-                {sel ? "A life on the island" : "The town journal"}
-              </h2>
-              {sel ? (
-                <button aria-label="Close profile" onClick={() => {setSel(null);setTracking(null);}}><ArrowIcon name="close" size={20}/></button>
-              ) : (
-                <button aria-label="Close journal" onClick={()=>setJournalOpen(false)}><ArrowIcon name="close" size={20}/></button>
-              )}
+      <section className={s.viewport} aria-label="The island" aria-describedby={clean ? undefined : "town-camera-help"}>
+        <World
+          mineId={agent?.id ?? null}
+          focusId={tracking ?? (follow ? agent?.id ?? null : null)}
+          onViewChange={changeView}
+          onSelect={(p) => { if (p) open(p); else setSel(null); }}
+          selectedId={sel?.id ?? null}
+          spotlight={spotlight}
+          view={view}
+          effects={effects}
+          observer
+          compact
+          miniature={miniature}
+          onMiniatureChange={toggleMiniature}
+          onSnapshot={setSnapshot}
+        />
+      </section>
+      {!clean && (
+        <>
+          <header className={s.clockPill}>
+            <Link href="/" className={s.mark} aria-label="Unwatched home">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 15V3h12" stroke="currentColor" strokeWidth="2.2" /><circle cx="16" cy="16" r="2" fill="var(--accent)" /></svg>
+              <span>unwatched</span>
+            </Link>
+            <span className={s.rule} aria-hidden="true" />
+            <div className={s.time} aria-live="off">
+              <svg width="34" height="18" viewBox="0 0 34 18" fill="none" aria-hidden="true" className={s.arc}>
+                <path d="M2 16a15 15 0 0 1 30 0" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 3" />
+                {night ? <circle cx="17" cy="4" r="3.5" fill="#dfe6f2" /> : <circle cx={17 - 15 * Math.cos(Math.PI * sunAt)} cy={16 - 15 * Math.sin(Math.PI * sunAt)} r="3.5" fill="#f2c14e" />}
+              </svg>
+              <strong>{c ? `Day ${c.day}` : "Connecting"}</strong>
+              <span className={s.clock}>{c ? `${String(c.hour).padStart(2, "0")}:${String(c.minute % 60).padStart(2, "0")}` : "—"}</span>
+              <span className={s.weather}>{c?.weather}{typeof c?.temperatureC === "number" ? ` · ${Math.round(c.temperatureC)}°` : ""}</span>
             </div>
-            {!sel && (
-              <div className={s.tabs} role="group" aria-label="Journal view">
-                <button
-                  aria-pressed={tab === "activity"}
-                  onClick={() => setTab("activity")}
-                >
-                  Happening now
+          </header>
+
+          {!journalOpen && (
+            <button className={s.reopen} onClick={() => setJournalOpen(true)} aria-controls="town-journal">
+              <span className={s.faces} aria-hidden="true">{snapshot.citizens.slice(0, 3).map((p) => <Portrait key={p.id} name={p.name} appearance={p.appearance} age={p.age} size={28} />)}</span>
+              {snapshot.citizens.length} citizens
+            </button>
+          )}
+
+          <aside className={s.panel} id="town-journal" aria-label={sel ? sel.name : "Town journal"} hidden={!journalOpen} data-sheet={sheet}>
+            <button className={s.handle} aria-label={sheet === "open" ? "Show more of the island" : "Open the journal"} aria-expanded={sheet === "open"} onClick={() => setSheet(sheet === "open" ? "peek" : "open")}><span /></button>
+            <div className={s.panelTop}>
+              {sel ? (
+                <button className={s.back} onClick={() => { setSel(null); setTracking(null); }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" /></svg>Journal
                 </button>
-                <button
-                  aria-pressed={tab === "people"}
-                  onClick={() => setTab("people")}
-                >
-                  People{" "}
-                  {snapshot.citizens.length > 0
-                    ? `(${snapshot.citizens.length})`
-                    : ""}
+              ) : visitor ? (
+                <SessionLink className={s.quiet} />
+              ) : agent ? (
+                <button className={s.back} onClick={() => { open(agent); setTracking(agent.id); changeView("street"); }}>
+                  <Portrait name={agent.name} appearance={agent.appearance} age={agent.age} size={28} />{first(agent.name)}
+                </button>
+              ) : (
+                <SessionLink className={s.quiet} />
+              )}
+              <div className={s.topRight}>
+                {visitor && !sel && <Link href="/board" className={s.cta}>Send someone over</Link>}
+                <button className={s.iconBtn} aria-label={sel ? "Close profile" : "Close journal"} onClick={() => { if (sel) { setSel(null); setTracking(null); } else setJournalOpen(false); }}>
+                  <ArrowIcon name="close" size={16} />
                 </button>
               </div>
-            )}
-            <div className={s.scroll} ref={journalScroll}>
-              {!sel && tab === "activity" && (
-                <div aria-label="Recent island events">
-                  {snapshot.feed.length ? (
-                    snapshot.feed.slice(0, 12).map((e) => (
-                      <button
-                        type="button"
-                        key={e.id}
-                        className={`${s.event} ${s.eventBtn}`}
-                        data-important={e.importance >= 0.45}
-                        onClick={() =>
-                          setSpotlight({
-                            id: e.id,
-                            actors: e.actors,
-                            place: e.place ?? null,
-                            at: Date.now(),
-                          })
-                        }
-                        title="Show this on the island"
-                      >
-                        <time>
-                          Day {e.day} · {hhmm(e.t)}
-                        </time>
-                        <p>{e.text}</p>
-                      </button>
-                    ))
-                  ) : (
-                    <p className={s.empty}>
-                      {snapshot.error
-                        ? "The record could not be reached. Try reloading the island."
-                        : snapshot.ready
-                          ? "A quiet minute on the island. New events will appear here."
-                          : "Opening the town record…"}
-                    </p>
-                  )}
+            </div>
+
+            {!sel && (
+              <>
+                <div className={s.tabs} role="tablist" aria-label="Journal">
+                  {([["activity", "Now"], ["people", `People${snapshot.citizens.length ? ` · ${snapshot.citizens.length}` : ""}`], ["places", "Places"]] as const).map(([t, label]) => (
+                    <button key={t} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); setSheet("open"); }}>{label}</button>
+                  ))}
                 </div>
-              )}
-              {!sel && tab === "people" && (
-                <div>
-                  {[...snapshot.citizens]
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((p) => (
-                      <button
-                        key={p.id}
-                        className={s.person}
-                        onClick={() => setSel(p)}
-                      >
-                        <span>
-                          <strong>{p.name}</strong>
-                          <small>
-                            {p.asleep ? "Asleep" : p.place} ·{" "}
-                            {p.job ?? "Finding their way"}
-                          </small>
-                        </span>
-                        <span aria-hidden="true"><ArrowIcon name="arrowUpRight" size={20} /></span>
-                      </button>
-                    ))}
-                  {!snapshot.citizens.length && (
-                    <p className={s.empty}>
-                      {snapshot.ready
-                        ? "Nobody is here yet."
-                        : "Waiting for the island's people…"}
-                    </p>
-                  )}
-                </div>
-              )}
-              {sel && (
-                <div className={s.details}>
-                  <section>
-                    <Label>{sel.asleep ? "Asleep" : `At ${sel.place}`}</Label>
-                    <h3>{sel.name}</h3>
-                    <p className="text-ink2">
-                      {sel.job ?? "No work yet"} · arrived day {sel.arrivedDay}
-                      {sel.ownerId ? "" : " · house-funded"}
-                    </p>
-                  </section>
-                  {agent && sel.id !== agent.id && (
-                    <section>
-                      <Label>What {agent.name.split(" ")[0]} knows</Label>
-                      {rel ? (
-                        <div className="mt-3 flex flex-col gap-3">
-                          <Tide
-                            name="Trust"
-                            trust={rel.trust}
-                            word={rel.tide}
-                            width={60}
-                          />
-                          {rel.opinion && (
-                            <Bubble max={300}>“{rel.opinion}”</Bubble>
-                          )}
-                        </div>
+                <div className={s.scroll} ref={journalScroll}>
+                  {tab === "activity" && (
+                    <div aria-label="Recent island events" className={s.list}>
+                      {feed.length ? (
+                        <>
+                          <div className={s.listHead}><span>Happening now</span><span>Tap one to see it</span></div>
+                          {feed.slice(0, 14).map((e, i) => {
+                            const who = byId.get(e.actors[0] ?? "");
+                            return (
+                              <button type="button" key={e.id} className={s.event} data-live={i === 0} data-important={e.importance >= 0.45} onClick={() => showEvent(e)} title="Show this on the island">
+                                {who ? <Portrait name={who.name} appearance={who.appearance} age={who.age} size={40} className={s.face} /> : <span className={s.faceBlank} aria-hidden="true" />}
+                                <span className={s.eventBody}>
+                                  <span className={s.eventText}>{e.text}</span>
+                                  <span className={s.meta}>{e.place && <span className={s.chip}>{placeName(e.place)}</span>}<time>Day {e.day} · {hhmm(e.t)}</time></span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </>
                       ) : (
-                        <p className="mt-3 text-ink2">
-                          They have not met. {agent.name.split(" ")[0]} would
-                          have to introduce themselves.
+                        <p className={s.empty}>
+                          {snapshot.error ? "The record could not be reached. Try reloading the island." : snapshot.ready ? "A quiet minute on the island. New events will appear here." : "Opening the town record…"}
                         </p>
                       )}
-                    </section>
+                    </div>
                   )}
-                  {visitor && (
+                  {tab === "people" && (
+                    <div className={s.list}>
+                      {[...snapshot.citizens].sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
+                        <button key={p.id} className={s.person} onClick={() => open(p)}>
+                          <Portrait name={p.name} appearance={p.appearance} age={p.age} size={40} className={s.face} />
+                          <span>
+                            <strong>{p.name}</strong>
+                            <small>{p.asleep ? "Asleep" : p.place} · {p.job ?? "Finding their way"}</small>
+                          </span>
+                          <span className={s.dot} data-awake={!p.asleep} aria-label={p.asleep ? "asleep" : "awake"} />
+                        </button>
+                      ))}
+                      {!snapshot.citizens.length && <p className={s.empty}>{snapshot.ready ? "Nobody is here yet." : "Waiting for the island's people…"}</p>}
+                    </div>
+                  )}
+                  {tab === "places" && (
+                    <div className={s.list}>
+                      {places.map((pl) => (
+                        <button key={pl.id} className={s.person} onClick={() => setSpotlight({ id: Date.now(), actors: pl.people.map((p) => p.id), place: pl.id, at: Date.now() })}>
+                          <span className={s.faces} aria-hidden="true">{pl.people.slice(0, 3).map((p) => <Portrait key={p.id} name={p.name} appearance={p.appearance} age={p.age} size={28} />)}</span>
+                          <span><strong>{pl.name}</strong><small>{pl.people.length === 1 ? "1 person" : `${pl.people.length} people`} · {pl.people.slice(0, 3).map((p) => first(p.name)).join(", ")}</small></span>
+                        </button>
+                      ))}
+                      {!places.length && <p className={s.empty}>Waiting for the island's people…</p>}
+                    </div>
+                  )}
+                </div>
+                <div className={s.panelFoot}>
+                  <Link href="/evolution">The island&rsquo;s history <ArrowIcon name="arrowUpRight" size={16} /></Link>
+                  <Link href="/feedback?from=%2Ftown">Feedback</Link>
+                </div>
+              </>
+            )}
+
+            {sel && (
+              <div className={s.scroll} ref={journalScroll}>
+                <div className={s.profile}>
+                  <div className={s.who}>
+                    <Portrait name={sel.name} appearance={sel.appearance} age={sel.age} size={80} className={s.bigFace} />
+                    <div>
+                      <h2 ref={heading} tabIndex={-1}>{sel.name}</h2>
+                      <p>{sel.job ?? "No work yet"} · arrived day {sel.arrivedDay}{sel.ownerId ? "" : " · house-funded"}</p>
+                    </div>
+                  </div>
+                  <div className={s.status}><span className={s.dot} data-awake={!sel.asleep} aria-hidden="true" /><span>{status}</span></div>
+                  <div className={s.primary}>
+                    <button className={s.ctaBig} onClick={() => { setTracking(tracking === sel.id ? null : sel.id); setFollow(false); changeView("street"); setSheet("peek"); }}>{tracking === sel.id ? "Stop following" : `Follow ${first(sel.name)}`}</button>
+                    <Link href={`/agent/${sel.id}`} className={s.secondary}>Their page <ArrowIcon name="arrowUpRight" size={16} /></Link>
+                  </div>
+                  {agent && !possessed && (
+                    <button className={s.secondaryWide} onClick={() => { setPossessed(true); setFollow(true); }} disabled={agent.asleep}>
+                      {agent.asleep ? `${first(agent.name)} is asleep` : `Possess ${first(agent.name)}${sel.id !== agent.id ? " and go talk" : ""}`}
+                    </button>
+                  )}
+
+                  <section>
+                    <Label>{sel.asleep ? "Their day" : "Their day so far"}</Label>
+                    {dayOf.length ? (
+                      <ol className={s.timeline}>
+                        {dayOf.map((e, i) => (
+                          <li key={e.id}><time>{hhmm(e.t)}</time><span className={s.tick} data-now={i === 0} aria-hidden="true" /><button type="button" onClick={() => showEvent(e)}>{e.text}</button></li>
+                        ))}
+                      </ol>
+                    ) : <p className={s.empty}>Nothing on the record for them yet today.</p>}
+                  </section>
+
+                  {agent && sel.id !== agent.id && (
                     <section>
-                      <Label>A person, not an open book</Label>
-                      <p className="mt-3 text-ink2">
-                        Your citizen gets to know people through time together.
-                        Their trust and opinions belong to that relationship.
-                      </p>
+                      <Label>What {first(agent.name)} knows</Label>
+                      {rel ? (
+                        <div className="mt-3 flex flex-col gap-3">
+                          <Tide name="Trust" trust={rel.trust} word={rel.tide} width={60} />
+                          {rel.opinion && <Bubble max={300}>“{rel.opinion}”</Bubble>}
+                        </div>
+                      ) : (
+                        <p className={s.muted}>They have not met. {first(agent.name)} would have to introduce themselves.</p>
+                      )}
                     </section>
                   )}
                   {selFull && "persona" in selFull ? (
                     <section>
                       <Label>Only you can see this</Label>
-                      <p className="mt-3 text-ink2">
-                        {String(selFull.persona.summary)}
-                      </p>
+                      <p className={s.muted}>{String(selFull.persona.summary)}</p>
                     </section>
                   ) : (
-                    <section>
-                      <Label>
-                        {detailError
-                          ? "Details unavailable"
-                          : "Still a stranger?"}
-                      </Label>
-                      <p className="mt-3 text-ink2">
-                        {detailError
-                          ? "Their details could not be loaded. Close and reopen this profile to try again."
-                          : "Their money, their family, where they were last night. Someone would have to ask."}
-                      </p>
-                    </section>
+                    <div className={s.locked}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" /><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.8" /></svg>
+                      <div>
+                        <p>{detailError ? "Their details could not be loaded. Close and reopen this profile to try again." : `Their trust, money and family stay private. ${visitor ? "A citizen of yours" : "Your citizen"} learns them by spending time with ${first(sel.name)}.`}</p>
+                        {visitor && <Link href="/board">Send someone over to meet {first(sel.name)}</Link>}
+                      </div>
+                    </div>
                   )}
-                  {selFull && "belongings" in selFull && selFull.belongings && <Inventory data={selFull.belongings}/>}
-                  <div className={s.detailActions}>
-                    <Button kind="secondary" onClick={()=>{setTracking(tracking === sel.id ? null : sel.id);setFollow(false);changeView("street");}}>{tracking === sel.id ? "Stop following" : `Follow ${sel.name.split(" ")[0]}`}</Button>
-                    {agent && !possessed && (
-                      <Button
-                        onClick={() => {
-                          setPossessed(true);
-                          setFollow(true);
-                        }}
-                        disabled={agent.asleep}
-                      >
-                        {agent.asleep
-                          ? `${agent.name.split(" ")[0]} is asleep`
-                          : `Possess ${agent.name.split(" ")[0]}${sel.id !== agent.id ? " and go talk" : ""}`}
-                      </Button>
-                    )}
-                    <LinkButton href={`/agent/${sel.id}`} kind="secondary">
-                      Their page ↗
-                    </LinkButton>
-                  </div>
-                </div>
-              )}
-              {possessed && agent && (
-                <section
-                  className={s.composer}
-                  aria-label="Act as your citizen"
-                >
-                  <Label>You are {agent.name.split(" ")[0]}</Label>
-                  <p className="text-sm text-ink2">
-                    {agent.memories[0]?.text ?? "Nothing remembered yet."}
-                  </p>
-                  <div className={s.actions}>
-                    {sel && sel.id !== agent.id && (
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          void act({ kind: "move", to: sel.location })
-                        }
-                      >
-                        Walk to {sel.name.split(" ")[0]}
-                      </button>
-                    )}
-                    {["wait", "work", "sleep"].map((kind) => (
-                      <button
-                        key={kind}
-                        disabled={busy}
-                        onClick={() => void act({ kind })}
-                      >
-                        {kind.charAt(0).toUpperCase() + kind.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (say.trim())
-                        void act({
-                          kind: "say",
-                          ...(sel && sel.id !== agent.id ? { to: sel.id } : {}),
-                          text: say.trim(),
-                        });
-                    }}
-                  >
-                    <label htmlFor="citizen-speech">
-                      {sel && sel.id !== agent.id
-                        ? `Say something to ${sel.name}`
-                        : "Say something to whoever is here"}
-                    </label>
-                    <input
-                      id="citizen-speech"
-                      value={say}
-                      onChange={(e) => setSay(e.target.value)}
-                      readOnly={busy}
-                      placeholder="Your words, their voice"
-                    />
-                    <Button type="submit" disabled={busy || !say.trim()}>
-                      Say it ↗
-                    </Button>
-                  </form>
-                  {note && (
-                    <p role="alert" className="text-sm">
-                      {note}
-                    </p>
-                  )}
-                  <Button kind="secondary" onClick={() => setPossessed(false)}>
-                    Let {agent.name.split(" ")[0]} go
-                  </Button>
-                </section>
-              )}
-            </div>
-            {visitor && nudge && !sel && (
-              <div className={s.invite}>
-                <strong>A life here could be yours.</strong>
-                <p>
-                  Give someone a personality. Let the island give them a story.
-                </p>
-                <div>
-                  <LinkButton href="/board" size={36}>
-                    Send someone over ↗
-                  </LinkButton>
-                  <button onClick={dismiss}>Not now</button>
+                  {selFull && "belongings" in selFull && selFull.belongings && <Inventory data={selFull.belongings} />}
                 </div>
               </div>
             )}
+
+            {possessed && agent && (
+              <section className={s.composer} aria-label="Act as your citizen">
+                <Label>You are {first(agent.name)}</Label>
+                <p className={s.muted}>{agent.memories[0]?.text ?? "Nothing remembered yet."}</p>
+                <div className={s.actions}>
+                  {sel && sel.id !== agent.id && <button disabled={busy} onClick={() => void act({ kind: "move", to: sel.location })}>Walk to {first(sel.name)}</button>}
+                  {["wait", "work", "sleep"].map((kind) => <button key={kind} disabled={busy} onClick={() => void act({ kind })}>{kind.charAt(0).toUpperCase() + kind.slice(1)}</button>)}
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); if (say.trim()) void act({ kind: "say", ...(sel && sel.id !== agent.id ? { to: sel.id } : {}), text: say.trim() }); }}>
+                  <label htmlFor="citizen-speech">{sel && sel.id !== agent.id ? `Say something to ${sel.name}` : "Say something to whoever is here"}</label>
+                  <input id="citizen-speech" value={say} onChange={(e) => setSay(e.target.value)} readOnly={busy} placeholder="Your words, their voice" />
+                  <Button type="submit" disabled={busy || !say.trim()}>Say it ↗</Button>
+                </form>
+                {note && <p role="alert" className="text-sm">{note}</p>}
+                <Button kind="secondary" onClick={() => setPossessed(false)}>Let {first(agent.name)} go</Button>
+              </section>
+            )}
+
+            {visitor && nudge && !sel && (
+              <div className={s.invite}>
+                <strong>A life here could be yours.</strong>
+                <p>Give someone a personality. Let the island give them a story.</p>
+                <button onClick={dismiss}>Not now</button>
+              </div>
+            )}
           </aside>
-        )}
-      </div>
-      {!clean && <footer className={s.dock}>
-        <div className={s.dockIdentity}><span className={s.eyebrow}>UNWATCHED / THE LIVING ISLAND</span><strong>{sel ? sel.name : "Their world. Unfolding."}</strong><span className={s.hint} id="town-camera-help">Drag to explore · Scroll to zoom · Click to discover</span></div>
-        <div className={s.segment} role="group" aria-label="View of the town">{([["street","Explore","street"],["map","Whole island","map"],["cinema","Follow the day","watch"]] as const).map(([v,label,icon])=><button key={v} aria-pressed={view===v} onClick={()=>{setTracking(null);setFollow(false);changeView(v);}}><ArrowIcon name={icon} size={20}/><span>{label}</span></button>)}</div>
-        <nav className={s.dockLinks} aria-label="Island activity"><button aria-expanded={journalOpen&&!sel&&tab==="activity"} onClick={()=>{setSel(null);setTab("activity");setJournalOpen(!(journalOpen&&tab==="activity"));}}><ArrowIcon name="digest" size={20}/>Journal</button><button aria-expanded={journalOpen&&!sel&&tab==="people"} onClick={()=>{setSel(null);setTab("people");setJournalOpen(!(journalOpen&&tab==="people"));}}><ArrowIcon name="people" size={20}/>People</button>{agent&&<button onClick={()=>{setSel(agent);setTracking(agent.id);changeView("street");}}><ArrowIcon name="follow" size={20}/>My citizen</button>}<Link href="/evolution"><ArrowIcon name="time" size={20}/>History</Link></nav>
-      </footer>}
+
+          <nav className={s.views} aria-label="View of the town" data-panel={journalOpen}>
+            {views.map(([v, label, icon]) => (
+              <button key={v} aria-pressed={view === v} aria-label={label} onClick={() => { setTracking(null); setFollow(false); changeView(v); }}>
+                <ArrowIcon name={icon} size={20} /><span>{label}</span>
+              </button>
+            ))}
+            <button aria-pressed={miniature} aria-label="Miniature" onClick={toggleMiniature}>
+              <ArrowIcon name="model" size={20} /><span>Miniature</span>
+            </button>
+          </nav>
+
+          {hint && (
+            <div className={s.hint} id="town-camera-help" data-panel={journalOpen}>
+              <span>Drag to look around · scroll or pinch to zoom · click anyone</span>
+              <button aria-label="Dismiss the tip" onClick={dismissHint}><ArrowIcon name="close" size={16} /></button>
+            </div>
+          )}
+          {!hint && <span id="town-camera-help" hidden>Drag to look around, scroll or pinch to zoom, click anyone.</span>}
+        </>
+      )}
     </main>
   );
 }
