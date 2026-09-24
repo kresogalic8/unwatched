@@ -29,7 +29,7 @@ export type LifePlaces = {
   meadows: (Pt & { r: number })[];
   roosts: Pt[];
 };
-export type LifeInput = { tick: number; hour: number; rise: number; set: number; night: number; season: string; weather: string; wind: number; people: Iterable<Pt & { moving?: boolean }>; /** the GPU night is on: the beam cuts the shade and the fireflies bloom */ effects: boolean };
+export type LifeInput = { /** draw on this step: the town steps several times in a slow frame and only the last one is seen; left out, every other step draws */ draw?: boolean; tick: number; hour: number; rise: number; set: number; night: number; season: string; weather: string; wind: number; people: Iterable<Pt & { moving?: boolean }>; /** the GPU night is on: the beam cuts the shade and the fireflies bloom */ effects: boolean };
 
 /** A small seeded random, so the island's animals have habits and not a pattern. */
 function rnd(seed: number): () => number { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -83,7 +83,7 @@ export class Life {
   }
 
   update(o: LifeInput): void {
-    const { tick, P } = { tick: o.tick, P: this.P };
+    const { tick, P } = { tick: o.tick, P: this.P }; const paint = o.draw ?? tick % 2 === 0;
     const day = o.hour > o.rise - 0.5 && o.hour < o.set + 0.5, storm = o.weather === "storm", wet = storm || o.weather === "rain" || o.weather === "snow";
     const cold = o.season === "winter";
     const people = [...o.people];
@@ -91,7 +91,7 @@ export class Life {
     this.flushes = this.flushes.filter((f) => tick - f.at < 90);
     this.lights = []; this.sounds = [];
     // the pennant: it hangs in a calm, lifts and cracks in a blow, and always points where the wind is going
-    if (tick % 2 === 0) {
+    if (paint) {
       const f = this.flag; f.clear(); const { x, y } = P.flag; f.moveTo(0, 0).lineTo(0, -48).stroke({ width: 2.2, color: WOOD_DARK }); f.circle(0, -49, 1.8).fill(KELP);
       const lift = 0.2 + 0.8 * Math.min(1, o.wind * 1.4), L = 24, flap = 8 - o.wind * 5;
       const top: [number, number][] = [], bot: [number, number][] = [];
@@ -106,8 +106,8 @@ export class Life {
       this.boatOut = goOut; if (moving && tick % 75 === 0) this.sounds.push({ name: "oars", x: this.boatX, y: this.boatY, level: 0.8 });
       // the wake: a trail of rings that widen and fade behind the hull, and two lines of foam off the bow while she moves
       if (moving && tick % 7 === 0) { this.wake.push({ x: this.boatX, y: this.boatY + 3, t: tick }); if (this.wake.length > 18) this.wake.shift(); }
-      if (tick % 2 === 0) { const wg = this.wakeG; wg.clear(); for (const r of this.wake) { const age = (tick - r.t) / 130; if (age > 1) continue; wg.ellipse(r.x, r.y, 6 + age * 26, 2.5 + age * 8).stroke({ width: 1.5, color: 0xf7f6f3, alpha: 0.5 * (1 - age) }); } if (moving) { const dir = dx < 0 ? -1 : 1; wg.moveTo(this.boatX + dir * 16, this.boatY + 2).lineTo(this.boatX - dir * 14, this.boatY + 9).stroke({ width: 2, color: 0xf7f6f3, alpha: 0.35 }); wg.moveTo(this.boatX + dir * 16, this.boatY + 2).lineTo(this.boatX - dir * 12, this.boatY - 4).stroke({ width: 1.5, color: 0xf7f6f3, alpha: 0.25 }); } }
-      if (tick % 2 === 0) { const b = this.boat; b.clear(); const bob = Math.sin(tick / 38) * 1.4, dir = dx < 0 ? -1 : 1; b.position.set(this.boatX, this.boatY + bob); b.rotation = Math.sin(tick / 52) * 0.02;
+      if (paint) { const wg = this.wakeG; wg.clear(); for (const r of this.wake) { const age = (tick - r.t) / 130; if (age > 1) continue; wg.ellipse(r.x, r.y, 6 + age * 26, 2.5 + age * 8).stroke({ width: 1.5, color: 0xf7f6f3, alpha: 0.5 * (1 - age) }); } if (moving) { const dir = dx < 0 ? -1 : 1; wg.moveTo(this.boatX + dir * 16, this.boatY + 2).lineTo(this.boatX - dir * 14, this.boatY + 9).stroke({ width: 2, color: 0xf7f6f3, alpha: 0.35 }); wg.moveTo(this.boatX + dir * 16, this.boatY + 2).lineTo(this.boatX - dir * 12, this.boatY - 4).stroke({ width: 1.5, color: 0xf7f6f3, alpha: 0.25 }); } }
+      if (paint) { const b = this.boat; b.clear(); const bob = Math.sin(tick / 38) * 1.4, dir = dx < 0 ? -1 : 1; b.position.set(this.boatX, this.boatY + bob); b.rotation = Math.sin(tick / 52) * 0.02;
         b.moveTo(-18, -4).lineTo(18, -4).lineTo(13, 4).lineTo(-13, 4).closePath().fill(WOOD_DARK).stroke({ width: 1.2, color: KELP, alpha: 0.8 }); b.moveTo(-16, -5).lineTo(16, -5).stroke({ width: 1.5, color: CREAM, alpha: 0.6 });
         b.moveTo(2, -4).lineTo(2, -34).stroke({ width: 1.6, color: KELP });
         if (moving) b.moveTo(3, -33).lineTo(3 - dir * 16 + Math.sin(tick / 9) * 1.5, -20).lineTo(3, -8).closePath().fill(CREAM).stroke({ width: 1, color: KELP, alpha: 0.6 }); else b.roundRect(0, -30, 4, 22, 2).fill(CREAM);
@@ -142,7 +142,7 @@ export class Life {
       const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
       if (c.state === "walk" || c.state === "follow") { if (d > 1) { const st = Math.min(d, c.speed); c.x += (dx / d) * st; c.y += (dy / d) * st; if (Math.abs(dx) > 0.5) c.facing = dx < 0 ? -1 : 1; } else if (c.state === "walk") { c.state = c.kind === "hen" ? "peck" : "sit"; c.until = tick + 200 + r() * 600; } }
       c.g.position.set(c.x, c.y); c.g.zIndex = c.y; c.g.visible = c.state !== "hide";
-      if (tick % 2 === 0 && c.g.visible) this.drawCritter(c, tick, o.night, d > 1 && (c.state === "walk" || c.state === "follow"));
+      if (paint && c.g.visible) this.drawCritter(c, tick, o.night, d > 1 && (c.state === "walk" || c.state === "follow"));
     }
     // leaves in autumn, blossom in spring: born in the crowns, carried by the wind, gone in a while on the ground
     const fallSeason = o.season === "autumn" ? "leaf" : o.season === "spring" ? "petal" : null;
@@ -156,7 +156,7 @@ export class Life {
     // the beam: it turns once the night is on, and it is the one light the whole island can see
     const lampOn = o.night > 0.12 || o.weather === "fog" || storm; this.beam += ((lampOn ? 1 : 0) - this.beam) * 0.03;
     if (this.beam > 0.02) this.lights.push({ x: P.lantern.x, y: P.lantern.y, r: 70 + 50 * Math.abs(Math.cos(tick / 140)), color: LIGHT.lamp, strength: (0.35 + 0.65 * Math.abs(Math.cos(tick / 140))) * this.beam, noHole: true });
-    if (tick % 2 !== 0) return;
+    if (!paint) return;
     // everything in the air, drawn fresh
     const a = this.air; a.clear(); const gw = o.effects ? this.glow : a; this.glow.clear(); this.cut.clear();
     if (this.beam > 0.02) { const ang = tick / 140, Lb = 560, half = 0.055, { x: lx, y: ly } = P.lantern; const wedge = (g: Graphics, h: number, al: number, len: number) => { g.moveTo(lx, ly).lineTo(lx + Math.cos(ang - h) * len, ly + Math.sin(ang - h) * len * 0.55).lineTo(lx + Math.cos(ang + h) * len, ly + Math.sin(ang + h) * len * 0.55).closePath().fill({ color: LIGHT.lamp, alpha: al * this.beam }); };

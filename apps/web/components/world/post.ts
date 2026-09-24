@@ -80,6 +80,12 @@ export class Post {
   private vignette = new Graphics();
   private bars = new Graphics();
   private w = 0; private h = 0; private view: View = "street"; private nightNow = 0;
+  /** how much the device can afford, set by the town from its frame times: 0 everything, 1 a lighter bloom, 2 no bloom */
+  private lite: 0 | 1 | 2 = 0;
+  setLite(level: 0 | 1 | 2): void {
+    if (level === this.lite) return; this.lite = level;
+    this.bloom.quality = level ? 2 : 4; this.bloom.blur = level ? 6 : 9; this.bloom.resolution = level ? 0.5 : 1;
+  }
   constructor(private app: Application) {
     this.frame.eventMode = "none"; this.frame.addChild(this.vignette, this.bars); app.stage.addChild(this.frame);
   }
@@ -97,7 +103,7 @@ export class Post {
   update(view: View, night: number, effects: boolean, seed: number, grade: Grade = NEUTRAL, miniature = false): void {
     const { width, height } = this.app.screen; if (width !== this.w || height !== this.h) this.layout(width, height);
     this.view = view; this.nightNow = night;
-    const cinema = effects && view === "cinema"; const map = effects && view === "map"; const bloom = effects && night > 0.12 && view !== "map";
+    const cinema = effects && view === "cinema"; const map = effects && view === "map"; const bloom = effects && night > 0.12 && view !== "map" && this.lite < 2;
     this.vignette.visible = false; this.bars.visible = cinema;
     if (cinema && seed % 3 === 0) this.grain.seed = (seed % 997) / 997;
     this.bloom.bloomScale = 0.2 + Math.min(1, night) * 0.4;
