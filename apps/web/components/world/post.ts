@@ -4,6 +4,7 @@
  */
 import { Application, Container, FillGradient, Filter, GlProgram, Graphics, NoiseFilter } from "pixi.js";
 import { AdvancedBloomFilter, TiltShiftFilter } from "pixi-filters";
+import { dioramaGrade } from "./diorama";
 
 export type View = "street" | "map" | "cinema";
 
@@ -70,6 +71,8 @@ export class GradeFilter extends Filter {
 
 export class Post {
   private tilt = new TiltShiftFilter({ blur: 7, gradientBlur: 900 });
+  /** the miniature's lens: a narrow band of focus a little below the middle, where the eye rests, the rest going soft fast */
+  private macro = new TiltShiftFilter({ blur: 14, gradientBlur: 500 });
   private bloom = new AdvancedBloomFilter({ threshold: 0.9, bloomScale: 0.55, brightness: 1, blur: 9, quality: 4 });
   private grain = new NoiseFilter({ noise: 0.045 });
   private grade = new GradeFilter();
@@ -88,9 +91,10 @@ export class Post {
     g.rect(w / 2 - r, h / 2 - r, r * 2, r * 2).fill(grad);
     const b = this.bars; b.clear(); const bar = Math.round(h * 0.09); b.rect(0, 0, w, bar).rect(0, h - bar, w, bar).fill(0x0b0c0e);
     this.tilt.start = { x: 0, y: h * 0.3 }; this.tilt.end = { x: w, y: h * 0.72 };
+    this.macro.start = { x: 0, y: h * 0.54 }; this.macro.end = { x: w, y: h * 0.54 }; this.macro.gradientBlur = h * 0.5;
   }
-  /** Called every tick with the view, how deep the night is (0..1), whether effects are on, and the hour's grade. */
-  update(view: View, night: number, effects: boolean, seed: number, grade: Grade = NEUTRAL): void {
+  /** Called every tick with the view, how deep the night is (0..1), whether effects are on, the hour's grade, and whether the island is the miniature. */
+  update(view: View, night: number, effects: boolean, seed: number, grade: Grade = NEUTRAL, miniature = false): void {
     const { width, height } = this.app.screen; if (width !== this.w || height !== this.h) this.layout(width, height);
     this.view = view; this.nightNow = night;
     const cinema = effects && view === "cinema"; const map = effects && view === "map"; const bloom = effects && night > 0.12 && view !== "map";
@@ -98,7 +102,8 @@ export class Post {
     if (cinema && seed % 3 === 0) this.grain.seed = (seed % 997) / 997;
     this.bloom.bloomScale = 0.2 + Math.min(1, night) * 0.4;
     const filters: Filter[] = [];
-    if (map) filters.push(this.tilt);
+    if (miniature && effects) { filters.push(this.macro); grade = dioramaGrade(grade); }
+    else if (map) filters.push(this.tilt);
     if (bloom) filters.push(this.bloom);
     // the grade only costs a pass when it changes the picture; a clear noon skips it
     if (effects && gradeDistance(grade) > 0.012) { this.grade.set(grade); filters.push(this.grade); }

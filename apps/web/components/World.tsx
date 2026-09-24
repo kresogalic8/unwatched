@@ -14,6 +14,7 @@ import { constructionStage } from "@unwatched/protocol";
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef, useState } from "react";
 import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Text, TextStyle } from "pixi.js";
+import { BAY, PLINTH, TABLE, drawPlinth, drawTable } from "./world/diorama";
 import { API, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
 import { Citizen, lookFor, aged, type Look, type Pose } from "./world/citizen";
 import { Figurine } from "./world/figurine";
@@ -124,6 +125,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
   const [sound, setSound] = useState(false);
   const [caption, setCaption] = useState<{ text: string; who: string } | null>(null);
   const [cleanUi, setCleanUi] = useState(false);
+  // the miniature: the island as a model on a walnut table, shot close with a shallow focus and people moved a frame at a time
+  const [miniature, setMiniature] = useState(false); const miniRef = useRef(false); miniRef.current = miniature;
+  useEffect(() => { const q = new URLSearchParams(location.search).get("look"); let saved: string | null = null; try { saved = localStorage.getItem("uw.look"); } catch {} setMiniature(q ? q === "miniature" : saved === "miniature"); }, []);
+  const toggleMiniature = () => setMiniature((m) => { try { localStorage.setItem("uw.look", m ? "town" : "miniature"); } catch {} return !m; });
   const placePast = useRef<{place:string;through:number} | null>(null);
   const [placeInfo, setPlaceInfo] = useState<{ decorations?: Decoration[]; community?: CommunityView; stock?: Record<string,number>; hasHistory?: boolean; id: string; name: string; district: string; kind: string; sprite: string; owner: string | null; site: PlaceView["site"]; people: InteriorPerson[] } | null>(null);
   const [mini, setMini] = useState<{ w: number; h: number; places: { id: string; x: number; y: number; kind: string; crowd: number }[]; view: { x: number; y: number; w: number; h: number }; people: { x: number; y: number; mine: boolean }[] } | null>(null);
@@ -231,6 +236,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
 
       // everything with a foot on the ground sorts by y
       const footfall = new Footfall(); world.addChild(footfall.g);
+      // the miniature's table and plinth: the table covers everything past the bay, so the sea inside it reads as resin poured round the model
+      const rim = outline(BAY);
+      const table = new Graphics(); drawTable(table, W, H); const tableCut = new Graphics().rect(-4000, -4000, W + 8000, H + 8000).fill(0xffffff).poly(rim.flat()).cut();
+      const plinthShadow = new Graphics(), plinth = new Graphics(); drawPlinth(new Graphics(), plinth, rim, 0.3);
+      // its shadow on the table, soft-edged by a few widening layers rather than a blur the size of the island every frame
+      for (let i = 5; i >= 0; i--) plinthShadow.poly(rim.flatMap(([x, y]) => { const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1; return [x + 12 + (dx / d) * i * 14, y + PLINTH + 50 + (dy / d) * i * 9]; })).fill({ color: 0x1b140f, alpha: i ? 0.07 : 0.2 });
+      const onTable = new Container(); onTable.addChild(table, plinthShadow); onTable.mask = tableCut; // the table and the plinth's shadow on it, only past the rim
+      const model = new Container(); model.addChild(onTable, tableCut, plinth); model.visible = false; world.addChild(model);
       const scene = new Container(); scene.sortableChildren = true; world.addChild(scene);
       // everything standing on the ground is drawn in code, in one projection, at its natural size; props may be scaled
       const shadows = new Graphics(); shadows.zIndex = 0.5; scene.addChild(shadows);
@@ -473,6 +486,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const sunNow = { elev: 1, dir: 1, low: 0 }; const lastCart = { x: 0, y: 0 }; const lifeMeadows = (() => { const f = places.get("fields"), o = places.get("orchard"), pw = places.get("pinewood"); return [f && { x: f.x - 40, y: f.y + 140, r: 220 }, o && { x: o.x, y: o.y + 40, r: 200 }, pw && { x: pw.x - 60, y: pw.y + 120, r: 180 }].filter((m): m is { x: number; y: number; r: number } => !!m); })();
       world.addChild(life.glow); lighting.dark.addChild(life.cut); // the beam cuts the shade; what glows sits above it, so the night cannot dim it
       const sky = new Graphics(); sky.alpha = 0; world.addChild(sky); // stars and the moon over the water, after the night shade so they stay bright
+      let lastStop = -1; // the miniature's last posed frame
       const falling = new Map<number, { x: number; y: number }>();
       const STARS = Array.from({ length: 160 }, (_, i) => ({ x: ((i * 7919) % (W + 1600)) - 800, y: ((i * 104729) % (H + 1200)) - 600, r: i % 7 === 0 ? 4.5 : 2.6, tw: (i * 31) % 17 }));
       const moonPhase = () => { const days = (Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000; return (days / 29.530588) % 1; }; // 0 new, 0.5 full
@@ -778,7 +792,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         night.alpha += (nightAmt - night.alpha) * ease(0.05); dusk.alpha += (duskAmt - dusk.alpha) * ease(0.05); moonlit.alpha = 0.85 * Math.min(1, night.alpha / 0.42) * Math.max(0, 1 - flash.alpha * 1.4); worldLight.windowGlow = nightLook ? Math.min(1, night.alpha / 0.3) : 0;
         perfMark("life");
         for (let s = 0; s < steps; s++) cartTick();
-        post.update(viewRef.current, night.alpha / 0.42, effectsOn && !nofx.has("post"), tick, nofx.has("grade") ? NEUTRAL : gradeNow);
+        const mini = miniRef.current;
+        if (model.visible !== mini) { model.visible = mini; horizon.visible = celestial.visible = !mini; app.renderer.background.color = mini ? TABLE : C.water; }
+        sky.visible = !mini; // no stars or moon over a table
+        post.update(viewRef.current, night.alpha / 0.42, effectsOn && !nofx.has("post"), tick, nofx.has("grade") ? NEUTRAL : gradeNow, mini);
         if (nofx.size) { ground.visible = !nofx.has("ground"); scene.visible = !nofx.has("scene"); lighting.dark.visible = !nofx.has("dark"); lighting.glow.visible = !nofx.has("glow"); clouds.puffs.visible = clouds.shadows.visible = !nofx.has("clouds"); weatherFx.rain.visible = weatherFx.snow.visible = weatherFx.fog.visible = !nofx.has("weather"); if (nofx.has("sky")) sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; }
         { const smithy = places.get("smithy"); const dalSmithy = !classic && !!smithy && DALMATIAN_FOR[smithy.sprite]?.kind === "smithy"; const forced = new Set((q?.get("force") ?? "").split(",").filter(Boolean)); if (forced.has("hearths")) for (const id of Object.keys(HEARTHS)) litHearths.add(id); /* ?force=hearths,forge lights them for filming */ const cartMoving = Math.abs(carter.g.x - lastCart.x) > 0.3 || Math.abs(carter.g.y - lastCart.y) > 0.3; lastCart.x = carter.g.x; lastCart.y = carter.g.y;
           for (let s = 0; s < steps; s++) particles.update({ renderer: app.renderer, tick: prevTick + s + 1, wind, night: night.alpha / 0.42, hour, season: forcedSeason ?? c?.season ?? "summer", weather, effects: effectsOn && !nofx.has("particles"),
@@ -848,7 +865,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           sources.push(...life.lights);
           lighting.update(night.alpha * (1 - golden * (1 - cover) * 0.55), sources, ft, flash.alpha, shadeTint); // the low sun holds the dark off a while
           weatherFx.update({ weather, wind, snowing, wet, tick: ft, dt: dtf, density: still ? 0.35 : 1, night: Math.min(1, night.alpha / 0.42), fogColor: 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
-          clouds.update({ tick: ft, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) });
+          clouds.update({ tick: ft, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) }); if (miniRef.current) clouds.puffs.visible = clouds.shadows.visible = false; // no weather in the sky over a model on a table
         }
         // long shadows near sunrise and sunset
         const lowSun = Math.max(0, 1 - Math.min(Math.abs(hour - rise), Math.abs(hour - set)) / 1.5) * (night.alpha < 0.3 ? 1 : 0);
@@ -891,6 +908,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         // people
         perfMark("people");
         const now = Date.now(); const next: typeof labels = []; const secs = now / 1000;
+        // in the miniature, people are posed twelve times a second, as if moved by hand between frames
+        const stopFrame = Math.floor(secs * 12), posed = !miniRef.current || stopFrame !== lastStop; lastStop = stopFrame; const poseSecs = miniRef.current ? stopFrame / 12 : secs;
         for (const f of figs.current.values()) {
           const dx = f.tx - f.x, dy = f.ty - f.y, dist = Math.hypot(dx, dy);
           const fleeing = stagedNow?.kind === "fire" && f.place !== stagedNow.place;
@@ -903,7 +922,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (motion.distance > 0) { f.x += dx / dist * motion.distance; f.y += dy / dist * motion.distance; }
           f.rig.travel(motion.distance / .82);
           if (f.boarding) { f.tx = boat.position.x + 12; f.ty = boat.position.y - 2; if (dist < 4) { scene.removeChild(f.g); f.g.position.set(-20 + aboard.length * 16, -14); f.g.scale.set(0.9); f.rig.setPose("idle"); f.rig.face(-1); boat.addChild(f.g); aboard.push(f.g); figs.current.delete(f.id); continue; } }
-          f.g.position.set(f.x, f.y);
+          if (posed) f.g.position.set(f.x, f.y);
           // asleep in a bed of their own, or at the inn or the boat shed, they are indoors and out of sight; asleep anywhere else they sleep rough, in the open, for everyone to see
           const indoors = f.asleep && !moving && (f.home === f.place || f.place === "inn" || f.place === "boatshed");
           f.g.visible = !indoors; if (indoors) continue;
@@ -942,7 +961,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           f.rig.mood({ hunger: Math.min(1, (ag?.daysHungry ?? 0) / 3), joy: inStage && (stagedNow.kind === "wedding" || stagedNow.kind === "feast") ? 0.8 : (moment?.mood?.joy ?? 0), grief: inStage && stagedNow.kind === "funeral" ? 0.8 : 0, anger: moment?.mood?.anger ?? 0, surprise: moment?.mood?.surprise ?? 0, tired: f.weak ? 0.6 : 0 });
           if (partner) { f.rig.lookAt((partner.x - f.x) * f.facing); } else if (b || f.rig["pose" as keyof typeof f.rig] === "talk") { let best: Fig | null = null, bd = 90; for (const o of figs.current.values()) { if (o === f || o.asleep || o.place !== f.place) continue; const d = Math.hypot(o.x - f.x, o.y - f.y); if (d < bd) { bd = d; best = o; } } f.rig.lookAt(best ? (best.x - f.x) * (f.facing) : 0); } else if (petting && f.react) f.rig.lookAt((f.react.ax - f.x) * f.facing); else if (animal && (animal.kind === "hen" ? animalD < 90 : animalD < 70) && !(animal.kind === "dog" && animal.state === "follow" && tick % 400 > 120)) f.rig.lookAt((animal.x - f.x) * f.facing); else f.rig.lookAt(0);
           if (!moving && petting) f.rig.face(f.facing, true);
-          f.rig.update(secs);
+          if (posed) f.rig.update(poseSecs);
           f.rig.weather({ rain: wet && !snowing && !f.asleep, cold: (winter || snowing) && !f.asleep });
           if (moving && snowiness > 0.3 && every(6)) { prints.push({ x: f.x + (tick % 12 < 6 ? -4 : 4), y: f.y + 2, at: tick }); if (prints.length > 400) prints.shift(); }
           f.g.zIndex = f.y;
@@ -998,6 +1017,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         <button aria-label="Zoom in" title="Zoom in" onClick={() => cameraControl.current?.("in")} className="w-11 h-11 text-2xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">+</button>
         <button aria-label="Zoom out" title="Zoom out" onClick={() => cameraControl.current?.("out")} className="w-11 h-11 text-2xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4">−</button>
         <button aria-label="Show whole island" title="Show whole island" onClick={() => cameraControl.current?.("reset")} className="w-11 h-11 text-xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4"><Icon name="map" size={20}/></button>
+        <button aria-label="Miniature" title={miniature ? "Back to the town" : "See the island as a model"} aria-pressed={miniature} onClick={toggleMiniature} className={`w-11 h-11 text-xl hover:bg-glass focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 ${miniature ? "bg-glass" : ""}`}><Icon name="model" size={20}/></button>
       </div>}
       <div hidden={cleanUi} className="absolute inset-0 pointer-events-none">
         {labels.map((l) => (
