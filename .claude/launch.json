@@ -2,6 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "server", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@unwatched/server", "dev"], "port": 4000 },
-    { "name": "web", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@unwatched/web", "dev"], "port": 3000 }
+    { "name": "web", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@unwatched/web", "dev"], "port": 3000 },
+    { "name": "web-3001", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@unwatched/web", "exec", "next", "dev", "-p", "3001"], "port": 3001 }
   ]
 }
