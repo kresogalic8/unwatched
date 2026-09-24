@@ -1083,7 +1083,12 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         perfMark("smoke");
         if (every(2)) { smoke.clear(); const sn = forcedSeason ?? c?.season; const cold = sn === "winter" || sn === "autumn"; const evening = hour >= 16.5 || hour < 8; litHearths.clear(); for (const [id, [ox, oy]] of [...Object.entries(CHIMNEYS).filter(([id]) => workingPlaces.has(id)), ...Object.entries(HEARTHS).filter(() => cold || evening)]) { const p = places.get(id); if (!p || p.crowd === 0) continue; if (id in HEARTHS && (cold || evening)) litHearths.add(id); for (let i = 0; i < 6; i++) { const age = ((tick / 3 + i * 17) % 60) / 60; smoke.circle(p.x + ox + Math.sin(age * 6 + i) * 6 + age * wind * 30, p.y + oy - age * 70, 4 + age * 10).fill({ color: C.shell, alpha: 0.5 * (1 - age) }); } } }
         // sound follows the camera
-        if (every(30) && c) { const f = cam.follow ? figs.current.get(cam.follow) : null; const p = places.get(f?.place ?? "market"); ambience.tick({ mood: stagedNow ? (stagedNow.kind === "wedding" || stagedNow.kind === "feast" ? "tavern" : stagedNow.kind === "funeral" ? "night" : stagedNow.kind === "fire" ? "storm" : "day") : null, weather, hour: c.hour, season: c.season, district: p?.district ?? "old town", place: p?.id ?? "market", crowd: p?.crowd ?? 0, hearth: !!p && litHearths.has(p.id), walking: !!f && !f.asleep && Math.hypot(f.tx - f.x, f.ty - f.y) > 1.5, wind }); }
+        if (every(30) && c) {
+          // the ear is where the camera is: with the one it follows, or else at the place nearest the middle of the screen
+          const f = cam.follow ? figs.current.get(cam.follow) : null; const ex = f?.x ?? (Wd / 2 - cam.x) / cam.zoom, ey = f?.y ?? (Hd / 2 - cam.y) / cam.zoom;
+          let p = f ? places.get(f.place) : undefined; if (!p) { let best = Infinity; for (const q of places.values()) { const d = Math.hypot(q.x - ex, q.y - ey); if (d < best) { best = d; p = q; } } }
+          const shore = Math.max(0, Math.min(1, 1 - Math.abs(inside(ex, ey) - 1) / 0.3)); // 1 on the waterline, nothing a good way inland or out
+          ambience.tick({ shore, far: cam.zoom < 0.55, fast: !!rw?.playing, mood: stagedNow ? (stagedNow.kind === "wedding" || stagedNow.kind === "feast" ? "tavern" : stagedNow.kind === "funeral" ? "night" : stagedNow.kind === "fire" ? "storm" : "day") : null, weather, hour: c.hour, season: c.season, district: p?.district ?? "old town", place: p?.id ?? "market", crowd: p?.crowd ?? 0, hearth: !!p && litHearths.has(p.id), walking: !!f && !f.asleep && Math.hypot(f.tx - f.x, f.ty - f.y) > 1.5, wind }); }
         // people
         perfMark("people");
         const now = Date.now(); const next: typeof labels = []; const secs = now / 1000;
