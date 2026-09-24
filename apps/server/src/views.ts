@@ -76,3 +76,27 @@ export function publicProject(town: Town, p: Place) {
   return { ...structuredClone(p.community), byName: town.agents.get(p.community.by)?.persona.name ?? p.community.by,
     members: p.community.members.map(m => ({ ...m, name: town.agents.get(m.id)?.persona.name ?? m.id })) };
 }
+
+/** The day again, for the town to play back fast: where each citizen stood and whether they slept when it began, the weather then, and
+ * every moment since as `show` lets the public see it; a walk keeps only who and where it stopped. Whoever came on a boat since is not
+ * on the island yet, and whoever the record does not place before the day began and never walked since is where they stand now. */
+export function replayOf(town: Pick<Town, "t" | "weather" | "events" | "agents">, hours: number, show: (e: TownEvent) => TownEvent) {
+  const from = Math.max(0, town.t - Math.min(48, Math.max(1, hours)) * 60);
+  const start: Record<string, { location: string; asleep: boolean }> = {}; let weather = town.weather as string;
+  const moved = new Set<string>(), came = new Set<string>();
+  for (const e of town.events) {
+    const id = e.actors[0];
+    if (e.t >= from) { if (id && e.kind === "agent.move") moved.add(id); if (id && e.kind === "agent.arrive") came.add(id); continue; }
+    if (e.kind === "weather.change") weather = /turned to (\w+)/.exec(e.text)?.[1] ?? weather;
+    if (!id) continue; const s = (start[id] ??= { location: e.place ?? "harbor", asleep: false });
+    if (e.kind === "agent.move" && e.place) s.location = e.place; if (e.kind === "agent.sleep") s.asleep = true; if (e.kind === "agent.wake") s.asleep = false;
+  }
+  for (const a of town.agents.values()) {
+    const s = start[a.id]; if (!s && came.has(a.id)) continue;
+    if (!s || (!moved.has(a.id) && s.location !== a.location)) start[a.id] = { location: a.location, asleep: s?.asleep ?? a.asleep };
+  }
+  // events of people who have left keep their place in the record, but only those still here have a starting point
+  for (const id of Object.keys(start)) if (!town.agents.has(id)) delete start[id];
+  const events = town.events.filter((e) => e.t >= from).slice(-20000).map((e) => e.kind === "agent.move" ? { id: e.id, t: e.t, day: e.day, kind: e.kind, actors: e.actors, place: e.place, text: "", importance: 0 } as TownEvent : show(e));
+  return { from, to: town.t, weather, start, events };
+}

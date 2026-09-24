@@ -89,11 +89,18 @@ function lookSvg(hash: string): Promise<string | null> {
   return p;
 }
 
-type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Rig; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
+type Fig = { /** not on the island at this moment of the day played back: arrived later, or gone */ away?: boolean; speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Rig; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
+/** A moment worth marking on the day played back. */
+export type RewindMark = { t: number; text: string; importance: number; actors: string[] };
+/** The day played back, as the page shows it: its span in island minutes, the playhead, and the moments on it. */
+export type RewindState = { from: number; to: number; t: number; playing: boolean; marks: RewindMark[] } | null;
+export type RewindControl = { start(hours?: number): Promise<void>; play(): void; pause(): void; seek(t: number): void; stop(): void };
 export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
-export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API, selectedId = null, spotlight = null, miniature: miniatureProp, onMiniatureChange, compact = false }: { /** the miniature look, when the page holds it (the town page's view switcher); left out, the world keeps its own */ miniature?: boolean; onMiniatureChange?: (on: boolean) => void; /** the town page's own chrome: no minimap, and only zoom and sound at the island's edge */ compact?: boolean; apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void; selectedId?: string | null; spotlight?: { id: number; actors: string[]; place: string | null; at: number } | null }) {
+export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API, selectedId = null, spotlight = null, miniature: miniatureProp, onMiniatureChange, compact = false }: { /** the miniature look, when the page holds it (the town page's view switcher); left out, the world keeps its own */ miniature?: boolean; onMiniatureChange?: (on: boolean) => void; /** the town page's own chrome: no minimap, and only zoom and sound at the island's edge */ compact?: boolean; /** filled with the controls of the day played back, for the page's scrubber */ rewindControl?: { current: RewindControl | null }; onRewind?: (state: RewindState) => void; apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void; selectedId?: string | null; spotlight?: { id: number; actors: string[]; place: string | null; at: number } | null }) {
   const viewChange = useRef(onViewChange); viewChange.current = onViewChange;
+  const rewindChange = useRef(onRewind); rewindChange.current = onRewind;
+  const ownRewind = useRef<RewindControl | null>(null); const rewindControl = rewindHandle ?? ownRewind;
   const focusRef = useRef(focusId); focusRef.current = focusId;
   const selRef = useRef(selectedId); selRef.current = selectedId;
   const spotRef = useRef(spotlight); spotRef.current = spotlight;
@@ -139,6 +146,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
     const dialogue = new Map<string, { peers: string[]; until: number }>();
     const speechTimers = new Set<ReturnType<typeof setTimeout>>();
     let app: Application | null = null; let stopWatching: (() => void) | null = null; let ws: WebSocket | null = null; let alive = true; let inited = false; let poll: ReturnType<typeof setInterval> | null = null;
+    /** the last day played back: the record, where it began, and the playhead in island minutes; null while the island is live */
+    let rw: { from: number; to: number; t: number; i: number; playing: boolean; weather: string; weather0: string; start: Record<string, { location: string; asleep: boolean }>; events: TownEvent[]; marks: RewindMark[]; clockSent: number } | null = null;
+    let liveClock: Clock | null = null;
     (async () => {
       const el = host.current!;
       const townView = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView;
@@ -631,7 +641,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (!f.asleep && a.activity?.kind !== "fish" && ["idle","sit","eat","drink"].includes(f.pose) && !f.bench) { const b = benchAt(f.place); if (b && !takenBenches.has(b.key)) { takenBenches.add(b.key); f.bench = true; f.seat=b; f.tx = b.x; f.ty = b.y; } }
         return f;
       };
-      const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place) { wear.step(f.place, place); trailStep(f.place, place); } f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
+      // a walk wears the path it takes, but the day played back again wears none twice
+      const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place && !rw) { wear.step(f.place, place); trailStep(f.place, place); } f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
       const refreshPlaces = async () => { try { const t = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock) || old.storedCount !== p.storedCount || old.looseCount !== p.looseCount) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
       // Full population snapshots are authoritative, including citizens who were moved off island.
@@ -651,71 +662,78 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (removed) setFeed(feed => [...feed]);
       };
       poll = setInterval(() => { void fetch(`${apiUrl}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
+      /** One moment of the record played onto the island: live as it happens, or `past` while the last day plays back, when nothing is
+       * fetched and nobody boards for good; `quiet` while the day is wound to a moment, when only where everyone ends up matters. */
+      const applyEvent = (e: TownEvent, past = false, quiet = false) => {
+        const eventActor=agents.current.get(e.actors[0]!);
+        if (eventActor && (e.kind === "agent.fishing" || e.kind === "agent.activity")) {
+          const activity = (e.payload as {activity?: PublicAgent["activity"]} | undefined)?.activity;
+          ensure({...eventActor, activity: activity ?? null, pose: activity?.kind === "work" ? "work" : "idle"});
+        }
+        if (eventActor && e.kind === "agent.fishing-ended") {
+          const caught = (e.payload as {caught?: number} | undefined)?.caught;
+          ensure({...eventActor, activity: null, pose: "idle", ...(caught ? {carrying: "fish"} : {})});
+        }
+        if(eventActor && e.kind==="agent.sleep"){eventActor.asleep=true;eventActor.pose="sleep";}
+        if(eventActor && e.kind==="agent.wake"){eventActor.asleep=false;eventActor.pose="idle";}
+        if(["agent.move","agent.sleep","agent.wake","agent.work"].includes(e.kind)) setPlaceInfo(info=>{
+          if(!info)return info;
+          const list=[...agents.current.values()].map(a=>a.id!==e.actors[0]?a:{...a,...(e.kind==="agent.move"&&e.place?{location:e.place}:{}),...(e.kind==="agent.sleep"?{asleep:true,pose:"sleep" as const}:{}),...(e.kind==="agent.wake"?{asleep:false,pose:"idle" as const}:{})});
+          return {...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))};
+        });
+        if ((e.kind === "town.gathering" || e.kind === "town.fire") && e.place && !quiet) { const pl = places.get(e.place); const pay = (e.payload ?? {}) as { kind?: string; crowd?: string[]; held?: boolean; stage?: string }; if (pl && pay.held !== false) { const kind = e.kind === "town.fire" ? "fire" : (pay.kind ?? "feast"); staged.current = { kind, place: e.place, x: pl.x, y: pl.y, actors: e.actors, until: Date.now() + (past ? 5000 : kind === "fire" ? 180000 : 150000) }; const crowd = (pay.crowd ?? []).map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place); const leads = e.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place && !f.asleep); const g = gather(pl); const cxp = g.x + g.w / 2, cyp = g.y + 10; leads.forEach((f, i) => { releaseSeat(f); f.tx = cxp - 14 + i * 28; f.ty = cyp; f.facing = i === 0 ? 1 : -1; }); const others = crowd.filter((f) => !leads.includes(f)); others.forEach((f, i) => { const n = Math.max(1, others.length); const ang = Math.PI * 0.15 + (Math.PI * 0.7 * i) / n; const r = 70 + (i % 2) * 22; releaseSeat(f); f.tx = cxp + Math.cos(ang) * r * 1.6; f.ty = cyp + 30 + Math.sin(ang) * r * 0.5; }); if (kind === "wedding" || kind === "funeral") ambienceRef.current?.toll(kind === "wedding" ? 6 : 3); } }
+        if (e.importance >= 0.45 && e.kind !== "agent.move" && e.kind !== "agent.reflect" && !quiet) { const f = e.actors[0] ? figs.current.get(e.actors[0]) : null; const p = e.place ? places.get(e.place) : null; const x = f?.x ?? p?.x, y = f?.y ?? p?.y; if (x !== undefined && y !== undefined) cinema.current = { x, y: y - 40, ids: e.actors, at: Date.now(), text: e.text }; }
+        if (e.kind === "agent.move" && eventActor) eventActor.activity = null;
+        if (e.kind === "agent.move" && e.place) moveTo(e.actors[0]!, e.place);
+        if (e.kind === "agent.sleep") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = true; f.pose = "sleep"; } }
+        if (e.kind === "agent.wake") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = false; f.pose = "idle"; } }
+        if (e.kind === "agent.work" && /worked on|mornings done/.test(e.text)) { const f = figs.current.get(e.actors[0]!); if (f) f.pose = "work"; }
+        // whoever leaves walks to the boat and rides away on it; the deck carries them until the boat is out of sight
+        if (e.kind === "agent.leave" && past) { const f = figs.current.get(e.actors[0]!); if (f) f.away = true; }
+        else if (e.kind === "agent.leave") { const f = figs.current.get(e.actors[0]!); if (f) { f.boarding = true; releaseSeat(f); f.asleep = false; f.tx = boat.position.x + 12; f.ty = boat.position.y - 2; } }
+        if (e.kind === "knowledge.shared" && !quiet) {
+          bubbles.current.set(e.actors[0]!, { text: e.text.split(": ").slice(1).join(": ") || e.text, until: Date.now() + 9000 });
+          for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "greet", until: Date.now() + 1800 }; }
+        }
+        if ((e.kind === "garden.harvest" || e.kind === "place.decorated") && !quiet) { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "work", until: Date.now() + 8000 }; }
+        if (!past && (e.kind.startsWith("project.") || e.kind === "garden.harvest" || e.kind === "place.decorated")) void refreshPlaces();
+        if (e.kind === "agent.give" && e.actors.length===2 && !quiet) {
+          const pair=e.actors.map(id=>figs.current.get(id));const [a,b]=pair;
+          if(a&&b&&a.place===b.place&&!a.asleep&&!b.asleep){
+            dialogue.set(a.id,{peers:[b.id],until:Date.now()+4000});dialogue.set(b.id,{peers:[a.id],until:Date.now()+4000});
+            for(const f of [a,b])f.moment={pose:"greet",until:Date.now()+2400};
+          }
+        }
+        if (e.kind === "agent.eat" && !quiet) {const f=figs.current.get(e.actors[0]!);if(f)f.moment={pose:"eat",until:Date.now()+6000};}
+        if (e.kind === "agent.say" && !quiet) { const q = /“([^”]+)”/.exec(e.text)?.[1]; if (q) bubbles.current.set(e.actors[0]!, { text: q, until: Date.now() + 7000 }); }
+        if (e.kind === "conversation" && !quiet) { const lines = (e.payload?.lines as { speaker: string; text: string }[] | undefined) ?? []; const beat = past ? 900 : 2600; const until = Date.now() + Math.max(past ? 2500 : 5500, (lines.length - 1) * beat + (past ? 2500 : 5500));
+          for (const id of e.actors) dialogue.set(id, { peers: e.actors.filter(peer => peer !== id), until });
+          lines.forEach((l, i) => { const timer = setTimeout(() => { speechTimers.delete(timer); if (alive) bubbles.current.set(l.speaker, { text: l.text, until: Date.now() + 5500 }); }, i * beat); speechTimers.add(timer); }); for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "greet", until: Date.now() + 1800, mood: { joy: 0.6 } }; } }
+        // the moments the record names: a letter written home, a meal or a drink bought at the inn or the tavern, a charge argued before the council, a fire
+        if (e.kind === "agent.letter" && !quiet) { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "write", until: Date.now() + 12000 }; }
+        if (e.kind === "cart.leg" && !past) { const pay = (e.payload ?? {}) as { from?: string; to?: string; item?: string; qty?: number; route?: string[] }; if (pay.from && pay.to && pay.item) carter.queue.push({ from: pay.from, to: pay.to, item: pay.item, qty: pay.qty ?? 0, route: pay.route ?? [] }); }
+        if (e.kind === "economy.price" && !past) void refreshPlaces();
+        if (e.kind === "agent.trade" && !quiet && /bought (soup|bread|fish|apples|drink|wine|beer)/.test(e.text)) { const f = figs.current.get(e.actors[0]!); if (f && (f.place === "inn" || f.place === "tavern")) f.moment = { pose: /drink|wine|beer/.test(e.text) ? "drink" : "eat", until: Date.now() + 10000 }; }
+        if (e.kind === "town.verdict" && !quiet) for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "argue", until: Date.now() + 8000, mood: { anger: 0.8 } }; }
+        if (e.kind === "town.fire" && e.place && !quiet) for (const f of figs.current.values()) if (f.place === e.place || places.get(f.place)?.district === places.get(e.place)?.district) f.moment = { pose: "idle", until: Date.now() + 5000, mood: { surprise: 1 } };
+        if (e.kind === "agent.fired" && !quiet) { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "idle", until: Date.now() + 6000, mood: { anger: 0.5 } }; }
+        if (e.kind === "boat.dock") { if (/docked/.test(e.text)) { if (!quiet) boat.position.x = awayX; boatTarget = dockX; if (!quiet) ambience.horn(); } }
+        if (e.kind === "boat.depart") boatTarget = awayX;
+        if (!past && (e.kind.startsWith("item.") || ["agent.trade", "agent.give", "agent.take", "agent.eat"].includes(e.kind)) && e.actors[0]) void fetch(`${apiUrl}/api/agents/${e.actors[0]}`, {cache: "no-store"}).then(r => r.ok ? r.json() : null).then((a: PublicAgent | null) => { if (alive && a?.id) ensure(a); }).catch(() => {});
+        if (e.kind === "agent.arrive" && past) { const f = figs.current.get(e.actors[0]!); if (f) { f.away = false; f.place = ""; moveTo(f.id, e.place ?? "harbor"); if (!quiet) { f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } } }
+        else if (e.kind === "agent.arrive") { void fetch(`${apiUrl}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } }); }
+        if (!past && (e.kind.startsWith("item.") || e.kind === "town.recipe" || e.kind === "agent.trade" || e.kind === "agent.make" || e.kind === "place.decorated" || e.kind === "garden.harvest" || e.kind === "agent.build" || e.kind === "town.built" || (e.kind === "agent.work" && /mornings done/.test(e.text)))) void refreshPlaces();
+        if (e.kind === "weather.change" && rw) rw.weather = /turned to (\w+)/.exec(e.text)?.[1] ?? rw.weather;
+        if (e.importance >= 0.1 && e.kind !== "agent.move" && !quiet) setFeed((f) => [e, ...f].slice(0, 12));
+      };
       ws = new WebSocket(apiUrl.replace(/^http/, "ws") + "/stream");
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data as string) as { type: string; agents?: PublicAgent[]; recent?: TownEvent[]; event?: TownEvent; clock?: Clock };
+        if (msg.clock) liveClock = msg.clock;
+        if (rw) return; // the day is playing back; the live island resumes when it ends
         if (msg.type === "hello") { if(msg.agents)syncPopulation(msg.agents); setFeed((msg.recent ?? []).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move").slice(-12).reverse()); if (msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; } setReady(true); }
         if (msg.type === "clock" && msg.clock) { setClock(msg.clock); clockRef.current = msg.clock; }
-        if (msg.type === "event" && msg.event) {
-          const e = msg.event;
-          const eventActor=agents.current.get(e.actors[0]!);
-          if (eventActor && (e.kind === "agent.fishing" || e.kind === "agent.activity")) {
-            const activity = (e.payload as {activity?: PublicAgent["activity"]} | undefined)?.activity;
-            ensure({...eventActor, activity: activity ?? null, pose: activity?.kind === "work" ? "work" : "idle"});
-          }
-          if (eventActor && e.kind === "agent.fishing-ended") {
-            const caught = (e.payload as {caught?: number} | undefined)?.caught;
-            ensure({...eventActor, activity: null, pose: "idle", ...(caught ? {carrying: "fish"} : {})});
-          }
-          if(eventActor && e.kind==="agent.sleep"){eventActor.asleep=true;eventActor.pose="sleep";}
-          if(eventActor && e.kind==="agent.wake"){eventActor.asleep=false;eventActor.pose="idle";}
-          if(["agent.move","agent.sleep","agent.wake","agent.work"].includes(e.kind)) setPlaceInfo(info=>{
-            if(!info)return info;
-            const list=[...agents.current.values()].map(a=>a.id!==e.actors[0]?a:{...a,...(e.kind==="agent.move"&&e.place?{location:e.place}:{}),...(e.kind==="agent.sleep"?{asleep:true,pose:"sleep" as const}:{}),...(e.kind==="agent.wake"?{asleep:false,pose:"idle" as const}:{})});
-            return {...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))};
-          });
-          if ((e.kind === "town.gathering" || e.kind === "town.fire") && e.place) { const pl = places.get(e.place); const pay = (e.payload ?? {}) as { kind?: string; crowd?: string[]; held?: boolean; stage?: string }; if (pl && pay.held !== false) { const kind = e.kind === "town.fire" ? "fire" : (pay.kind ?? "feast"); staged.current = { kind, place: e.place, x: pl.x, y: pl.y, actors: e.actors, until: Date.now() + (kind === "fire" ? 180000 : 150000) }; const crowd = (pay.crowd ?? []).map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place); const leads = e.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === e.place && !f.asleep); const g = gather(pl); const cxp = g.x + g.w / 2, cyp = g.y + 10; leads.forEach((f, i) => { releaseSeat(f); f.tx = cxp - 14 + i * 28; f.ty = cyp; f.facing = i === 0 ? 1 : -1; }); const others = crowd.filter((f) => !leads.includes(f)); others.forEach((f, i) => { const n = Math.max(1, others.length); const ang = Math.PI * 0.15 + (Math.PI * 0.7 * i) / n; const r = 70 + (i % 2) * 22; releaseSeat(f); f.tx = cxp + Math.cos(ang) * r * 1.6; f.ty = cyp + 30 + Math.sin(ang) * r * 0.5; }); if (kind === "wedding" || kind === "funeral") ambienceRef.current?.toll(kind === "wedding" ? 6 : 3); } }
-          if (e.importance >= 0.45 && e.kind !== "agent.move" && e.kind !== "agent.reflect") { const f = e.actors[0] ? figs.current.get(e.actors[0]) : null; const p = e.place ? places.get(e.place) : null; const x = f?.x ?? p?.x, y = f?.y ?? p?.y; if (x !== undefined && y !== undefined) cinema.current = { x, y: y - 40, ids: e.actors, at: Date.now(), text: e.text }; }
-          if (e.kind === "agent.move" && eventActor) eventActor.activity = null;
-          if (e.kind === "agent.move" && e.place) moveTo(e.actors[0]!, e.place);
-          if (e.kind === "agent.sleep") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = true; f.pose = "sleep"; } }
-          if (e.kind === "agent.wake") { const f = figs.current.get(e.actors[0]!); if (f) { f.asleep = false; f.pose = "idle"; } }
-          if (e.kind === "agent.work" && /worked on|mornings done/.test(e.text)) { const f = figs.current.get(e.actors[0]!); if (f) f.pose = "work"; }
-          // whoever leaves walks to the boat and rides away on it; the deck carries them until the boat is out of sight
-          if (e.kind === "agent.leave") { const f = figs.current.get(e.actors[0]!); if (f) { f.boarding = true; releaseSeat(f); f.asleep = false; f.tx = boat.position.x + 12; f.ty = boat.position.y - 2; } }
-          if (e.kind === "knowledge.shared") {
-            bubbles.current.set(e.actors[0]!, { text: e.text.split(": ").slice(1).join(": ") || e.text, until: Date.now() + 9000 });
-            for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "greet", until: Date.now() + 1800 }; }
-          }
-          if (e.kind === "garden.harvest" || e.kind === "place.decorated") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "work", until: Date.now() + 8000 }; }
-          if (e.kind.startsWith("project.") || e.kind === "garden.harvest" || e.kind === "place.decorated") void refreshPlaces();
-          if (e.kind === "agent.give" && e.actors.length===2) {
-            const pair=e.actors.map(id=>figs.current.get(id));const [a,b]=pair;
-            if(a&&b&&a.place===b.place&&!a.asleep&&!b.asleep){
-              dialogue.set(a.id,{peers:[b.id],until:Date.now()+4000});dialogue.set(b.id,{peers:[a.id],until:Date.now()+4000});
-              for(const f of [a,b])f.moment={pose:"greet",until:Date.now()+2400};
-            }
-          }
-          if (e.kind === "agent.eat") {const f=figs.current.get(e.actors[0]!);if(f)f.moment={pose:"eat",until:Date.now()+6000};}
-          if (e.kind === "agent.say") { const q = /“([^”]+)”/.exec(e.text)?.[1]; if (q) bubbles.current.set(e.actors[0]!, { text: q, until: Date.now() + 7000 }); }
-          if (e.kind === "conversation") { const lines = (e.payload?.lines as { speaker: string; text: string }[] | undefined) ?? []; const until = Date.now() + Math.max(5500, (lines.length - 1) * 2600 + 5500);
-            for (const id of e.actors) dialogue.set(id, { peers: e.actors.filter(peer => peer !== id), until });
-            lines.forEach((l, i) => { const timer = setTimeout(() => { speechTimers.delete(timer); if (alive) bubbles.current.set(l.speaker, { text: l.text, until: Date.now() + 5500 }); }, i * 2600); speechTimers.add(timer); }); for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "greet", until: Date.now() + 1800, mood: { joy: 0.6 } }; } }
-          // the moments the record names: a letter written home, a meal or a drink bought at the inn or the tavern, a charge argued before the council, a fire
-          if (e.kind === "agent.letter") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "write", until: Date.now() + 12000 }; }
-          if (e.kind === "cart.leg") { const pay = (e.payload ?? {}) as { from?: string; to?: string; item?: string; qty?: number; route?: string[] }; if (pay.from && pay.to && pay.item) carter.queue.push({ from: pay.from, to: pay.to, item: pay.item, qty: pay.qty ?? 0, route: pay.route ?? [] }); }
-          if (e.kind === "economy.price") void refreshPlaces();
-          if (e.kind === "agent.trade" && /bought (soup|bread|fish|apples|drink|wine|beer)/.test(e.text)) { const f = figs.current.get(e.actors[0]!); if (f && (f.place === "inn" || f.place === "tavern")) f.moment = { pose: /drink|wine|beer/.test(e.text) ? "drink" : "eat", until: Date.now() + 10000 }; }
-          if (e.kind === "town.verdict") for (const id of e.actors) { const f = figs.current.get(id); if (f) f.moment = { pose: "argue", until: Date.now() + 8000, mood: { anger: 0.8 } }; }
-          if (e.kind === "town.fire" && e.place) for (const f of figs.current.values()) if (f.place === e.place || places.get(f.place)?.district === places.get(e.place)?.district) f.moment = { pose: "idle", until: Date.now() + 5000, mood: { surprise: 1 } };
-          if (e.kind === "agent.fired") { const f = figs.current.get(e.actors[0]!); if (f) f.moment = { pose: "idle", until: Date.now() + 6000, mood: { anger: 0.5 } }; }
-          if (e.kind === "boat.dock") { if (/docked/.test(e.text)) { boat.position.x = awayX; boatTarget = dockX; ambience.horn(); } }
-          if (e.kind === "boat.depart") boatTarget = awayX;
-          if ((e.kind.startsWith("item.") || ["agent.trade", "agent.give", "agent.take", "agent.eat"].includes(e.kind)) && e.actors[0]) void fetch(`${apiUrl}/api/agents/${e.actors[0]}`, {cache: "no-store"}).then(r => r.ok ? r.json() : null).then((a: PublicAgent | null) => { if (alive && a?.id) ensure(a); }).catch(() => {});
-          if (e.kind === "agent.arrive") { void fetch(`${apiUrl}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } }); }
-          if (e.kind.startsWith("item.") || e.kind === "town.recipe" || e.kind === "agent.trade" || e.kind === "agent.make" || e.kind === "place.decorated" || e.kind === "garden.harvest" || e.kind === "agent.build" || e.kind === "town.built" || (e.kind === "agent.work" && /mornings done/.test(e.text))) void refreshPlaces();
-          if (e.importance >= 0.1 && e.kind !== "agent.move") setFeed((f) => [e, ...f].slice(0, 12));
-        }
+        if (msg.type === "event" && msg.event) applyEvent(msg.event);
       };
 
       // Time runs in steps of a 60 Hz frame whatever the screen's refresh: `tick` counts whole steps for the per-step simulations
@@ -729,6 +747,55 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const handOn = () => { const c = camera.current; if (!c.hand) { const Wd = app!.screen.width, Hd = app!.screen.height; c.hand = { x: (Wd / 2 - c.x) / c.zoom, y: (Hd / 2 - c.y) / c.zoom, zoom: c.zoom, vx: 0, vy: 0 }; c.follow = null; } return c.hand; };
       const fitZoom = () => Math.min(app!.screen.width / (W * 1.12), Math.max(180,app!.screen.height - (observer ? 150 : 0)) / (H * 1.12));
       if (observer && !parked && !focusRef.current) camera.current.hand = {x:W/2,y:H/2+(observer ? 65/fitZoom() : 0),zoom:fitZoom(),vx:0,vy:0};
+      // the day again: the record of the last day played back in about a minute, the light turning with it, then the live island once more
+      const REWIND_SECONDS = 60;
+      let rwSent = 0;
+      const tellRewind = (force = false) => { if (!force && performance.now() - rwSent < 120) return; rwSent = performance.now(); rewindChange.current?.(rw ? { from: rw.from, to: rw.to, t: rw.t, playing: rw.playing, marks: rw.marks } : null); };
+      const rewindClock = (t: number): Clock => ({ ...(liveClock ?? clockRef.current!), t, day: Math.floor(t / 1440) + 1, hour: Math.floor((t % 1440) / 60), minute: t % 1440, weather: rw?.weather ?? liveClock?.weather ?? "clear" });
+      const showClock = (t: number) => { clockRef.current = rewindClock(t); if (rw && Math.floor(t) !== rw.clockSent) { rw.clockSent = Math.floor(t); setClock(rewindClock(Math.floor(t))); } };
+      /** wind the day to island minute t: everyone back where the day began, then every moment up to t, with nothing shown on the way */
+      const windTo = (t: number) => {
+        if (!rw) return;
+        staged.current = null; cinema.current = null; bubbles.current.clear(); dialogue.clear(); seatOf.current.clear(); rw.weather = rw.weather0;
+        for (const f of figs.current.values()) {
+          releaseSeat(f); f.moment = undefined; const s0 = rw.start[f.id]; const a = agents.current.get(f.id);
+          f.away = !s0; if (!s0) continue;
+          f.place = ""; moveTo(f.id, s0.location); f.asleep = s0.asleep; f.pose = s0.asleep ? "sleep" : "idle"; if (a) { a.asleep = s0.asleep; a.pose = f.pose; a.activity = null; }
+        }
+        rw.i = 0; while (rw.i < rw.events.length && rw.events[rw.i]!.t <= t) applyEvent(rw.events[rw.i++]!, true, true);
+        for (const f of figs.current.values()) { f.x = f.tx; f.y = f.ty; f.speed = 0; f.g.position.set(f.x, f.y); }
+        rw.t = t; showClock(t);
+        setFeed(rw.events.slice(0, rw.i).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move" && e.text).slice(-12).reverse());
+        tellRewind(true);
+      };
+      const endRewind = async () => {
+        if (!rw) return; rw = null; staged.current = null; cinema.current = null; bubbles.current.clear(); dialogue.clear(); tellRewind(true);
+        for (const f of figs.current.values()) f.away = false;
+        try { const list = (await (await fetch(`${apiUrl}/api/agents`, { cache: "no-store" })).json()) as PublicAgent[]; if (!alive || rw) return; syncPopulation(list); } catch {}
+        for (const f of figs.current.values()) { f.x = f.tx; f.y = f.ty; f.g.position.set(f.x, f.y); }
+        if (liveClock) { clockRef.current = liveClock; setClock(liveClock); }
+        try { setFeed(((await (await fetch(`${apiUrl}/api/events?since=${(liveClock?.t ?? 0) - 240}`, { cache: "no-store" })).json()) as TownEvent[]).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move" && e.text).slice(-12).reverse()); } catch {}
+      };
+      rewindControl.current = {
+        async start(hours = 24) {
+          const r = (await (await fetch(`${apiUrl}/api/replay?hours=${hours}`, { cache: "no-store" })).json()) as { from: number; to: number; weather: string; start: Record<string, { location: string; asleep: boolean }>; events: TownEvent[] };
+          if (!alive) return;
+          const marks = r.events.filter((e) => e.importance >= 0.45 && e.text && e.kind !== "weather.change").map((e) => ({ t: e.t, text: e.text, importance: e.importance, actors: e.actors }));
+          rw = { from: r.from, to: r.to, t: r.from, i: 0, playing: true, weather: r.weather, weather0: r.weather, start: r.start, events: r.events, marks, clockSent: -1 };
+          windTo(r.from);
+        },
+        play() { if (!rw) return; if (rw.t >= rw.to) windTo(rw.from); rw.playing = true; tellRewind(true); },
+        pause() { if (rw) { rw.playing = false; tellRewind(true); } },
+        seek(t: number) { if (rw) windTo(Math.max(rw.from, Math.min(rw.to, t))); },
+        stop() { void endRewind(); },
+      };
+      /** this frame of the day played back: the playhead moves on and every moment it passes happens on the island */
+      const stepRewind = (dtMs: number) => {
+        if (!rw || !rw.playing) return;
+        const t = Math.min(rw.to, rw.t + (rw.to - rw.from) / REWIND_SECONDS * Math.min(dtMs, 250) / 1000);
+        while (rw.i < rw.events.length && rw.events[rw.i]!.t <= t) applyEvent(rw.events[rw.i++]!, true);
+        rw.t = t; showClock(t); if (t >= rw.to) rw.playing = false; tellRewind(!rw.playing);
+      };
       navigateMini.current = (x,y) => { parked=null;viewRef.current="street";viewChange.current?.("street");camera.current.follow=null;camera.current.hand={x,y,zoom:Math.max(.7,camera.current.zoom),vx:0,vy:0}; };
       cameraControl.current = action => {
         parked=null;
@@ -754,7 +821,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const perfMark = (next: string) => { const now = performance.now(); perf[perfSection] = (perf[perfSection] ?? 0) + (now - perfT); perfT = now; perfSection = next; };
       world.addChild(coastalLife.glow);
       app.ticker.add(() => {
-        if (!app) return; if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000;
+        if (!app) return; stepRewind(app.ticker.deltaMS); if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000;
         const dtf = Math.min(app.ticker.deltaMS, 100) / (1000 / 60); // this frame, in 60 Hz frames: 0.5 on a 120 Hz screen, 2 on a 30 Hz one
         stepAcc += dtf; const steps = Math.min(4, Math.floor(stepAcc)); stepAcc -= Math.floor(stepAcc);
         const prevTick = tick; tick += steps; ft += dtf; const still = quietMotion.matches;
@@ -1028,7 +1095,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           // #5: people slow behind someone ahead of them rather than walking through a crowd
           let crowd = 1;
           if (dist > 8 && !fleeing) { const ix = dx / dist, iy = dy / dist; for (const o of figs.current.values()) { if (o === f || o.asleep || o.boarding) continue; const ox = o.x - f.x, oy = o.y - f.y; const ahead = ox * ix + oy * iy; if (ahead > 6 && ahead < 44 && Math.abs(-ox * iy + oy * ix) < 18) crowd = Math.min(crowd, Math.max(0.3, ahead / 44)); } }
-          const motion = advanceWalk(dist, f.speed ?? 0, (fleeing ? 78 : f.weak ? 28 : 48) * crowd, app.ticker.deltaMS / 1000);
+          const motion = advanceWalk(dist, f.speed ?? 0, (fleeing ? 78 : f.weak ? 28 : 48) * crowd * (rw?.playing ? 5 : 1), app.ticker.deltaMS / 1000); // the day played back walks at its pace
           f.speed = motion.speed;
           const moving = dist > .01;
           if (motion.distance > 0) { f.x += dx / dist * motion.distance; f.y += dy / dist * motion.distance; }
@@ -1037,7 +1104,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (posed) f.g.position.set(f.x, f.y);
           // asleep in a bed of their own, or at the inn or the boat shed, they are indoors and out of sight; asleep anywhere else they sleep rough, in the open, for everyone to see
           const indoors = f.asleep && !moving && (f.home === f.place || f.place === "inn" || f.place === "boatshed");
-          f.g.visible = !indoors; if (indoors) continue;
+          f.g.visible = !indoors && !f.away; if (indoors || f.away) continue;
           if (moving && Math.abs(dx) > .1) f.facing = dx < 0 ? -1 : 1;
           let b = bubbles.current.get(f.id); if (b && b.until < now) { bubbles.current.delete(f.id); b = undefined; }
           const conversation = dialogue.get(f.id);
@@ -1110,7 +1177,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // after the application has drawn the frame: what the draw cost lands in "render"
       app.ticker.add(() => perfMark("idle"), undefined, UPDATE_PRIORITY.UTILITY);
     })().catch(() => { if(alive) setLoadError(true); });
-    return () => { alive = false; stopWatching?.(); cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); clearNightGlow(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
+    return () => { alive = false; stopWatching?.(); cameraControl.current = null; rewindControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); clearNightGlow(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineId, apiUrl]);
 

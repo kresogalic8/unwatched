@@ -11,10 +11,10 @@ import {
 } from "@/components/explore/ExplorePage";
 import { SessionLink } from "@/components/auth/SessionLink";
 import { Bubble, Tide } from "@/components/ui";
-import { api, hhmm, PRIVATE_KINDS, type PublicAgent, type OwnerAgent, type TownEvent } from "@/lib/api";
+import { api, hhmm, dayOf as dayNumber, PRIVATE_KINDS, type PublicAgent, type OwnerAgent, type TownEvent } from "@/lib/api";
 import { Portrait } from "@/components/Portrait";
 import { useMyAgent } from "@/lib/useAgent";
-import type { WorldSnapshot } from "@/components/World";
+import type { WorldSnapshot, RewindControl, RewindState } from "@/components/World";
 import theme from "@/components/explore/explore.module.css";
 import s from "@/components/town/town.module.css";
 const World = dynamic(() => import("@/components/World").then((m) => m.World), {
@@ -43,6 +43,10 @@ export default function Town() {
   const [hint, setHint] = useState(false);
   const [sheet, setSheet] = useState<"peek" | "open">("peek");
   const [selDay, setSelDay] = useState<TownEvent[]>([]);
+  // the day again: the last day of the record played back on the island in about a minute
+  const rewindCtl = useRef<RewindControl | null>(null);
+  const [rewind, setRewind] = useState<RewindState>(null);
+  const [rewinding, setRewinding] = useState(false);
   const [snapshot, setSnapshot] = useState<WorldSnapshot>({
     clock: null,
     feed: [],
@@ -138,6 +142,12 @@ export default function Town() {
   }
   useEffect(() => {setSel(current => current ? snapshot.citizens.find(p=>p.id===current.id) ?? current : null);}, [snapshot.citizens]);
   const rel = agent?.people.find((p) => p.id === sel?.id);
+  async function startRewind() {
+    if (rewinding) return;
+    setRewinding(true); setSel(null); setTracking(null); setFollow(false); setPossessed(false); changeView("cinema");
+    try { await rewindCtl.current?.start(24); } catch { setRewinding(false); }
+  }
+  function stopRewind() { rewindCtl.current?.stop(); setRewinding(false); changeView("street"); }
   function toggleMiniature() { setMiniature((m) => { try { localStorage.setItem("uw.look", m ? "town" : "miniature"); } catch {} return !m; }); }
   function dismissHint() { setHint(false); try { localStorage.setItem("uw.townHint", "1"); } catch {} }
   function open(person: PublicAgent) { setSel(person); setJournalOpen(true); setSheet("open"); }
@@ -174,6 +184,8 @@ export default function Town() {
           miniature={miniature}
           onMiniatureChange={toggleMiniature}
           onSnapshot={setSnapshot}
+          rewindControl={rewindCtl}
+          onRewind={setRewind}
         />
       </section>
       {!clean && (
@@ -191,6 +203,7 @@ export default function Town() {
               </svg>
               <strong>{c ? `Day ${c.day}` : "Connecting"}</strong>
               <span className={s.clock}>{c ? `${String(c.hour).padStart(2, "0")}:${String(c.minute % 60).padStart(2, "0")}` : "—"}</span>
+              {rewinding && <span className={s.replayTag}>The day again</span>}
               <span className={s.weather}>{c?.weather}{typeof c?.temperatureC === "number" ? ` · ${Math.round(c.temperatureC)}°` : ""}</span>
             </div>
           </header>
@@ -238,7 +251,7 @@ export default function Town() {
                     <div aria-label="Recent island events" className={s.list}>
                       {feed.length ? (
                         <>
-                          <div className={s.listHead}><span>Happening now</span><span>Tap one to see it</span></div>
+                          <div className={s.listHead}><span>{rewinding ? "As it happened" : "Happening now"}</span><span>Tap one to see it</span></div>
                           {feed.slice(0, 14).map((e, i) => {
                             const who = byId.get(e.actors[0] ?? "");
                             return (
@@ -384,7 +397,25 @@ export default function Town() {
             )}
           </aside>
 
-          <nav className={s.views} aria-label="View of the town" data-panel={journalOpen}>
+          {rewinding && (
+            <div className={s.rewind} role="group" aria-label="The last day, played back" data-panel={journalOpen}>
+              <button className={s.play} aria-label={rewind?.playing ? "Pause" : "Play"} disabled={!rewind} onClick={() => rewind?.playing ? rewindCtl.current?.pause() : rewindCtl.current?.play()}>
+                <ArrowIcon name={rewind?.playing ? "pause" : "play"} size={20} />
+              </button>
+              <span className={s.rewindTime} aria-live="off">{rewind ? `Day ${dayNumber(Math.floor(rewind.t))} · ${hhmm(Math.floor(rewind.t))}` : "Fetching the day…"}</span>
+              <div className={s.track}>
+                {rewind && rewind.marks.map((m, i) => (
+                  <button key={i} className={s.moment} style={{ left: `${((m.t - rewind.from) / Math.max(1, rewind.to - rewind.from)) * 100}%` }} data-big={m.importance >= 0.8} title={`${hhmm(m.t)} · ${m.text}`} aria-label={`${hhmm(m.t)}: ${m.text}`} onClick={() => rewindCtl.current?.seek(m.t - 20)} />
+                ))}
+                <input type="range" aria-label="Time of day" min={rewind?.from ?? 0} max={rewind?.to ?? 1} step={1} value={Math.floor(rewind?.t ?? 0)} disabled={!rewind}
+                  aria-valuetext={rewind ? `Day ${dayNumber(Math.floor(rewind.t))}, ${hhmm(Math.floor(rewind.t))}` : undefined}
+                  onChange={(e) => rewindCtl.current?.seek(Number(e.target.value))} />
+              </div>
+              <button className={s.live} onClick={stopRewind} aria-label="Back to live"><span className={s.liveDot} aria-hidden="true" /><span className={s.liveLong}>Back to live</span><span className={s.liveShort}>Live</span></button>
+            </div>
+          )}
+
+          <nav className={s.views} aria-label="View of the town" data-panel={journalOpen} hidden={rewinding}>
             {views.map(([v, label, icon]) => (
               <button key={v} aria-pressed={view === v} aria-label={label} onClick={() => { setTracking(null); setFollow(false); changeView(v); }}>
                 <ArrowIcon name={icon} size={20} /><span>{label}</span>
@@ -392,6 +423,10 @@ export default function Town() {
             ))}
             <button aria-pressed={miniature} aria-label="Miniature" onClick={toggleMiniature}>
               <ArrowIcon name="model" size={20} /><span>Miniature</span>
+            </button>
+            <span className={s.navRule} aria-hidden="true" />
+            <button aria-label="The last day again" title="Play the last day back in a minute" onClick={() => void startRewind()}>
+              <ArrowIcon name="rewind" size={20} /><span>The day again</span>
             </button>
           </nav>
 
