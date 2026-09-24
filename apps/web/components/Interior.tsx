@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Application, Container, Graphics } from "pixi.js";
-import { Citizen, lookFor, aged, type Look, type Pose } from "@/components/world/citizen";
+import { lookFor, aged, type Look, type Pose } from "@/components/world/citizen";
+import { Figurine, FIGURE_SCALE } from "@/components/world/figurine";
 
 export type InteriorPerson = { id: string; name: string; asleep: boolean; job: string | null; appearance: Record<string, unknown> | null; age?: number; carrying?: string | null; pose?: "sleep" | "work" | "sit" | "idle" };
 
@@ -78,13 +79,13 @@ export function Interior({ kind, sprite, hour, people, stock }: { kind: string; 
       const fur = new Graphics(); const spots = furnish(fur, kind, sprite, W, H, floorY, stock ?? {}); stage.addChild(fur);
       if (night) { const lamp = new Graphics(); for(let i=6;i>0;i--)lamp.ellipse(W/2,65,20+i*10,25+i*11).fill({color:LIGHT.lamp,alpha:.025}); lamp.moveTo(W/2,8).lineTo(W/2,22).stroke({width:1,color:INK});lamp.poly([W/2-9,27,W/2,18,W/2+9,27]).fill(WOOD);lamp.circle(W / 2, 27, 3).fill(LIGHT.lamp); stage.addChild(lamp); }
       // people, each at a spot that fits their pose
-      const rigs: Citizen[] = []; let si = 0, bi = 0, wi = 0, xi = 0;
+      const rigs: Figurine[] = []; let si = 0, bi = 0, wi = 0, xi = 0;
       for (const p of people.slice(0, 8)) {
         const pose: Pose = p.asleep || p.pose === "sleep" ? "sleep" : p.pose === "work" ? "work" : p.pose === "sit" ? "sit" : "idle";
-        const c = new Citizen(aged(lookFor(p.name, p.appearance as Partial<Look> | null), p.age ?? 30)); c.age(p.age ?? 30); c.trade(p.job); c.hold(p.carrying ?? null); c.scale.set(1.15); c.setPose(pose);
+        const c = new Figurine(aged(lookFor(p.name, p.appearance as Partial<Look> | null), p.age ?? 30)); c.age(p.age ?? 30); c.trade(p.job); c.hold(p.carrying ?? null); c.scale.set(1.15 * FIGURE_SCALE); c.setPose(pose);
         let at: [number, number] | undefined;
         if (pose === "sleep") at = spots.beds[bi++]; else if (pose === "work") at = spots.benches[wi++]; else if (pose === "sit") at = spots.seats[si++];
-        if (pose === "sit" && at) c.seatAt(-12/1.15);
+        if (pose === "sit" && at) c.seatAt(0); // the spot is the seat itself
         if (!at) { if(pose === "sit") c.setPose("idle"); at = [45 + (xi++ % 8) * 54, floorY + 28]; }
         c.position.set(at[0], at[1]); c.face(at[0] < W / 2 ? 1 : -1); stage.addChild(c); rigs.push(c);
       }

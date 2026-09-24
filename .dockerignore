@@ -8,3 +8,9 @@ out
 .git
 **/.env
 **/.env.*
+# not needed to build or run either image: docs media, local research, generated working files
+docs
+graft
+artifacts
+**/*.blend
+apps/web/public/sound/*.wav

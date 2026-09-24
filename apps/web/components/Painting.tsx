@@ -2,8 +2,9 @@
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef } from "react";
 import { Application, Container, Graphics, Text } from "pixi.js";
-import { Citizen, lookFor } from "@/components/world/citizen";
-import { loadWorldArt, drawThing } from "@/components/world/buildings";
+import { lookFor } from "@/components/world/citizen";
+import { Figurine, FIGURE_SCALE } from "@/components/world/figurine";
+import { loadWorldArt, drawThing, streetHouse } from "@/components/world/buildings";
 import type { PaperScene } from "@/lib/api";
 import { KELP, SAND, GROUND, LIGHT, SKY } from "@/components/world/palette";
 
@@ -36,12 +37,12 @@ export function Painting({ scene, edition }: { scene: PaperScene; edition: numbe
       const sea = new Graphics(); sea.rect(0, H * 0.58, W, H * 0.08).fill(night ? 0x1f3a42 : scene.weather === "storm" ? 0x4c6a74 : GROUND.waterDeep); stage.addChild(sea);
       const ground = new Graphics(); ground.rect(0, H * 0.64, W, H * 0.36).fill(night ? 0x3a4a44 : scene.weather === "rain" || scene.weather === "storm" ? GROUND.wetSand : GROUND.sand); ground.ellipse(W / 2, H * 0.78, 300, 44).fill({ color: 0xffffff, alpha: night ? 0.04 : 0.18 }); stage.addChild(ground);
       // the place
-      const d = drawThing(scene.sprite) ?? drawThing("house");
+      const d = drawThing(streetHouse(scene.sprite, 0) ?? scene.sprite) ?? drawThing(streetHouse("house", 0) ?? "house"); // the place as the town draws it now
       if (d) { const s = Math.min(2.4, 240 / d.w); d.c.scale.set(s); d.c.position.set(W / 2, H * 0.74); stage.addChild(d.c); }
       // the people who were there
-      const names = scene.actors.slice(0, 4); const rigs: Citizen[] = [];
+      const names = scene.actors.slice(0, 4); const rigs: Figurine[] = [];
       names.forEach((n, i) => {
-        const c = new Citizen(lookFor(n, null)); c.scale.set(2.1);
+        const c = new Figurine(lookFor(n, null)); c.scale.set(2.1 * FIGURE_SCALE);
         const side = i % 2 === 0 ? -1 : 1; const k = Math.floor(i / 2);
         c.position.set(W / 2 + side * (150 + k * 70), H * 0.84 + k * 10); c.face(side === -1 ? 1 : -1);
         c.setPose(names.length >= 2 ? "talk" : night ? "idle" : "work"); stage.addChild(c); rigs.push(c);

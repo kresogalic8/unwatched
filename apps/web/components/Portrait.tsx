@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Application, Container, Graphics } from "pixi.js";
-import { Citizen, lookFor, aged, type Look } from "@/components/world/citizen";
-import { CITIZEN_BODY } from "@/components/world/person-art";
+import { lookFor, aged, type Look } from "@/components/world/citizen";
+import { Figurine, headHeight } from "@/components/world/figurine";
 import { SAND, CREAM_DARK } from "@/components/world/palette";
 
 /**
- * A portrait: head and shoulders from the same rig that walks the street, drawn once per person and kept, so a face
+ * A portrait: head and shoulders of the same painted figurine that walks the street, drawn once per person and kept, so a face
  * becomes familiar across the digest, the book, the paper and the library. One hidden renderer serves every portrait.
  */
 const cache = new Map<string, Promise<string>>();
@@ -23,10 +23,10 @@ export function portraitFor(name: string, appearance: Partial<Look> | null | und
       const a = await renderer(); const stage = new Container();
       const bg = new Graphics(); bg.circle(48, 48, 46).fill(CREAM_DARK).stroke({ width: 1.5, color: SAND }); stage.addChild(bg);
       const look = aged(lookFor(name, appearance), age);
-      const c = new Citizen(look); c.age(age); c.setPose("idle");
-      const ageScale = age < 16 ? 0.62 + age / 16 * 0.3 : age >= 70 ? 0.94 : 1;
-      const tall = look.build === "Tall" ? 1.14 : 1;
-      c.scale.set(3.2 / ageScale); c.position.set(48, 36 - CITIZEN_BODY.headY * tall * 3.2);
+      const c = new Figurine(look, 0); c.age(age); c.setPose("idle"); c.facing4("front");
+      // the head fills the upper circle whatever the age: children are drawn smaller, so they are framed closer
+      const ageScale = age < 16 ? 0.62 + age / 16 * 0.3 : age >= 70 ? 0.95 : 1; const s = 2.5 / ageScale;
+      c.scale.set(s); c.position.set(48, 46 + headHeight(look, age) * s);
       c.update(0.4); stage.addChild(c);
       const mask = new Graphics(); mask.circle(48, 48, 46).fill(0xffffff); stage.addChild(mask); stage.mask = mask;
       const canvas = a.renderer.extract.canvas(stage) as HTMLCanvasElement; const url = canvas.toDataURL("image/png"); stage.destroy({ children: true }); return url;

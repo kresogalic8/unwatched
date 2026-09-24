@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { DALMATIAN_FOR, atlasName } from "@/components/world/dalmatian";
+
+/** The island draws its buildings in the Dalmatian style now; the landing island shows the same ones. */
+const drawingOf = (name: string) => { const m = DALMATIAN_FOR[name]; return m ? atlasName(m.kind, m.variant ?? 0) : name; };
 
 /** A small illustrative diorama using the actual harbor atlas, not a fake live feed. */
 export default function IslandScene({
@@ -141,7 +145,7 @@ export default function IslandScene({
     let loaded = 0;
     for (const [name, x, z, height] of objects) {
       loader.load(
-        `/harbor/${name}.png`,
+        `/harbor/${drawingOf(name)}.webp`,
         (texture) => {
           if (disposed) {
             texture.dispose();
@@ -164,7 +168,7 @@ export default function IslandScene({
           sprites.push(material);
           resources.push(texture, material);
           if (["inn", "house", "bakery", "harbor-office"].includes(name))
-            loader.load(`/harbor/${name}-lit.png`, (lit) => {
+            loader.load(`/harbor/${drawingOf(name)}-lit.webp`, (lit) => {
               if (disposed) {
                 lit.dispose();
                 return;

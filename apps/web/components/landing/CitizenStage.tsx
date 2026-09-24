@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Application, Container, Graphics } from "pixi.js";
-import { Citizen, lookFor, type Look } from "@/components/world/citizen";
+import { lookFor, type Look } from "@/components/world/citizen";
+import { Figurine, FIGURE_SCALE } from "@/components/world/figurine";
 
 const looks: Partial<Look>[] = [
   {
@@ -88,7 +89,7 @@ export default function CitizenStage({
       const group = new Container();
       a.stage.addChild(group);
       const citizens = looks.map((look, index) => {
-        const c = new Citizen(lookFor(`Landing sample ${index}`, look));
+        const c = new Figurine(lookFor(`Landing sample ${index}`, look));
         c.age(index === 3 ? 67 : 30);
         c.facing4("front");
         group.addChild(c);
@@ -104,7 +105,7 @@ export default function CitizenStage({
         ground.clear();
         citizens.forEach((c, i) => {
           const x = mobile ? w / 2 + (((i-offset+2)%4+4)%4-2)*w : (w * (i + 0.5)) / 4;
-          const scale = mobile ? Math.min(h / 105, w / 135) : Math.min(h / 108, w / 390);
+          const scale = (mobile ? Math.min(h / 105, w / 135) : Math.min(h / 108, w / 390)) * FIGURE_SCALE;
           c.scale.set(scale);
           c.position.set(x, h * 0.88);
           ground

@@ -155,6 +155,9 @@ importers:
       '@types/three':
         specifier: ^0.186.0
         version: 0.186.0
+      sharp:
+        specifier: ^0.35.4
+        version: 0.35.4(@types/node@22.20.2)
       tailwindcss:
         specifier: ^4.3.0
         version: 4.3.3
@@ -1885,8 +1888,7 @@ snapshots:
     dependencies:
       hono: 4.13.7
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.4':
     optionalDependencies:
@@ -2764,8 +2766,7 @@ snapshots:
 
   scheduler@0.28.0: {}
 
-  semver@7.8.5:
-    optional: true
+  semver@7.8.5: {}
 
   sharp@0.35.4(@types/node@22.20.2):
     dependencies:
@@ -2799,7 +2800,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.4
       '@img/sharp-win32-x64': 0.35.4
       '@types/node': 22.20.2
-    optional: true
 
   siginfo@2.0.0: {}
 

@@ -25,7 +25,7 @@ export default function Towns() {
   const chosen = towns?.find((t) => t.id === dest && (t.live || t.far)) ?? towns?.find((t) => t.live) ?? towns?.[0];
   const choose = (id: string) => { setDest(id); try { localStorage.setItem("ft.town", id); } catch {} };
   return (
-    <ExplorePage eyebrow="The archipelago · destinations" title="A world beyond the shore." description="Every island has its own people, rules, and unfinished stories. Choose where your citizen’s life begins." art="/harbor/house.png">
+    <ExplorePage eyebrow="The archipelago · destinations" title="A world beyond the shore." description="Every island has its own people, rules, and unfinished stories. Choose where your citizen’s life begins." art="/harbor/dal-stone.png">
       {err && <Offline />}
       {!err && !towns && <Loading what="Looking out across the islands." />}
       {towns && <>

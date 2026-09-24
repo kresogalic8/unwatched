@@ -11,6 +11,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBL
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @unwatched/web...
 RUN pnpm --filter @unwatched/web exec next build --webpack
+# character research art only serves /experiments, which is a 404 outside development; it stays in the repo but not in the image
+RUN rm -rf apps/web/public/characters apps/web/public/studies
 
 FROM base AS run
 ARG RELEASE_VERSION=dev

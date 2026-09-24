@@ -207,10 +207,11 @@ export class Weather {
     for (let i = 0; i < 16; i++) { const b = new Sprite(this.disc); b.anchor.set(0.5); b.alpha = 0; this.fog.addChild(b); this.banks.push(b); this.bankSeed.push({ x: r() * (W + 1400) - 700, y: r() * (H + 300) - 150, v: 0.6 + r() * 0.8, w: 800 + r() * 700, h: 240 + r() * 200, a: 0.34 + r() * 0.2 }); }
     this.rain.visible = false; this.snow.visible = false; this.fog.visible = false;
   }
-  update(o: { weather: string; wind: number; snowing: boolean; wet: boolean; tick: number; night: number; fogColor: number; rainColor: number }): void {
-    const { W, H } = this; const t = o.tick;
+  /** tick is time in 60 Hz frames, and may be fractional; dt is this frame in the same units; density thins what falls, for reduced motion. */
+  update(o: { weather: string; wind: number; snowing: boolean; wet: boolean; tick: number; dt?: number; density?: number; night: number; fogColor: number; rainColor: number }): void {
+    const { W, H } = this; const t = o.tick; const density = o.density ?? 1;
     const raining = o.wet && !o.snowing, snowing = o.wet && o.snowing;
-    const n = raining ? (o.weather === "storm" ? 900 : 520) : 0;
+    const n = raining ? Math.round((o.weather === "storm" ? 900 : 520) * density) : 0;
     const tilt = o.wind * 0.55;
     this.rain.visible = raining; this.snow.visible = snowing;
     const wrap = (v: number, lo: number, span: number) => ((((v - lo) % span) + span) % span) + lo;
@@ -222,7 +223,7 @@ export class Weather {
       const y = wrap(sd.y + t * speed, -200, H + 400);
       d.position.set(x, y); d.rotation = -tilt; d.scale.set(1, sd.len * (1 + (o.weather === "storm" ? 0.6 : 0.2))); d.tint = o.rainColor; d.alpha = sd.a;
     }
-    const m = snowing ? (o.weather === "storm" ? 500 : 300) : 0;
+    const m = snowing ? Math.round((o.weather === "storm" ? 500 : 300) * density) : 0;
     for (let i = 0; i < this.flakes.length; i++) {
       const f = this.flakes[i]!; const sd = this.flakeSeed[i]!;
       if (i >= m) { f.alpha = 0; continue; }
@@ -233,7 +234,7 @@ export class Weather {
     }
     // fog: banks that drift with the wind; a thin haze in rain; nothing on a clear day
     this.fogTarget = o.weather === "fog" ? 1 : raining ? 0.22 : 0;
-    this.fogAlpha += (this.fogTarget - this.fogAlpha) * 0.06;
+    this.fogAlpha += (this.fogTarget - this.fogAlpha) * (1 - Math.pow(0.94, o.dt ?? 1));
     this.fog.visible = this.fogAlpha > 0.01;
     this.veil.tint = o.fogColor; this.veil.alpha = 0.34 * this.fogAlpha * (1 - o.night * 0.5);
     if (this.fog.visible) for (let i = 0; i < this.banks.length; i++) {

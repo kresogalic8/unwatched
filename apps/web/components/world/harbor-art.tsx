@@ -52,6 +52,32 @@ export function Door({u,v,arch=false,color="#547666"}:{u:number;v:number;arch?:b
  <circle cx="27" cy="-26" r="1.4" fill="#d4b07d"/><path d="M-7 1H42L45 6H-10Z" fill="#d8ceb5" stroke="#989b83" strokeWidth=".7"/>
  </g>;
 }
+/** Every kind of house on the street: name, width along the lane, depth, wall height, whether it has a café front, front and side wall colours. The atlas and the light studies both build from this. */
+export const HOUSE_SPECS = [
+ ['house',130,95,142,false,'#ece3cc','#c4c5ac'],['cottage',110,85,106,false,'#ddd5b8','#b8bca2'],
+ ['shop',145,100,130,true,'#e4c4a0','#bbb59a'],['inn',160,110,192,false,'#ece3cc','#c4c5ac'],
+ ['tavern',149,105,133,true,'#e4c4a0','#bbb59a'],['bakery',140,95,142,true,'#ead9b9','#c4bea2'],
+ ['chandlery',100,80,158,false,'#d9d8be','#b4bca4'],['harbor-office',110,85,130,false,'#ddd5b8','#b8bca2'],
+ ['smithy',132,100,102,true,'#d7ccb4','#afa991'],['fishhouse',125,85,90,true,'#d9d8be','#b4bca4'],
+ ['boatshed',145,100,88,true,'#ddd5b8','#b8bca2'],['council',175,115,177,false,'#ece3cc','#c4c5ac'],
+ ] as const;
+/** A building's surfaces by the way they face, for the atlas's light masks: red faces the lane (+v), green faces along it (+u), blue faces the sky. Painted in the drawing's own order, so what the roof hides stays hidden. */
+export function HouseFaces({u,v,w,d,h,cafe=false}:{u:number;v:number;w:number;d:number;h:number;cafe?:boolean}){
+ const rise=40;const q=(i:number,j:number,k:number)=>P(u+i,v+j,k);const F=(points:Point[],fill:string)=><Face points={points} fill={fill} stroke={fill}/>;
+ const R="#ff0000",G="#00ff00",B="#0000ff";
+ return <g>
+ {F([q(0,d,0),q(w,d,0),q(w,d,h),q(0,d,h)],R)}
+ {F([q(w,d,0),q(w,0,0),q(w,0,h),q(w,d,h)],G)}
+ {F([q(-3,d+3,h),q(w+4,d+3,h),q(w+4,d+3,h-7),q(-3,d+3,h-7)],R)}
+ {F([q(-7,-6,h),q(w+7,-6,h),q(w+7,d/2,h+rise),q(-7,d/2,h+rise)],B)}
+ {F([q(w+7,-6,h),q(w+7,d+6,h),q(w+7,d/2,h+rise)],G)}
+ {F([q(-7,d+6,h),q(w+7,d+6,h),q(w+7,d/2,h+rise),q(-7,d/2,h+rise)],B)}
+ {F([q(w-32,14,h+5),q(w-18,14,h+5),q(w-18,14,h+54),q(w-32,14,h+54)],R)}
+ {F([q(w-18,14,h+5),q(w-18,2,h+5),q(w-18,2,h+54),q(w-18,14,h+54)],G)}
+ {F([q(w-35,0,h+54),q(w-15,0,h+54),q(w-15,17,h+54),q(w-35,17,h+54)],B)}
+ {cafe&&<>{F([q(7,d+1,66),q(97,d+1,66),q(97,d+41,52),q(7,d+41,52)],B)}{F([q(7,d+41,52),q(97,d+41,52),q(97,d+41,46),q(7,d+41,46)],R)}</>}
+ </g>;
+}
 export function House({u,v,w,d,h,name,color="#ece3cc",side="#c4c5ac",roof=0,lit=false,cafe=false}:{u:number;v:number;w:number;d:number;h:number;name:string;color?:string;side?:string;roof?:number;lit?:boolean;cafe?:boolean}){
  const rise=40;const front=v+d;const q=(i:number,j:number,k:number)=>P(u+i,v+j,k);
  const frontPolygon=pts([q(0,d,0),q(w,d,0),q(w,d,h),q(0,d,h)]);

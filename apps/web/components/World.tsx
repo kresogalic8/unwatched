@@ -13,16 +13,20 @@ import { previewZoom, coast } from "./world/camera-motion";
 import { constructionStage } from "@unwatched/protocol";
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef, useState } from "react";
-import { Application, Container, Graphics, Rectangle, Text, TextStyle } from "pixi.js";
+import { Application, BlurFilter, Container, Graphics, Rectangle, Text, TextStyle } from "pixi.js";
 import { API, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
 import { Citizen, lookFor, aged, type Look, type Pose } from "./world/citizen";
+import { Figurine } from "./world/figurine";
+/** Every citizen is a painted figurine; `?figures=classic` puts back the drawn rig they replaced. */
+type Rig = Citizen | Figurine;
 import { Ambience } from "./world/ambience";
 import { ProjectDetails, type CommunityView } from "./CommunityProjects";
-import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason } from "./world/buildings";
+import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, setClassicHouses, streetHouse } from "./world/buildings";
+import { DALMATIAN_FOR, chimneyTop, forgeAt, lanternAt } from "./world/dalmatian";
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
 import { Life, type Critter } from "./world/life";
-import { Post } from "./world/post";
+import { Post, gradeFor, NEUTRAL, type Grade } from "./world/post";
 import { Particles } from "./world/particles";
 import { drawGround, drawRoads, segmentsOf, keepOffRoads, Wear, noise } from "./world/terrain";
 import { Interior, type InteriorPerson } from "./Interior";
@@ -41,7 +45,7 @@ type TownView = Clock & { size: { w: number; h: number }; places: PlaceView[] };
 
 
 /** Trees, rocks and props laid by district so the island reads as a landscape and not a diagram. Positions are map units. */
-function decorFor(places: PlaceView[]): { sprite: string; x: number; y: number; w?: number; flip?: boolean }[] {
+export function decorFor(places: Pick<PlaceView, "id" | "x" | "y" | "sprite">[]): { sprite: string; x: number; y: number; w?: number; flip?: boolean }[] {
   const at = (id: string) => places.find((p) => p.id === id) ?? { x: 0, y: 0 };
   const h = at("harbor"), m = at("market"), pw = at("pinewood"), q = at("quarry"), f = at("fields"), o = at("orchard"), cv = at("cove"), lh = at("lighthouse"), sh = at("shore"), ln = at("lane");
   const out: { sprite: string; x: number; y: number; w?: number; flip?: boolean }[] = [
@@ -84,7 +88,7 @@ function lookSvg(hash: string): Promise<string | null> {
   return p;
 }
 
-type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Citizen; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
+type Fig = { speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Rig; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
 export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
 export function World({ mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API, selectedId = null, spotlight = null }: { apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void; selectedId?: string | null; spotlight?: { id: number; actors: string[]; place: string | null; at: number } | null }) {
@@ -96,6 +100,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
   const host = useRef<HTMLDivElement>(null);
   const cameraControl = useRef<((action: "in" | "out" | "reset") => void) | null>(null);
   const [labels, setLabels] = useState<{ id: string; name: string; x: number; y: number; mine: boolean; shown: boolean; activity?: string; bubble?: string }[]>([]);
+  const labelEls = useRef(new Map<string, HTMLDivElement>());
+  const labelPos = useRef(new Map<string, { x: number; y: number }>());
+  const labelKey = useRef("");
   const [feed, setFeed] = useState<TownEvent[]>([]);
   const [clock, setClock] = useState<Clock | null>(null);
   const [ready, setReady] = useState(false);
@@ -126,7 +133,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
     let suppressSelectUntil = 0;
     const dialogue = new Map<string, { peers: string[]; until: number }>();
     const speechTimers = new Set<ReturnType<typeof setTimeout>>();
-    let app: Application | null = null; let ws: WebSocket | null = null; let alive = true; let inited = false; let poll: ReturnType<typeof setInterval> | null = null;
+    let app: Application | null = null; let stopWatching: (() => void) | null = null; let ws: WebSocket | null = null; let alive = true; let inited = false; let poll: ReturnType<typeof setInterval> | null = null;
     (async () => {
       const el = host.current!;
       const townView = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView;
@@ -143,7 +150,11 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // a filmed move: ?to=place,dx,dy&zoomTo=1.8&over=8&delay=1 glides the camera from `at` to `to` over that many seconds, eased both ends
       const q = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
       const moveTo_ = parkAt(q?.get("to") ?? null); const zoomToParam = previewZoom(q?.get("zoomTo")); const moveOver = Number(q?.get("over")) || 8; const moveDelay = Number(q?.get("delay")) || 0.8; const moveStart = performance.now();
-      const nofx = new Set((q?.get("nofx") ?? "").split(",").filter(Boolean)); // ?nofx=water,dark,glow,sky,clouds,weather,post switches one layer off, for profiling
+      const nofx = new Set((q?.get("nofx") ?? "").split(",").filter(Boolean));
+      const classic = q?.get("houses") === "classic"; setClassicHouses(classic);
+      const classicFigures = q?.get("figures") === "classic";
+      /** a citizen's figure at the size the street wants it */
+      const makeRig = (look: Look): Rig => { const r = classicFigures ? new Citizen(look) : new Figurine(look); r.scale.set(classicFigures ? 0.82 : 0.95); return r; }; // ?houses=classic: the drawings the Dalmatian houses replaced // ?nofx=water,dark,glow,sky,clouds,weather,post switches one layer off, for profiling
       const moveP = () => { const t = Math.max(0, Math.min(1, (performance.now() - moveStart) / 1000 - moveDelay) / moveOver); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
       if (!alive) return;
       app = new Application();
@@ -152,10 +163,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       inited = true;
       if (!alive) { try { app.destroy(true); } catch {} return; }
       el.appendChild(app.canvas);
+      // nobody is looking: a hidden tab or a town scrolled out of view stops drawing; the stream keeps the record current meanwhile
+      { let onScreen = true; const run = () => { if (!app) return; const on = onScreen && !document.hidden; if (on && !app.ticker.started) app.ticker.start(); else if (!on && app.ticker.started) app.ticker.stop(); };
+        const io = new IntersectionObserver(([en]) => { onScreen = !!en?.isIntersecting; run(); }); io.observe(el);
+        document.addEventListener("visibilitychange", run);
+        stopWatching = () => { io.disconnect(); document.removeEventListener("visibilitychange", run); }; }
       const world = new Container(); app.stage.addChild(world);
 
       // sea, with slow ripples
-      const sea = new Graphics(); world.addChild(sea);
+      const sea = new Graphics(); sea.rect(-3000, -3000, W + 6000, H + 6000).fill(C.water); world.addChild(sea); // one rectangle, drawn once; the weather tints it and the water filter moves it
       const ripples: Graphics = new Graphics(); world.addChild(ripples);
       // the island: a soft blob, big enough that every district has shore or hill behind it. Its outline is one smooth curve;
       // the shallows and the foam follow it, the wet sand sits inside it, and the tiles stop just short of it.
@@ -302,13 +318,13 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const t = new Text({ text: `${p.site.name} · ${p.site.done} of ${p.site.of}`, style: smallStyle }); t.anchor.set(0.5, 0); t.position.set(0, 6); g.addChild(t);
         } else if (p.sprite.startsWith("look:")) {
           // a building someone described: the plain kind stands in until the island's drawing of it arrives
-          const stand = local(bldVariant(p.kind === "shop" ? "shop" : "house", p.x, p.y));
+          const standIn = p.kind === "shop" ? "shop" : "house"; const stand = local(streetHouse(standIn, vhash(p.x, p.y, 13)) ?? bldVariant(standIn, p.x, p.y));
           void lookSvg(p.sprite.slice(5)).then((svg) => { if (!svg || g.destroyed) return; const d = new Graphics(); try { d.svg(svg); } catch { return; } const b = d.getLocalBounds(); if (b.width < 1) return; const target = p.kind === "shop" ? 120 : 104; const sc = target / b.width; d.scale.set(sc); d.position.set(-(b.x + b.width / 2) * sc, -(b.y + b.height) * sc); d.zIndex = 0; stand?.destroy(); g.addChild(d); });
         } else {
-          local(bldVariant(p.sprite, p.x, p.y));
+          const drawing = streetHouse(p.sprite, vhash(p.x, p.y, 13)) ?? bldVariant(p.sprite, p.x, p.y); local(drawing);
           // #3: moss and lichen creep up the foot of a building, a little on every one and more on some, so the stone reads as lived-in and aged
           if (ROOF_Y[p.sprite] !== undefined) { const moss = new Graphics(); const n = 8 + Math.floor(vhash(p.x, p.y, 7) * 11); for (let i = 0; i < n; i++) { const mx = -54 + vhash(p.x + i, p.y, 8) * 108, mz = vhash(p.x, p.y + i, 9) * 30; moss.ellipse(mx, -mz, 3.5 + vhash(i, p.y, 10) * 5, 2.2 + vhash(i, p.x, 11) * 3).fill({ color: i % 3 ? 0x6f8158 : 0x8a9470, alpha: 0.2 + vhash(i, i + 3, 12) * 0.16 }); } moss.zIndex = 0.3; g.addChild(moss); }
-          if (p.stock) { const st = drawStock(p.sprite, p.stock); if (st) { st.zIndex = 1; g.addChild(st); } }
+          if (p.stock) { const st = drawStock(p.sprite, p.stock, drawing); if (st) { st.zIndex = 1; g.addChild(st); } }
           // the shelf is bare: a board leans by the door until the cart or the work fills it again
           if (p.stock && (p.kind === "shop" || p.kind === "workplace" || p.kind === "market") && Object.values(p.stock).every((v) => v <= 0)) { const sg = drawSign("nothing left"); sg.position.set(-58, -10); sg.zIndex = 2; g.addChild(sg); const st = new Text({ text: "Sold out", style: { ...smallStyle, fontSize: 7, stroke: { color: 0xeee3cc, width: 0 } } }); st.anchor.set(0.5, 0.5); st.position.set(-58, -33); st.zIndex = 3; g.addChild(st); }
           // owned: the owner's name on a board by the door
@@ -330,7 +346,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); onSelect(null); placePast.current=null; setPlaceInfo({ decorations:p.decorations, community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, carrying:a.carrying, ...(a.pose ? { pose: a.pose } : {}) })) }); });
       };
       for (const p of places.values()) drawPlace(p);
-      const decor = keepOffRoads(decorFor([...places.values()]), segs);
+      // the konoba brings its own tables under its vine, so the tavern's terrace and parasol stay away
+      const tavern = places.get("tavern"); const konoba = !classic && !!tavern && DALMATIAN_FOR[tavern.sprite]?.kind === "konoba";
+      const decor = keepOffRoads(decorFor([...places.values()]), segs).filter((d) => !(konoba && tavern && /^(terrace|parasol)$/.test(d.sprite) && Math.hypot(d.x - tavern.x, d.y - tavern.y) < 160));
       let trees: Container[] = [];
       const plantTrees = () => {
         treeSpecs.length = 0; // rebuilt from scratch each replant, so season changes never pile shadows up
@@ -356,10 +374,11 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const aboard: Container[] = []; // figures riding the boat, parented to it
       const gulls = new Graphics(); gulls.zIndex = 180000; scene.addChild(gulls);
       const rays = new Graphics(); rays.zIndex = 148000; rays.blendMode = "add"; scene.addChild(rays); // soft light shafts through the pinewood at dawn and dusk; additive, so they glow where they cross shade and vanish over the brightest sand
-      const roofGlow = new Graphics(); roofGlow.zIndex = 155000; roofGlow.blendMode = "add"; scene.addChild(roofGlow); // the low sun catching the upper walls and roofs on the side it stands
       const CHIMNEYS: Record<string, [number, number]> = { smithy: [44, -150], bakery: [30, -180], inn: [60, -210], mill: [0, -220], tavern: [40, -150], fishhouse: [30, -120] };
       const litHearths = new Set<string>();
       const HEARTHS: Record<string, [number, number]> = { inn: [60, -210], tavern: [40, -150], chandlery: [30, -150], boatshed: [20, -120], council: [50, -190] }; // where a fire is kept for the people inside, not the work
+      // a Dalmatian house smokes from its own chimney
+      if (!classic) for (const table of [CHIMNEYS, HEARTHS]) for (const id of Object.keys(table)) { const m = DALMATIAN_FOR[places.get(id)?.sprite ?? ""]; if (m) table[id] = chimneyTop(m.kind); }
       const harbor = places.get("harbor") ?? { x: 560, y: 1180 };
       const dockX = harbor.x - 420, awayX = -760;
       const boat = put("boat", dockX, harbor.y + 20)!; boat.zIndex = harbor.y - 30; let boatTarget = dockX;
@@ -374,8 +393,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // the GPU's share, behind a switch so the old street and the new can be compared: night the lights cut through, and water that moves
       const lighting = new Lighting(world, W, H); const water = new WaterFilter(); let effectsOn = false;
       water.island(cx, cy, Rx, Ry);
-      const lightArea = new Rectangle(); lighting.dark.filterArea = lightArea; lighting.glow.filterArea = lightArea; // the layers are world-sized; the filter only needs the screen, or retina fills a texture many times larger every frame
-      const post = new Post(app); // the picture after the world: the map as a miniature, the night blooming, the cinema's grain and bars
+      const lightArea = new Rectangle(); lighting.dark.filterArea = lightArea; lighting.glow.filterArea = lightArea;
+      // the ground shadows soften at their edges the way a real sun's do; blurred over the screen only, like the light layers
+      const shadowBlur = new BlurFilter({ strength: 3, quality: 2 }); shadows.filterArea = lightArea; // the layers are world-sized; the filter only needs the screen, or retina fills a texture many times larger every frame
+      const post = new Post(app); let gradeNow: Grade = NEUTRAL; // the picture after the world: the map as a miniature, the night blooming, the cinema's grain and bars
       const sunGrade = new Sky(W, H); world.addChildAt(sunGrade.veil, world.getChildIndex(lighting.glow)); world.addChild(sunGrade.glow, sunGrade.halo); // the cast under the night's layers, the light above them
       sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false;
       const clouds = new Clouds(W, H); clouds.shadows.zIndex = 0.4; scene.addChild(clouds.shadows); clouds.puffs.zIndex = 220000; scene.addChild(clouds.puffs);
@@ -388,7 +409,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // the small life: it needs to know where the posts, the benches, the yard and the trees are
       // the six o'clock cart: a carter pulling a cart along the roads, leg by leg as the record names them; empty where a link has failed
       const roadTo = (from: string, to: string): string[] => { if (from === to) return [from]; const prev = new Map<string, string | null>([[from, null]]); const q = [from]; while (q.length) { const cur = q.shift()!; for (const nx of places.get(cur)?.exits ?? []) if (!prev.has(nx)) { prev.set(nx, cur); q.push(nx); } } if (!prev.has(to)) return [from, to]; const out: string[] = []; for (let cur: string | null = to; cur; cur = prev.get(cur) ?? null) out.unshift(cur); return out; };
-      const carter = { g: new Container(), rig: new Citizen(lookFor("the carter", { build: "Sturdy", hair: "Short dark", hat: "Wide brim", carrying: "Nothing", top: "Sand", bottom: "Kelp", coral: "None" })), cart: new Container() as Container, queue: [] as { from: string; to: string; item: string; qty: number; route: string[] }[], path: [] as { x: number; y: number }[], at: null as string | null, load: null as { item: string; qty: number } | null, x: 0, y: 0, busy: false, pause: 0 };
+      const carter = { g: new Container(), rig: makeRig(lookFor("the carter", { build: "Sturdy", hair: "Short dark", hat: "Wide brim", carrying: "Nothing", top: "Sand", bottom: "Kelp", coral: "None" })), cart: new Container() as Container, queue: [] as { from: string; to: string; item: string; qty: number; route: string[] }[], path: [] as { x: number; y: number }[], at: null as string | null, load: null as { item: string; qty: number } | null, x: 0, y: 0, busy: false, pause: 0 };
       carter.rig.scale.set(0.9); carter.rig.setPose("walk"); carter.g.addChild(carter.cart); carter.g.addChild(carter.rig); carter.rig.position.set(26, 0); carter.cart.position.set(-14, 0); carter.g.visible = false; scene.addChild(carter.g);
       const setLoad = (load: { item: string; qty: number } | null) => { carter.load = load; carter.cart.removeChildren().forEach((ch) => ch.destroy({ children: true })); carter.cart.addChild(drawCart(load)); };
       setLoad(null);
@@ -423,7 +444,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         return new Life({
           perches, catSpots, dogHome: { x: harbor.x + 80, y: harbor.y + 70 }, yard: { x: f.x + 150, y: f.y + 200, r: 70 },
           trees: () => trees.map((t) => ({ x: t.position.x, y: t.position.y, h: t.scale.x > 1.3 ? 70 : 44, orchard: Math.hypot(t.position.x - o.x, t.position.y - o.y) < 260 })),
-          flag: { x: (pier?.x ?? harbor.x - 250) - 118, y: (pier?.y ?? harbor.y + 40) - 12 }, moor, spot, lantern: { x: lh.x, y: lh.y - 233 },
+          flag: { x: (pier?.x ?? harbor.x - 250) - 118, y: (pier?.y ?? harbor.y + 40) - 12 }, moor, spot, lantern: !classic && DALMATIAN_FOR[(lh as PlaceView).sprite ?? ""] ? { x: lh.x + lanternAt()[0], y: lh.y + lanternAt()[1] } : { x: lh.x, y: lh.y - 233 },
           meadows: [{ x: f.x - 40, y: f.y + 140, r: 220 }, { x: o.x, y: o.y + 40, r: 200 }, { x: pw.x - 60, y: pw.y + 120, r: 180 }], roosts: [{ x: lh.x, y: lh.y - 100 }, { x: ch.x, y: ch.y - 70 }],
         }, scene);
       })();
@@ -452,7 +473,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         let f = figs.current.get(a.id);
         if (!f) {
           const g = new Container();
-          const rig = new Citizen(aged(lookFor(a.name, a.appearance as Partial<Look> | null), a.age)); rig.scale.set(0.82); rig.age(a.age); rig.trade(a.job); rig.hold(a.carrying ?? null); g.addChild(rig);
+          const rig = makeRig(aged(lookFor(a.name, a.appearance as Partial<Look> | null), a.age)); rig.age(a.age); rig.trade(a.job); rig.hold(a.carrying ?? null); g.addChild(rig);
           g.eventMode = "static"; g.cursor = "pointer"; g.hitArea = { contains: (x: number, y: number) => x > -18 && x < 18 && y > -66 && y < 0 } as never;
           g.on("pointertap", () => { if (performance.now() >= suppressSelectUntil) { placePast.current=null; setPlaceInfo(null); onSelect(agents.current.get(a.id) ?? null); } });
           g.on("pointerover", () => { hoverRef.current = a.id; }); g.on("pointerout", () => { if (hoverRef.current === a.id) hoverRef.current = null; });
@@ -560,7 +581,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         }
       };
 
-      let tick = 0;
+      // Time runs in steps of a 60 Hz frame whatever the screen's refresh: `tick` counts whole steps for the per-step simulations
+      // (critters, embers, the cart) and the redraw cadences; `ft` is the same clock unbroken, for anything drawn as a function of time.
+      let tick = 0; let ft = 0; let stepAcc = 0; let firstFrame = true;
       // a filmed pan to a selected person or a picked event, eased both ends; the hand takes over once it lands
       let glide: { fromX: number; fromY: number; toX: number; toY: number; start: number; dur: number } | null = null;
       let lastSel: string | null = null; let lastSpotAt = 0; let lastCaptionKey = "";
@@ -581,7 +604,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const startGlide = (x: number, y: number) => {
         if (viewRef.current !== "street") { viewRef.current = "street"; viewChange.current?.("street"); }
         const h = handOn(); h.vx = 0; h.vy = 0;
-        glide = { fromX: h.x, fromY: h.y, toX: x, toY: y, start: performance.now(), dur: 900 };
+        glide = { fromX: h.x, fromY: h.y, toX: x, toY: y, start: performance.now(), dur: quietMotion.matches ? 1 : 900 }; // with reduced motion the camera cuts instead of flying
       };
       canvas.addEventListener("pointerdown", (e) => { if (viewRef.current !== "street") return; press = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, moved: false }; lastMove = { x: e.clientX, y: e.clientY, t: performance.now() }; });
       canvas.addEventListener("pointermove", (e) => { if (!press) return; const dx = e.clientX - press.cx, dy = e.clientY - press.cy; if (!press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return; press.moved = true; suppressSelectUntil = performance.now() + 250; const h = handOn(); h.x -= dx / camera.current.zoom; h.y -= dy / camera.current.zoom; const now = performance.now(); const dt = Math.max(8, now - lastMove.t); h.vx = Math.max(-30, Math.min(30, -(e.clientX - lastMove.x) / dt * 16 / camera.current.zoom)); h.vy = Math.max(-30, Math.min(30, -(e.clientY - lastMove.y) / dt * 16 / camera.current.zoom)); lastMove = { x: e.clientX, y: e.clientY, t: now }; press.cx = e.clientX; press.cy = e.clientY; });
@@ -594,7 +617,16 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const perfMark = (next: string) => { const now = performance.now(); perf[perfSection] = (perf[perfSection] ?? 0) + (now - perfT); perfT = now; perfSection = next; };
       world.addChild(coastalLife.glow);
       app.ticker.add(() => {
-        if (!app) return; if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000; tick++; perfT = performance.now(); perfSection = "camera"; perf.frames = (perf.frames ?? 0) + 1;
+        if (!app) return; if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000;
+        const dtf = Math.min(app.ticker.deltaMS, 100) / (1000 / 60); // this frame, in 60 Hz frames: 0.5 on a 120 Hz screen, 2 on a 30 Hz one
+        stepAcc += dtf; const steps = Math.min(4, Math.floor(stepAcc)); stepAcc -= Math.floor(stepAcc);
+        const prevTick = tick; tick += steps; ft += dtf; const still = quietMotion.matches;
+        const first = firstFrame; firstFrame = false;
+        /** true once each time the step clock crosses a multiple of n, so a cadence keeps its rate at any refresh */
+        const every = (n: number) => first || Math.floor(tick / n) !== Math.floor(prevTick / n);
+        /** a per-frame ease of k at 60 Hz, made the same per second at any refresh */
+        const ease = (k: number) => 1 - Math.pow(1 - k, dtf);
+        perfT = performance.now(); perfSection = "camera"; perf.frames = (perf.frames ?? 0) + 1;
         const Wd = app.screen.width, Hd = app.screen.height; const cam = camera.current;
         // a person was selected, or an event was picked from the journal: fly there, and pulse the actors
         {
@@ -616,8 +648,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const followed = viewRef.current === "street" && cam.follow ? figs.current.get(cam.follow) : null;
         const talking = followed ? followed.pose === "talk" : false;
         // the cinema breathes: the zoom swells and settles over half a minute; a followed conversation draws the camera in a step
-        const zoom = viewRef.current === "map" ? fitZoom() : viewRef.current === "cinema" ? 1.22 + Math.sin(tick / 1400) * 0.06 : hand ? hand.zoom : talking ? 1.16 : 1.05; // the map leaves sea around the island, so the horizon shows
-        const zoomAim = parked && !hand && !focusRef.current && viewRef.current === "street" && Number.isFinite(zoomParam) ? (Number.isFinite(zoomToParam) ? zoomParam + (zoomToParam - zoomParam) * moveP() : zoomParam) : zoom; cam.zoom += (zoomAim - cam.zoom) * (hand ? 0.16 : parked ? 0.5 : 0.05);
+        const zoom = viewRef.current === "map" ? fitZoom() : viewRef.current === "cinema" ? 1.22 + (still ? 0 : Math.sin(ft / 1400) * 0.06) : hand ? hand.zoom : talking ? 1.16 : 1.05; // the map leaves sea around the island, so the horizon shows
+        const zoomAim = parked && !hand && !focusRef.current && viewRef.current === "street" && Number.isFinite(zoomParam) ? (Number.isFinite(zoomToParam) ? zoomParam + (zoomToParam - zoomParam) * moveP() : zoomParam) : zoom; cam.zoom += (zoomAim - cam.zoom) * ease(hand ? 0.16 : parked ? 0.5 : 0.05);
         let fx = W / 2, fy = H / 2 + (observer && viewRef.current === "map" ? 65/zoom : 40);
         if (hand) { hand.vx = Math.max(-22, Math.min(22, hand.vx)); hand.vy = Math.max(-22, Math.min(22, hand.vy)); hand.x = Math.max(-200, Math.min(W + 200, hand.x + (press ? 0 : coast(hand.vx, app.ticker.deltaTime).distance))); hand.y = Math.max(-150, Math.min(H + 150, hand.y + (press ? 0 : coast(hand.vy, app.ticker.deltaTime).distance))); if (!press) { hand.vx = coast(hand.vx, app.ticker.deltaTime).velocity; hand.vy = coast(hand.vy, app.ticker.deltaTime).velocity; } fx = hand.x; fy = hand.y; } // the hand stays over the island and never flings it
         else if (viewRef.current === "street") { if (followed) { const lead = Math.max(-70, Math.min(70, (followed.tx - followed.x) * 0.7)); fx = followed.x + lead; fy = followed.y - 60; } else { const mk = places.get("market"); if (mk) { fx = mk.x; fy = mk.y; } } }
@@ -625,9 +657,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const stagedNow = staged.current && Date.now() < staged.current.until ? staged.current : null;
         if (viewRef.current === "cinema" && stagedNow) { fx = stagedNow.x; fy = stagedNow.y + 20; }
         else if (viewRef.current === "cinema") { const cn = cinema.current; if (cn && Date.now() - cn.at < 120000) { const f = cn.ids[0] ? figs.current.get(cn.ids[0]) : null; fx = f?.x ?? cn.x; fy = (f?.y ?? cn.y) - 50; } else { let best: PlaceView | null = null; for (const p of places.values()) if (!best || p.crowd > best.crowd) best = p; if (best) { fx = best.x; fy = best.y - 20; } } }
-        if (viewRef.current === "cinema") { const key = stagedNow ? `s:${stagedNow.place}` : cinema.current ? `c:${cinema.current.at}` : "idle"; if (key !== lastCut) { lastCut = key; cutAt = tick; } fx += Math.sin(tick / 900) * 36; fy += Math.cos(tick / 1100) * 18; } // a slow drift while the moment plays
+        if (viewRef.current === "cinema") { const key = stagedNow ? `s:${stagedNow.place}` : cinema.current ? `c:${cinema.current.at}` : "idle"; if (key !== lastCut) { lastCut = key; cutAt = tick; } if (!still) { fx += Math.sin(ft / 900) * 36; fy += Math.cos(ft / 1100) * 18; } } // a slow drift while the moment plays
         // the lower third: who is on screen and what the record says is happening, while the cinema plays
-        if (viewRef.current === "cinema" && tick % 12 === 0) {
+        if (viewRef.current === "cinema" && every(12)) {
           let capText: string | null = null, capIds: string[] = [];
           if (stagedNow) { capText = stagedNow.kind === "fire" ? "A fire on the island" : `The town gathers · ${stagedNow.kind}`; capIds = stagedNow.actors; }
           else if (cinema.current && Date.now() - cinema.current.at < 120000 && cinema.current.text) { capText = cinema.current.text; capIds = cinema.current.ids; }
@@ -639,16 +671,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (observer && focusRef.current && followed && !hand && viewRef.current === "street") fy += Math.min(160, Hd * .25) / cam.zoom;
         const tx = Wd / 2 - fx * cam.zoom, ty = Hd / 2 - fy * cam.zoom;
         const cutting = viewRef.current === "cinema" && tick - cutAt < 90; // a new moment is a cut, not a crawl
-        const ease = hand ? 1 : viewRef.current === "cinema" ? (cutting ? 0.09 : 0.02) : 0.08; cam.x += (tx - cam.x) * ease; cam.y += (ty - cam.y) * ease;
-        world.scale.set(cam.zoom); world.position.set(cam.x, cam.y); lightArea.x = -cam.x / cam.zoom; lightArea.y = -cam.y / cam.zoom; lightArea.width = Wd / cam.zoom; lightArea.height = Hd / cam.zoom; // the screen, in world space, for the light filters
+        const camEase = hand ? 1 : ease(viewRef.current === "cinema" ? (cutting ? 0.09 : 0.02) : 0.08); cam.x += (tx - cam.x) * camEase; cam.y += (ty - cam.y) * camEase;
+        world.scale.set(cam.zoom); world.position.set(cam.x, cam.y); shadowBlur.strength = 2.4 * cam.zoom; lightArea.x = -cam.x / cam.zoom; lightArea.y = -cam.y / cam.zoom; lightArea.width = Wd / cam.zoom; lightArea.height = Hd / cam.zoom; // the screen, in world space, for the light filters
         // parallax: what is far moves less than the island, what is near moves more, measured from where the camera looks
         const cwx = (Wd / 2 - cam.x) / cam.zoom, cwy = (Hd / 2 - cam.y) / cam.zoom;
         const par = (f: number) => [(cwx - cx) * (1 - f), (cwy - cy) * (1 - f)] as const;
         { const [sx, sy] = par(0.92); sea.position.set(sx, sy); ripples.position.set(sx, sy); const [hx, hy] = par(0.8); horizon.position.set(hx, hy); const [ex, ey] = par(0.7); celestial.position.set(ex, ey); const [gx, gy] = par(1.1); gulls.position.set(gx, gy); const [kx, ky] = par(1.03); smoke.position.set(kx, ky); const [ox, oy] = par(1.06); fog.position.set(ox, oy); weatherFx.fog.position.set(ox, oy); const [rx, ry] = par(1.04); weatherFx.rain.position.set(rx, ry); weatherFx.snow.position.set(rx, ry); const [px, py] = par(1.2); clouds.puffs.position.set(px, py); }
         // sea
         perfMark("sea");
-        sea.clear(); sea.rect(-3000, -3000, W + 6000, H + 6000).fill(C.water);
-        if (tick % 6 === 0) { ripples.clear(); for (let i = 0; i < 48; i++) { const yy = ((i * 97 + tick * 0.4) % (H + 600)) - 300; const xx = ((i * 331) % (W + 800)) - 400 + Math.sin(tick / 90 + i) * 12; ripples.moveTo(xx, yy).lineTo(xx + 60 + (i % 3) * 20, yy).stroke({ width: 3, color: C.waterDeep, cap: "round" }); } }
+        if (every(6) && (!still || first)) { ripples.clear(); for (let i = 0; i < 48; i++) { const yy = ((i * 97 + tick * 0.4) % (H + 600)) - 300; const xx = ((i * 331) % (W + 800)) - 400 + Math.sin(tick / 90 + i) * 12; ripples.moveTo(xx, yy).lineTo(xx + 60 + (i % 3) * 20, yy).stroke({ width: 3, color: C.waterDeep, cap: "round" }); } }
         // weather: what falls, what lingers, what blows
         perfMark("weather");
         const c = clockRef.current; const weather = forcedWeather ?? c?.weather ?? "clear"; const winter = (forcedSeason ?? c?.season) === "winter";
@@ -656,18 +687,18 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const wind = weather === "storm" ? 1 : weather === "wind" ? 0.8 : weather === "rain" ? 0.45 : weather === "fog" ? 0.1 : 0.2;
         // the sea itself: the foam breathes, the water darkens and breaks white in a blow, rain rings the surface
         const rough = weather === "storm" ? 1 : weather === "wind" ? 0.5 : 0;
-        if (tick % 3 === 0) { drawFoam(tick, rough); drawTide(tick); }
+        if (every(3)) { drawFoam(tick, rough); drawTide(tick); }
         sea.tint = weather === "storm" ? 0x8fa9a6 : weather === "rain" || weather === "fog" ? 0xb9cfcb : 0xffffff;
-        if (tick % 3 === 0) {
+        if (every(3)) {
           seaLife.clear();
           if (rough > 0) for (let i = 0; i < 70 * rough; i++) { const xx = ((i * 811 + tick * 3) % (W + 1400)) - 700, yy = ((i * 1237) % (H + 1000)) - 500; if (inside(xx, yy) < 1.12) continue; const ph = Math.sin(tick / 12 + i); if (ph < 0.2) continue; seaLife.moveTo(xx, yy).lineTo(xx + 14 + ph * 10, yy - 2).stroke({ width: 2.2, color: C.foam, alpha: 0.5 + ph * 0.4, cap: "round" }); }
           if (weather === "rain" || weather === "storm") for (let i = 0; i < 60; i++) { const xx = ((i * 947 + Math.floor(tick / 9) * 131) % (W + 1400)) - 700, yy = ((i * 1543 + Math.floor(tick / 9) * 71) % (H + 1000)) - 500; if (inside(xx, yy) < 1.1) continue; const age = ((tick + i * 7) % 9) / 9; seaLife.ellipse(xx, yy, 3 + age * 14, 1.5 + age * 6).stroke({ width: 1, color: C.foam, alpha: 0.5 * (1 - age) }); }
         }
         // boat: it crosses at a boat's pace, bobs, and leaves a wake; the rowboats bob beside the quay
         const sailing = Math.abs(boatTarget - boat.position.x) > 2;
-        if (sailing) boat.position.x += Math.sign(boatTarget - boat.position.x) * Math.min(Math.abs(boatTarget - boat.position.x), 2.2);
-        boat.position.y = harbor.y + 20 + Math.sin(tick / 40) * 1.5; boat.rotation = Math.sin(tick / 55) * 0.012;
-        if (tick % 2 === 0) { wake.clear(); if (sailing) { const dir = Math.sign(boatTarget - boat.position.x); for (let i = 1; i <= 7; i++) { const x = boat.position.x - dir * (70 + i * 26), y = boat.position.y + 6 + Math.sin(tick / 9 + i) * 2; wake.moveTo(x, y - i * 1.5).lineTo(x - dir * 18, y - i * 1.5).moveTo(x, y + i * 1.5).lineTo(x - dir * 18, y + i * 1.5).stroke({ width: 2, color: C.foam, alpha: Math.max(0, 0.7 - i * 0.09), cap: "round" }); } } }
+        if (sailing) boat.position.x += Math.sign(boatTarget - boat.position.x) * Math.min(Math.abs(boatTarget - boat.position.x), 2.2 * dtf);
+        boat.position.y = harbor.y + 20 + (still ? 0 : Math.sin(ft / 40) * 1.5); boat.rotation = still ? 0 : Math.sin(ft / 55) * 0.012;
+        if (every(2)) { wake.clear(); if (sailing) { const dir = Math.sign(boatTarget - boat.position.x); for (let i = 1; i <= 7; i++) { const x = boat.position.x - dir * (70 + i * 26), y = boat.position.y + 6 + Math.sin(tick / 9 + i) * 2; wake.moveTo(x, y - i * 1.5).lineTo(x - dir * 18, y - i * 1.5).moveTo(x, y + i * 1.5).lineTo(x - dir * 18, y + i * 1.5).stroke({ width: 2, color: C.foam, alpha: Math.max(0, 0.7 - i * 0.09), cap: "round" }); } } }
         // out of sight, the passengers are gone
         if (aboard.length && Math.abs(boat.position.x - awayX) < 4) { for (const g of aboard) g.destroy({ children: true }); aboard.length = 0; }
         for (let i = 0; i < boats.length; i++) { const bt = boats[i]!; const breeze=harborBreeze(detailSeconds,bt.x,bt.userData,wind);bt.position.y=bt.userData+Math.sin(detailSeconds*1.35+i*2)*(quietMotion.matches?0:.7+breeze*1.2);bt.rotation=quietMotion.matches?0:Math.sin(detailSeconds*.9+i)*(.007+breeze*.018); }
@@ -675,15 +706,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         // the mill turns while it is worked; the chapel bell swings at ten on Sunday; the washing sways in the wind
         const workingPlaces = new Set([...agents.current.values()].filter(a => !a.asleep && a.activity?.kind === "work" && a.activity.place === a.location && a.activity.until > (c?.t ?? 0)).map(a => a.location));
         const millOn = workingPlaces.has("mill");
-        millSpeed += ((millOn ? 0.012 : 0) - millSpeed) * 0.01; for (const sl of sails) sl.rotation += millSpeed;
-        const bellOn = c?.weekday === "Sunday" && c.hour === 10 && c.minute % 60 < 3; for (const bl of bells) bl.rotation = bellOn ? Math.sin(tick / 4) * 0.5 : bl.rotation * 0.95;
+        millSpeed += ((millOn ? 0.012 : 0) - millSpeed) * ease(0.01); for (const sl of sails) sl.rotation += millSpeed * dtf;
+        const bellOn = c?.weekday === "Sunday" && c.hour === 10 && c.minute % 60 < 3; for (const bl of bells) bl.rotation = bellOn ? Math.sin(ft / 4) * 0.5 : bl.rotation * Math.pow(0.95, dtf);
         for (const cl of cloths) {const parent=cl.parent;const breeze=harborBreeze(detailSeconds,parent?.x??0,parent?.y??0,wind);cl.skew.x=quietMotion.matches?0:Math.sin(detailSeconds*2.1)*.075*breeze+Math.sin(detailSeconds*5)*.02*breeze;}
         // gulls over the quay by day, a few, wheeling
-        if (tick % 2 === 0) { gulls.clear(); if (!(c && (c.hour < 6 || c.hour >= 20)) && weather !== "storm") for (let i = 0; i < 5; i++) { const t = tick / 60 + i * 1.3; const gx = harbor.x - 120 + Math.cos(t * 0.7 + i) * (160 + i * 30), gy = harbor.y - 260 - i * 28 + Math.sin(t * 1.1) * 40; const flap = Math.sin(tick / 5 + i) * 4; gulls.moveTo(gx - 9, gy + flap).quadraticCurveTo(gx - 4, gy - 4, gx, gy).quadraticCurveTo(gx + 4, gy - 4, gx + 9, gy + flap).stroke({ width: 1.6, color: C.kelp, alpha: 0.7, cap: "round" }); } }
-        if (tick % 2 === 0) {
+        if (every(2)) { gulls.clear(); if (!still && !(c && (c.hour < 6 || c.hour >= 20)) && weather !== "storm") for (let i = 0; i < 5; i++) { const t = tick / 60 + i * 1.3; const gx = harbor.x - 120 + Math.cos(t * 0.7 + i) * (160 + i * 30), gy = harbor.y - 260 - i * 28 + Math.sin(t * 1.1) * 40; const flap = Math.sin(tick / 5 + i) * 4; gulls.moveTo(gx - 9, gy + flap).quadraticCurveTo(gx - 4, gy - 4, gx, gy).quadraticCurveTo(gx + 4, gy - 4, gx + 9, gy + flap).stroke({ width: 1.6, color: C.kelp, alpha: 0.7, cap: "round" }); } }
+        if (every(2)) {
           rain.clear();
           if (wet) {
-            const n = weather === "storm" ? 420 : 200;
+            const n = Math.round((weather === "storm" ? 420 : 200) * (still ? 0.35 : 1));
             for (let i = 0; i < n; i++) {
               const xx = ((i * 137 + tick * (snowing ? 2 : 9)) % (W + 400)) - 200 + Math.sin(tick / 40 + i) * wind * 6; const yy = ((i * 251 + tick * (snowing ? 4 : 16)) % (H + 200)) - 100;
               if (snowing) rain.circle(xx, yy, 2.2).fill({ color: 0xffffff, alpha: 0.8 }); else rain.moveTo(xx, yy).lineTo(xx - 3 - wind * 6, yy + 14).stroke({ width: 1.5, color: C.teal, alpha: 0.35 });
@@ -692,26 +723,26 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
             if (!snowing) for (let i = 0; i < 40; i++) { const xx = ((i * 419 + tick * 23) % W); const yy = ((i * 733 + tick * 31) % H); rain.circle(xx, yy, 2 + (tick + i) % 3).stroke({ width: 1, color: C.shell, alpha: 0.5 }); }
           }
         }
-        wetness += ((wet && !snowing ? 1 : 0) - wetness) * (wet ? 0.002 : 0.0006);
-        snowiness += ((snowing ? 1 : 0) - snowiness) * (snowing ? 0.0015 : winter ? 0.0002 : 0.001);
+        wetness += ((wet && !snowing ? 1 : 0) - wetness) * ease(wet ? 0.002 : 0.0006);
+        snowiness += ((snowing ? 1 : 0) - snowiness) * ease(snowing ? 0.0015 : winter ? 0.0002 : 0.001);
         harborSurface.update(wetness,detailSeconds);
         wetGround.alpha = 0.12 * wetness; snowGround.alpha = 0.6 * snowiness;
         // snow settles on every roof and crown; rain leaves the roofs shining; footprints cross the snow and fill in
-        if (tick % 15 === 0) {
+        if (every(15)) {
           caps.clear();
           if (snowiness > 0.05) { for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild" || p.kind === "public") continue; caps.ellipse(p.x + 8, p.y - 64, 54, 15).fill({ color: 0xffffff, alpha: 0.8 * snowiness }); caps.ellipse(p.x - 30, p.y - 50, 26, 9).fill({ color: 0xffffff, alpha: 0.6 * snowiness }); } for (const t of trees) caps.ellipse(t.position.x, t.position.y - (t.scale.x > 1.3 ? 70 : 44), 22, 9).fill({ color: 0xffffff, alpha: 0.7 * snowiness }); }
           if (wetness > 0.05) for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild" || p.kind === "public") continue; caps.ellipse(p.x + 12, p.y - 66, 40, 9).fill({ color: 0xffffff, alpha: 0.16 * wetness }); }
           prints_.clear(); for (const pr of prints) { const ageT = (tick - pr.at) / 900; if (ageT > 1) continue; prints_.ellipse(pr.x, pr.y, 3, 1.6).fill({ color: C.kelp, alpha: 0.18 * (1 - ageT) * snowiness }); }
         }
-        if (tick % 60 === 0 && c && setSeason(forcedSeason ?? c.season)) { plantTrees(); }
-        if (tick % 120 === 0) { wear.redraw(); redrawTrails(); }
-        if (tick % 60 === 0) ground.tint = SEASON_CAST[forcedSeason ?? c?.season ?? "summer"] ?? 0xffffff;
+        if (every(60) && c && setSeason(forcedSeason ?? c.season)) { plantTrees(); }
+        if (every(120)) { wear.redraw(); redrawTrails(); }
+        if (every(60)) ground.tint = SEASON_CAST[forcedSeason ?? c?.season ?? "summer"] ?? 0xffffff;
         // the short season: the fields turn to lavender
-        if (tick % 60 === 0) { const bloom = !!c?.inSeason?.includes("lavender"); if (bloom !== lavender.visible) { lavender.visible = bloom; } }
-        if (tick % 15 === 0) { puddles.clear(); if (wetness > 0.02) for (let i = 0; i < 26; i++) { const xx = ((i * 587) % (W - 400)) + 200, yy = ((i * 911) % (H - 400)) + 200; puddles.ellipse(xx, yy, 26 + (i % 4) * 8, 9 + (i % 3) * 3).fill({ color: C.waterDeep, alpha: 0.55 * wetness }); } }
+        if (every(60)) { const bloom = !!c?.inSeason?.includes("lavender"); if (bloom !== lavender.visible) { lavender.visible = bloom; } }
+        if (every(15)) { puddles.clear(); if (wetness > 0.02) for (let i = 0; i < 26; i++) { const xx = ((i * 587) % (W - 400)) + 200, yy = ((i * 911) % (H - 400)) + 200; puddles.ellipse(xx, yy, 26 + (i % 4) * 8, 9 + (i % 3) * 3).fill({ color: C.waterDeep, alpha: 0.55 * wetness }); } }
         for (let i = 0; i < trees.length; i++) { const tr = trees[i]!; const breeze=harborBreeze(detailSeconds,tr.x,tr.y,wind);tr.skew.x=quietMotion.matches?0:Math.sin(detailSeconds*1.5+i*.35)*.023*breeze+Math.sin(detailSeconds*3.4+i)*.006*breeze; }
-        if (tick % 3 === 0) { fog.clear(); if (weather === "fog") for (let i = 0; i < 18; i++) { const xx = ((i * 431 + tick * 0.6) % (W + 800)) - 400, yy = ((i * 277) % (H + 200)) - 100; fog.ellipse(xx, yy, 340 + (i % 3) * 120, 110 + (i % 2) * 50).fill({ color: C.shell, alpha: 0.16 }); } }
-        if (weather === "storm") { if (tick > nextBolt) { flash.alpha = 0.55; nextBolt = tick + 300 + Math.random() * 900; } flash.alpha *= 0.82; } else flash.alpha = 0;
+        if (every(3)) { fog.clear(); if (weather === "fog") for (let i = 0; i < 18; i++) { const xx = ((i * 431 + tick * 0.6) % (W + 800)) - 400, yy = ((i * 277) % (H + 200)) - 100; fog.ellipse(xx, yy, 340 + (i % 3) * 120, 110 + (i % 2) * 50).fill({ color: C.shell, alpha: 0.16 }); } }
+        if (weather === "storm" && !still) { if (tick > nextBolt) { flash.alpha = 0.55; nextBolt = tick + 300 + Math.random() * 900; } flash.alpha *= Math.pow(0.82, dtf); } else flash.alpha = 0; // no lightning flashes for anyone who has asked for less motion
         // light: a warm dawn, a coral dusk, kelp at night
         perfMark("light");
         const hour = Number.isFinite(forcedHour) ? forcedHour : c ? c.hour + (c.minute % 60) / 60 : 12;
@@ -720,24 +751,25 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const rise = hm(c?.sunrise) ?? 6.5, set = hm(c?.sunset) ?? 19.5;
         const nightAmt = (hour < rise - 1 ? 0.42 : hour < rise + 0.5 ? 0.42 * (rise + 0.5 - hour) / 1.5 : hour < set - 0.5 ? 0 : hour < set + 1 ? 0.42 * (hour - (set - 0.5)) / 1.5 : 0.42) + (weather === "storm" ? 0.12 : weather === "rain" ? 0.05 : 0);
         const duskAmt = Math.abs(hour - rise) < 1 ? 0.16 * (1 - Math.abs(hour - rise)) : Math.abs(hour - set) < 1 ? 0.2 * (1 - Math.abs(hour - set)) : 0;
-        night.alpha += (nightAmt - night.alpha) * 0.05; dusk.alpha += (duskAmt - dusk.alpha) * 0.05;
+        night.alpha += (nightAmt - night.alpha) * ease(0.05); dusk.alpha += (duskAmt - dusk.alpha) * ease(0.05);
         perfMark("life");
-        cartTick();
-        post.update(viewRef.current, night.alpha / 0.42, effectsOn && !nofx.has("post"), tick);
+        for (let s = 0; s < steps; s++) cartTick();
+        post.update(viewRef.current, night.alpha / 0.42, effectsOn && !nofx.has("post"), tick, nofx.has("grade") ? NEUTRAL : gradeNow);
         if (nofx.size) { ground.visible = !nofx.has("ground"); scene.visible = !nofx.has("scene"); lighting.dark.visible = !nofx.has("dark"); lighting.glow.visible = !nofx.has("glow"); clouds.puffs.visible = clouds.shadows.visible = !nofx.has("clouds"); weatherFx.rain.visible = weatherFx.snow.visible = weatherFx.fog.visible = !nofx.has("weather"); if (nofx.has("sky")) sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; }
-        { const smithy = places.get("smithy"); const forced = new Set((q?.get("force") ?? "").split(",").filter(Boolean)); if (forced.has("hearths")) for (const id of Object.keys(HEARTHS)) litHearths.add(id); /* ?force=hearths,forge lights them for filming */ const cartMoving = Math.abs(carter.g.x - lastCart.x) > 0.3 || Math.abs(carter.g.y - lastCart.y) > 0.3; lastCart.x = carter.g.x; lastCart.y = carter.g.y;
-          particles.update({ renderer: app.renderer, tick, wind, night: night.alpha / 0.42, hour, season: forcedSeason ?? c?.season ?? "summer", weather, effects: effectsOn && !nofx.has("particles"),
+        { const smithy = places.get("smithy"); const dalSmithy = !classic && !!smithy && DALMATIAN_FOR[smithy.sprite]?.kind === "smithy"; const forced = new Set((q?.get("force") ?? "").split(",").filter(Boolean)); if (forced.has("hearths")) for (const id of Object.keys(HEARTHS)) litHearths.add(id); /* ?force=hearths,forge lights them for filming */ const cartMoving = Math.abs(carter.g.x - lastCart.x) > 0.3 || Math.abs(carter.g.y - lastCart.y) > 0.3; lastCart.x = carter.g.x; lastCart.y = carter.g.y;
+          for (let s = 0; s < steps; s++) particles.update({ renderer: app.renderer, tick: prevTick + s + 1, wind, night: night.alpha / 0.42, hour, season: forcedSeason ?? c?.season ?? "summer", weather, effects: effectsOn && !nofx.has("particles"),
             hearths: [...litHearths].map((id) => { const p = places.get(id); const off = HEARTHS[id] ?? [0, 0]; return p ? { x: p.x + off[0], y: p.y + off[1] } : null; }).filter((h): h is { x: number; y: number } => !!h),
-            forge: { x: smithy ? smithy.x - 58 : 0, y: smithy ? smithy.y - 2 : 0, on: !!smithy && (forced.has("forge") || (smithy.crowd > 0 && hour >= 7 && hour < 18)) },
+            forge: { x: smithy ? smithy.x + (dalSmithy ? forgeAt()[0] : -58) : 0, y: smithy ? smithy.y + (dalSmithy ? forgeAt()[1] : -2) : 0, on: !!smithy && (forced.has("forge") || (smithy.crowd > 0 && hour >= 7 && hour < 18)) },
             cart: { x: carter.g.x, y: carter.g.y, moving: cartMoving && carter.g.visible }, meadows: lifeMeadows }); }
         for(const [id,marks] of drawnMarks) marks.children.forEach((child,i)=>{child.visible=placePast.current?.place!==id || i<placePast.current.through;});
         const livingPeople = [...figs.current.values()].map(f => ({ id: f.id, x: f.x, y: f.y, moving: Math.hypot(f.tx-f.x, f.ty-f.y)>1.5 }));
         footfall.update(detailSeconds,livingPeople,wetness>.35,quietMotion.matches,inside);
         coastalLife.update(detailSeconds, night.alpha / 0.42, weather, [boat, ...boats].filter(b => b.visible), livingPeople, quietMotion.matches, coastalWonder(c?.day ?? 1,hour,forcedSeason ?? c?.season ?? "summer",weather));
-        life.update({ tick, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn });
-        for (const snd of life.sounds) ambience.cue(snd.name, Math.hypot(snd.x - cam.x, snd.y - cam.y), snd.x - cam.x, snd.level ?? 1);
-        if (effectsRef.current !== effectsOn) { effectsOn = effectsRef.current; sea.filters = effectsOn && !nofx.has("water") ? [water] : null; ripples.visible = !effectsOn; lamps.visible = !effectsOn; night.visible = !effectsOn; dusk.visible = !effectsOn; rain.visible = !effectsOn; if (!effectsOn) { sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; } fog.visible = !effectsOn; if (!effectsOn) { lighting.dark.visible = false; lighting.glow.visible = false; weatherFx.rain.visible = false; weatherFx.snow.visible = false; weatherFx.fog.visible = false; clouds.puffs.visible = false; clouds.shadows.visible = false; } }
-        rays.clear(); roofGlow.clear();
+        const lifeSounds: typeof life.sounds = [];
+        for (let s = 0; s < steps; s++) { life.update({ tick: prevTick + s + 1, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn }); lifeSounds.push(...life.sounds); }
+        for (const snd of lifeSounds) ambience.cue(snd.name, Math.hypot(snd.x - cam.x, snd.y - cam.y), snd.x - cam.x, snd.level ?? 1);
+        if (effectsRef.current !== effectsOn) { effectsOn = effectsRef.current; sea.filters = effectsOn && !nofx.has("water") ? [water] : null; shadows.filters = effectsOn && !nofx.has("softshadow") ? [shadowBlur] : null; ripples.visible = !effectsOn; lamps.visible = !effectsOn; night.visible = !effectsOn; dusk.visible = !effectsOn; rain.visible = !effectsOn; if (!effectsOn) { sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; } fog.visible = !effectsOn; if (!effectsOn) { for (const face of ["front", "side", "roof"] as const) { worldLight.shade[face] = 0; worldLight.glow[face] = 0; } lighting.dark.visible = false; lighting.glow.visible = false; weatherFx.rain.visible = false; weatherFx.snow.visible = false; weatherFx.fog.visible = false; clouds.puffs.visible = false; clouds.shadows.visible = false; } }
+        rays.clear();
         if (effectsOn) {
           const up = hour > rise && hour < set; let lx: number, ly: number, ls: number;
           if (up) { const f = (hour - rise) / Math.max(1, set - rise); const ang = Math.PI * (1 - f); lx = cx - Rx * 1.05 * Math.cos(ang); ly = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(ang)) - 30; ls = 0.9; }
@@ -765,17 +797,18 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
               rays.moveTo(bx - nx * wid, by - ny * wid).lineTo(bx + nx * wid, by + ny * wid).lineTo(rex + nx * wid * 0.35, rey + ny * wid * 0.35).lineTo(rex - nx * wid * 0.35, rey - ny * wid * 0.35).closePath().fill({ color: warm, alpha: a });
             }
           }
-          // #2: the low sun catches the upper walls and roofs on the side it stands, warm and additive so it lifts the roofs without muddying them
-          if (golden > 0.12 && (1 - cover) > 0.2 && night.alpha < 0.5) {
-            const sd = phase === "rise" ? 1 : -1; const gs = golden * (1 - cover) * Math.max(0.35, 1 - night.alpha / 0.5);
-            const rwarm = mix(0x66502a, phase === "rise" ? 0x63501f : 0x6a4620, 0.5);
-            for (const p of places.values()) { const ry = ROOF_Y[p.sprite]; if (ry === undefined) continue; const gx = p.x + sd * 24, gy = p.y + ry + 22;
-              roofGlow.ellipse(gx, gy, 62, 32).fill({ color: rwarm, alpha: gs * 0.55 });
-              roofGlow.ellipse(gx + sd * 14, gy - 6, 36, 19).fill({ color: rwarm, alpha: gs * 0.7 });
-            }
-          }
+          // the sun on the buildings: each wall and roof is shaded by how far it turns from the sun, and raked warm when a low sun faces it.
+          // The sun rises in the east (screen right), stands in the south (toward us) at noon and sets in the west; walls face the lane (+v) or along it (+u).
+          { const f = Math.max(0, Math.min(1, (hour - rise) / Math.max(1, set - rise))); const th = Math.PI * f; const el = up ? Math.sin(Math.PI * f) * 1.05 : 0;
+            const hu = 0.707 * Math.cos(th) + 0.707 * Math.sin(th), hv = -0.707 * Math.cos(th) + 0.707 * Math.sin(th); // east turning to south turning to west
+            const L = [hu * Math.cos(el), hv * Math.cos(el), Math.sin(el)] as const;
+            const lit = { front: Math.max(0, L[1]), side: Math.max(0, L[0]), roof: Math.max(0, 0.6 * L[1] + 0.8 * L[2]) };
+            const day = up && !nofx.has("facelight") ? Math.max(0, 1 - night.alpha / 0.42) : 0; const contrast = 0.38 * day * (1 - cover * 0.8); const rake = 0.55 * golden * (1 - cover) * day;
+            for (const face of ["front", "side", "roof"] as const) { worldLight.shade[face] = contrast * Math.max(0, 0.55 - lit[face]) / 0.55; worldLight.glow[face] = rake * lit[face]; }
+            worldLight.shadeTint = mix(0x5d6b8c, 0x6a5f86, golden); worldLight.glowTint = mix(0x66502a, phase === "rise" ? 0x63501f : 0x6a4620, 0.5); }
+          gradeNow = gradeFor({ golden: golden * (1 - cover * 0.7), blue: blue * (1 - cover * 0.4), night: Math.min(1, night.alpha / 0.42), cover, weather });
           const shadeTint = mix(LIGHT.night, 0x1b2140, blue * (1 - cover));
-          water.update({ time: tick / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
+          water.update({ time: (still ? ft * 0.3 : ft) / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
           const sources: LightSource[] = [];
           if (night.alpha > 0.03) {
             for (const d of decor) if (d.sprite === "lamp") {
@@ -786,18 +819,18 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
           sources.push(...life.lights);
-          lighting.update(night.alpha * (1 - golden * (1 - cover) * 0.55), sources, tick, flash.alpha, shadeTint); // the low sun holds the dark off a while
-          weatherFx.update({ weather, wind, snowing, wet, tick, night: Math.min(1, night.alpha / 0.42), fogColor: 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
-          clouds.update({ tick, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) });
+          lighting.update(night.alpha * (1 - golden * (1 - cover) * 0.55), sources, ft, flash.alpha, shadeTint); // the low sun holds the dark off a while
+          weatherFx.update({ weather, wind, snowing, wet, tick: ft, dt: dtf, density: still ? 0.35 : 1, night: Math.min(1, night.alpha / 0.42), fogColor: 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
+          clouds.update({ tick: ft, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) });
         }
         // long shadows near sunrise and sunset
         const lowSun = Math.max(0, 1 - Math.min(Math.abs(hour - rise), Math.abs(hour - set)) / 1.5) * (night.alpha < 0.3 ? 1 : 0);
-        if (tick % 10 === 0) { const f = Math.max(0, Math.min(1, (hour - rise) / Math.max(1, set - rise))); const up = hour > rise && hour < set; sunNow.elev = up ? Math.sin(Math.PI * f) : 0.55; sunNow.dir = up ? (f < 0.5 ? -1 : 1) : 1; sunNow.low = lowSun; redrawShadows(sunNow.elev, sunNow.dir, sunNow.low); for (const fg of figs.current.values()) fg.rig.castShadow(sunNow.elev, sunNow.dir, sunNow.low); }
+        if (every(10)) { const f = Math.max(0, Math.min(1, (hour - rise) / Math.max(1, set - rise))); const up = hour > rise && hour < set; sunNow.elev = up ? Math.sin(Math.PI * f) : 0.55; sunNow.dir = up ? (f < 0.5 ? -1 : 1) : 1; sunNow.low = lowSun; redrawShadows(sunNow.elev, sunNow.dir, sunNow.low); for (const fg of figs.current.values()) fg.rig.castShadow(sunNow.elev, sunNow.dir, sunNow.low); }
         // the sun: up in the east over the far islands, over the top at noon, down in the west; on the sea beneath it, its light
-        if (tick % 4 === 0) { celestial.clear(); const up = hour > rise && hour < set; if (up) { const f = (hour - rise) / Math.max(1, set - rise); const ang = Math.PI * (1 - f); const sx = cx - Rx * 1.05 * Math.cos(ang), sy = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(ang)) - 30; const warm = f < 0.12 || f > 0.88; celestial.circle(sx, sy, 34).fill({ color: warm ? 0xf4b183 : 0xfff0b0, alpha: 0.95 }); celestial.circle(sx, sy, 60).fill({ color: warm ? 0xf4b183 : 0xfff0b0, alpha: 0.12 }); for (let i = 0; i < 6; i++) { const yy = sy + 70 + i * 30; if (inside(sx, yy) < 1.1) break; celestial.moveTo(sx - 16 + Math.sin(tick / 30 + i) * 6, yy).lineTo(sx + 16 + Math.sin(tick / 30 + i) * 6, yy).stroke({ width: 2.5, color: 0xfff0b0, alpha: 0.28 - i * 0.04, cap: "round" }); } } }
+        if (every(4)) { celestial.clear(); const up = hour > rise && hour < set; if (up) { const f = (hour - rise) / Math.max(1, set - rise); const ang = Math.PI * (1 - f); const sx = cx - Rx * 1.05 * Math.cos(ang), sy = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(ang)) - 30; const warm = f < 0.12 || f > 0.88; celestial.circle(sx, sy, 34).fill({ color: warm ? 0xf4b183 : 0xfff0b0, alpha: 0.95 }); celestial.circle(sx, sy, 60).fill({ color: warm ? 0xf4b183 : 0xfff0b0, alpha: 0.12 }); for (let i = 0; i < 6; i++) { const yy = sy + 70 + i * 30; if (inside(sx, yy) < 1.1) break; celestial.moveTo(sx - 16 + Math.sin(tick / 30 + i) * 6, yy).lineTo(sx + 16 + Math.sin(tick / 30 + i) * 6, yy).stroke({ width: 2.5, color: 0xfff0b0, alpha: 0.28 - i * 0.04, cap: "round" }); } } }
         // the sky over the water: stars come out with the dark, the moon keeps the calendar's phase, both lie on the sea
         sky.alpha = Math.max(0, (night.alpha - 0.12) / 0.3);
-        if (tick % 4 === 0 && sky.alpha > 0.02) {
+        if (every(4) && sky.alpha > 0.02) {
           sky.clear();
           for (const st of STARS) { if (inside(st.x, st.y) < 1.1) continue; const tw = 0.5 + 0.5 * Math.sin(tick / 20 + st.tw); sky.circle(st.x, st.y, st.r).fill({ color: LIGHT.star, alpha: 0.35 + 0.5 * tw }); }
           const ph = moonPhase(); const full = (1 - Math.cos(ph * Math.PI * 2)) / 2; // 0 new, 1 full
@@ -805,14 +838,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           const nightLen = 24 - set + rise; const nf = hour >= set ? (hour - set) / nightLen : (hour + 24 - set) / nightLen; const mang = Math.PI * (1 - Math.max(0, Math.min(1, nf)));
           const mx = cx + Rx * 1.05 * Math.cos(mang), my = cy - Ry * 1.05 - Ry * 0.16 * Math.abs(Math.sin(mang)) - 40;
           sky.circle(mx, my, 70).fill({ color: LIGHT.lamp, alpha: 0.05 * full }); sky.circle(mx, my, 44).fill({ color: LIGHT.lamp, alpha: 0.07 * full });
-          if (tick % 1400 === 0 && ((tick / 1400) % 3 === 0)) falling.set(tick, { x: 200 + ((tick * 7919) % (W - 400)), y: -500 + ((tick * 104729) % 300) });
+          if (every(4200) && !still) falling.set(tick, { x: 200 + ((tick * 7919) % (W - 400)), y: -500 + ((tick * 104729) % 300) });
           for (const [t0, st] of falling) { const age = (tick - t0) / 28; if (age > 1) { falling.delete(t0); continue; } const x = st.x + age * 260, y = st.y + age * 90; sky.moveTo(x - 60 * (1 - age), y - 20 * (1 - age)).lineTo(x, y).stroke({ width: 2, color: LIGHT.star, alpha: 0.9 * (1 - age), cap: "round" }); }
           sky.circle(mx, my, 28).fill(LIGHT.lamp); if (full < 0.98) sky.circle(mx + (ph < 0.5 ? -1 : 1) * 58 * full, my, 29).fill({ color: 0x1b2a30, alpha: 0.94 }); // the earth's shadow slides off as the moon fills
           for (let i = 0; i < 9; i++) { const yy = my + 60 + i * 34; if (inside(mx, yy) < 1.1) break; sky.moveTo(mx - 14 - (i % 3) * 8 + Math.sin(tick / 30 + i) * 6, yy).lineTo(mx + 14 + (i % 2) * 10 + Math.sin(tick / 30 + i) * 6, yy).stroke({ width: 2.5, color: LIGHT.lamp, alpha: 0.35 - i * 0.03, cap: "round" }); }
           // the quay's lamps on the water
           for (const d of decor) if (d.sprite === "lamp" && inside(d.x, d.y + 120) > 0.96) for (let i = 0; i < 4; i++) { const yy = d.y + 70 + i * 22; sky.moveTo(d.x - 8 + Math.sin(tick / 25 + i) * 4, yy).lineTo(d.x + 8 + Math.sin(tick / 25 + i) * 4, yy).stroke({ width: 2, color: LIGHT.lamp, alpha: 0.35 - i * 0.07, cap: "round" }); }
-        } else if (sky.alpha <= 0.02 && tick % 60 === 0) sky.clear();
-        if (tick % 10 === 0) {
+        } else if (sky.alpha <= 0.02 && every(60)) sky.clear();
+        if (every(10)) {
           lamps.clear(); windows.clear();
           for(const [id,node] of drawn) lightWorldArt(node,night.alpha>.05 && (places.get(id)?.crowd??0)>0);
           if (night.alpha > 0.05) {
@@ -821,12 +854,12 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
 
           }
         }
-        if (tick % 2 === 0) { moths.clear(); if (night.alpha > 0.15) for (const d of decor) { if (d.sprite !== "lamp") continue; for (let i = 0; i < 3; i++) { const t = tick / (9 + i * 3) + i * 2; moths.circle(d.x + Math.cos(t) * (10 + i * 4) + Math.sin(t * 2.3) * 3, d.y - 58 + Math.sin(t * 1.7) * (7 + i * 2), 1.3).fill({ color: LIGHT.star, alpha: 0.8 }); } } }
+        if (every(2)) { moths.clear(); if (night.alpha > 0.15 && !still) for (const d of decor) { if (d.sprite !== "lamp") continue; for (let i = 0; i < 3; i++) { const t = tick / (9 + i * 3) + i * 2; moths.circle(d.x + Math.cos(t) * (10 + i * 4) + Math.sin(t * 2.3) * 3, d.y - 58 + Math.sin(t * 1.7) * (7 + i * 2), 1.3).fill({ color: LIGHT.star, alpha: 0.8 }); } } }
         // smoke from a chimney where someone works
         perfMark("smoke");
-        if (tick % 2 === 0) { smoke.clear(); const sn = forcedSeason ?? c?.season; const cold = sn === "winter" || sn === "autumn"; const evening = hour >= 16.5 || hour < 8; litHearths.clear(); for (const [id, [ox, oy]] of [...Object.entries(CHIMNEYS).filter(([id]) => workingPlaces.has(id)), ...Object.entries(HEARTHS).filter(() => cold || evening)]) { const p = places.get(id); if (!p || p.crowd === 0) continue; if (id in HEARTHS && (cold || evening)) litHearths.add(id); for (let i = 0; i < 6; i++) { const age = ((tick / 3 + i * 17) % 60) / 60; smoke.circle(p.x + ox + Math.sin(age * 6 + i) * 6 + age * wind * 30, p.y + oy - age * 70, 4 + age * 10).fill({ color: C.shell, alpha: 0.5 * (1 - age) }); } } }
+        if (every(2)) { smoke.clear(); const sn = forcedSeason ?? c?.season; const cold = sn === "winter" || sn === "autumn"; const evening = hour >= 16.5 || hour < 8; litHearths.clear(); for (const [id, [ox, oy]] of [...Object.entries(CHIMNEYS).filter(([id]) => workingPlaces.has(id)), ...Object.entries(HEARTHS).filter(() => cold || evening)]) { const p = places.get(id); if (!p || p.crowd === 0) continue; if (id in HEARTHS && (cold || evening)) litHearths.add(id); for (let i = 0; i < 6; i++) { const age = ((tick / 3 + i * 17) % 60) / 60; smoke.circle(p.x + ox + Math.sin(age * 6 + i) * 6 + age * wind * 30, p.y + oy - age * 70, 4 + age * 10).fill({ color: C.shell, alpha: 0.5 * (1 - age) }); } } }
         // sound follows the camera
-        if (tick % 30 === 0 && c) { const f = cam.follow ? figs.current.get(cam.follow) : null; const p = places.get(f?.place ?? "market"); ambience.tick({ mood: stagedNow ? (stagedNow.kind === "wedding" || stagedNow.kind === "feast" ? "tavern" : stagedNow.kind === "funeral" ? "night" : stagedNow.kind === "fire" ? "storm" : "day") : null, weather, hour: c.hour, season: c.season, district: p?.district ?? "old town", place: p?.id ?? "market", crowd: p?.crowd ?? 0, hearth: !!p && litHearths.has(p.id), walking: !!f && !f.asleep && Math.hypot(f.tx - f.x, f.ty - f.y) > 1.5, wind }); }
+        if (every(30) && c) { const f = cam.follow ? figs.current.get(cam.follow) : null; const p = places.get(f?.place ?? "market"); ambience.tick({ mood: stagedNow ? (stagedNow.kind === "wedding" || stagedNow.kind === "feast" ? "tavern" : stagedNow.kind === "funeral" ? "night" : stagedNow.kind === "fire" ? "storm" : "day") : null, weather, hour: c.hour, season: c.season, district: p?.district ?? "old town", place: p?.id ?? "market", crowd: p?.crowd ?? 0, hearth: !!p && litHearths.has(p.id), walking: !!f && !f.asleep && Math.hypot(f.tx - f.x, f.ty - f.y) > 1.5, wind }); }
         // people
         perfMark("people");
         const now = Date.now(); const next: typeof labels = []; const secs = now / 1000;
@@ -861,7 +894,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
             for (const cr of life.critters) { if (!cr.g.visible) continue; const d = Math.hypot(cr.x - f.x, cr.y - f.y); if (d < animalD) { animalD = d; animal = cr; } }
             if (f.react && (moving || tick >= f.react.until)) f.react = undefined;
             if (f.react) { petting = true; f.facing = f.react.ax < f.x ? -1 : 1; }
-            else if (animal && animal.kind !== "hen" && animalD < 48 && !moving && !b && !f.bench && f.pose !== "work" && !(stagedNow && f.place === stagedNow.place) && (animal.kind === "dog" || animal.state === "sit" || animal.state === "sleep") && tick > (f.reactAt ?? 0) && tick % 5 === 0 && Math.random() < 0.3) {
+            else if (animal && animal.kind !== "hen" && animalD < 48 && !moving && !b && !f.bench && f.pose !== "work" && !(stagedNow && f.place === stagedNow.place) && (animal.kind === "dog" || animal.state === "sit" || animal.state === "sleep") && tick > (f.reactAt ?? 0) && every(5) && Math.random() < 0.3) {
               const len = 240 + Math.random() * 220; f.react = { until: tick + len, ax: animal.x, ay: animal.y }; f.reactAt = tick + len + 2400; animal.pinned = tick + len; petting = true; f.facing = animal.x < f.x ? -1 : 1;
             }
             for (const fl of life.flushes) if (tick - fl.at < 3 && Math.hypot(fl.x - f.x, fl.y - f.y) < 160) f.rig.glance(-0.26, (fl.x - f.x) * f.facing); // gulls going up turn heads
@@ -883,7 +916,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (!moving && petting) f.rig.face(f.facing, true);
           f.rig.update(secs);
           f.rig.weather({ rain: wet && !snowing && !f.asleep, cold: (winter || snowing) && !f.asleep });
-          if (moving && snowiness > 0.3 && tick % 6 === 0) { prints.push({ x: f.x + (tick % 12 < 6 ? -4 : 4), y: f.y + 2, at: tick }); if (prints.length > 400) prints.shift(); }
+          if (moving && snowiness > 0.3 && every(6)) { prints.push({ x: f.x + (tick % 12 < 6 ? -4 : 4), y: f.y + 2, at: tick }); if (prints.length > 400) prints.shift(); }
           f.g.zIndex = f.y;
           const subjectX = viewRef.current === "cinema" ? (cinema.current?.x ?? fx) : fx, subjectY = viewRef.current === "cinema" ? (cinema.current?.y ?? fy) : fy;
           const near = viewRef.current !== "map" && Math.hypot(f.x - subjectX, f.y - subjectY) < (viewRef.current === "cinema" ? 170 : 260);
@@ -891,7 +924,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           next.push({ id: f.id, name: f.name, activity: activity ? fishing ? moving ? "Walking to the pier" : "Fishing · line in the water" : "At work" : undefined, x: f.x * cam.zoom + cam.x, y: (f.y - 66) * cam.zoom + cam.y, mine: f.mine, shown: f.mine || !!b || hoverRef.current === f.id || inScene || (near && viewRef.current === "street"), ...(b ? { bubble: b.text } : {}) });
         }
         // the ring under the selected person, and the fading pulse under the actors of a picked event
-        if (tick % 2 === 0) {
+        if (every(2)) {
           emphasis.clear();
           const selF = selRef.current ? figs.current.get(selRef.current) : null;
           if (selF && selF.g.visible) { emphasis.ellipse(selF.x, selF.y + 2, 30, 30 * 0.42).stroke({ width: 2.5, color: C.coral, alpha: 0.9 }); emphasis.ellipse(selF.x, selF.y + 2, 34, 34 * 0.42).stroke({ width: 1.5, color: C.coral, alpha: 0.35 }); }
@@ -907,13 +940,16 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         perfMark("labels");
         next.sort((a, b) => a.x - b.x);
         for (let i = 0; i < next.length; i++) { const a = next[i]!; if (!a.shown) continue; for (let guard = 0; guard < 6; guard++) { const hit = next.slice(0, i).find((b) => b.shown && Math.abs(b.x - a.x) < 46 * cam.zoom + 8 && Math.abs(b.y - a.y) < 16); if (!hit) break; a.y = hit.y - 15; } }
-        if (tick % 2 === 0) setLabels(next);
+        // positions go straight to the tags every frame; React only hears about it when what a tag says or shows changes
+        for (const l of next) { labelPos.current.set(l.id, { x: l.x, y: l.y }); const el = labelEls.current.get(l.id); if (el) el.style.transform = `translate3d(${l.x}px,${l.y}px,0)`; }
+        const labelsNow = next.map((l) => `${l.id}\u0001${l.name}\u0001${l.mine ? 1 : 0}\u0001${l.shown ? 1 : 0}\u0001${l.activity ?? ""}\u0001${l.bubble ?? ""}`).sort().join("\u0002");
+        if (labelsNow !== labelKey.current) { labelKey.current = labelsNow; setLabels(next); }
         perfMark("mini");
-        if (tick % 20 === 0) setMini({ w: W, h: H, places: [...places.values()].map((p) => ({ id: p.id, x: p.x, y: p.y, kind: p.kind, crowd: p.crowd })), view: { x: -cam.x / cam.zoom, y: -cam.y / cam.zoom, w: Wd / cam.zoom, h: Hd / cam.zoom }, people: [...figs.current.values()].map((f) => ({ x: f.x, y: f.y, mine: f.mine })) });
+        if (every(20)) setMini({ w: W, h: H, places: [...places.values()].map((p) => ({ id: p.id, x: p.x, y: p.y, kind: p.kind, crowd: p.crowd })), view: { x: -cam.x / cam.zoom, y: -cam.y / cam.zoom, w: Wd / cam.zoom, h: Hd / cam.zoom }, people: [...figs.current.values()].map((f) => ({ x: f.x, y: f.y, mine: f.mine })) });
         perfMark("end");
       });
     })().catch(() => { if(alive) setLoadError(true); });
-    return () => { alive = false; cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
+    return () => { alive = false; stopWatching?.(); cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineId, apiUrl]);
 
@@ -937,7 +973,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       </div>}
       <div hidden={cleanUi} className="absolute inset-0 pointer-events-none">
         {labels.map((l) => (
-          <div key={l.id} className="absolute flex flex-col items-center gap-1 -translate-x-1/2 -translate-y-full" style={{ left: l.x, top: l.y }}>
+          <div key={l.id} ref={(el) => { if (el) { labelEls.current.set(l.id, el); const p = labelPos.current.get(l.id); if (p) el.style.transform = `translate3d(${p.x}px,${p.y}px,0)`; } else { labelEls.current.delete(l.id); labelPos.current.delete(l.id); } }} className="absolute left-0 top-0 will-change-transform flex flex-col items-center gap-1 -translate-x-1/2 -translate-y-full">
             {l.bubble && <div className="bg-glass px-3 py-2 italic text-[13px] max-w-[260px] leading-[1.3] pointer-events-auto shadow-none" style={{ borderRadius: "16px 16px 16px 4px" }}>“{l.bubble}”</div>}
             {/* a name tag: ink on the drawn ground whatever the theme, since the street is always sand; yours in the signal colour */}
             <div className="crossfade display text-[12px] font-semibold leading-none whitespace-nowrap rounded-[6px] px-1.5 py-[3px]" style={{ opacity: l.shown ? 1 : 0, background: l.mine ? "#E4572E" : "rgba(20,22,26,0.82)", color: "#F7F6F3", letterSpacing: "0.01em" }}>{l.name.split(" ")[0]}{l.mine ? " · you" : ""}{l.activity && <span className="block text-[10px] font-normal mt-1 opacity-80">{l.activity}</span>}</div>
