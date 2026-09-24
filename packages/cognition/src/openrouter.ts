@@ -205,9 +205,10 @@ export class OpenRouterBrain implements Brain {
 
   async decide(p: Perception, a: AgentState, tier: Tier): Promise<ActionProposal> {
     const { model, slot } = this.pick("action_proposal", a, tier >= 2 ? "stakes" : "routine");
-    const ids = (a.desires ?? []).filter(d => d.state === "active").map(d => d.id);
-    const proposalSchema = ids.length ? ActionProposal.extend({desire_id:z.enum(ids).optional()}) : ActionProposal.omit({desire_id:true});
-    const out = await this.call<ActionProposal>("action_proposal", model, slot, { shared: WORLD, own: personaBlock(a), cacheOwn: this.cachePersona(a) }, decidePrompt(p), proposalSchema, 1024, a.id);
+    // One schema for every citizen, so the shared prefix it sits in is the same bytes for all of them and caches. The citizen's own
+    // desire ids are in the perception (self.desires); an id that is not one of their active desires is dropped here, not by the grammar.
+    const out = await this.call<ActionProposal>("action_proposal", model, slot, { shared: WORLD, own: personaBlock(a), cacheOwn: this.cachePersona(a) }, decidePrompt(p), ActionProposal, 1024, a.id);
+    if (out?.desire_id !== undefined && !(a.desires ?? []).some(d => d.state === "active" && d.id === out.desire_id)) delete out.desire_id;
     return out ?? this.stood("action_proposal", model, await this.fallback.decide(p, a, tier));
   }
   async converse(ctx: ConverseContext): Promise<Dialogue> {
