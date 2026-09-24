@@ -1,0 +1,1 @@
+{"extends": "../../../tsconfig.base.json", "include": ["workshop-preview.ts", "life-story-preview.ts", "life-story-autonomous.ts", "life-day-autonomous.ts", "blueprint-preview.ts", "blueprint-autonomous.ts", "observation-budget.test.ts"]}

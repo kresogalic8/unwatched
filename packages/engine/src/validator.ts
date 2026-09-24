@@ -1,5 +1,6 @@
 import { skillId } from "./skills.ts";
-import { capacity, equipped, itemVerdict, recipe } from "./items.ts";
+import { blueprintVerdict } from "./blueprints.ts";
+import { hasTool, capacity, equipped, itemVerdict, recipe } from "./items.ts";
 import { teachable } from "./learning.ts";
 import { gardenReady } from "./community.ts";
 import type { Action } from "@unwatched/protocol";
@@ -31,6 +32,9 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
   if (a.asleep && action.kind !== "sleep" && action.kind !== "wait") return { ok: false, reason: "asleep" };
   if ((action.kind === "take" || action.kind === "write" || action.kind === "trade" && action.buy && !action.sell) && a.inventory.length >= capacity(a)) return {ok:false, reason:"your backpack is full; store, give or drop something first"};
   switch (action.kind) {
+    case "design_item": case "prototype_item": case "craft_design": {
+      const reason=blueprintVerdict(a,action);return reason?{ok:false,reason}:{ok:true};
+    }
     case "craft": case "equip": case "stow": case "retrieve": case "drop": case "pickup": case "repair_tool": {
       const reason = itemVerdict(a, action, here, v.places);
       return reason ? {ok:false, reason} : {ok:true};
@@ -53,7 +57,7 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
       if(a.coins < cost || (action.what === "bench" && a.inventory.filter(i=>i==="planks").length<2)) return {ok:false,reason:"flowers need 2 coins; a bench needs 3 coins and two carried planks; a cairn uses loose local stones"};
       return {ok:true};
     }
-    case "repair": return here.brokenUntil && here.brokenUntil>(v.day??0) && a.inventory.filter(i=>i==="planks").length>=(equipped(a)?.name === "hammer" ? 1 : 2) ? {ok:true} : {ok:false,reason:"stand at a damaged building with two planks, or one plank and an equipped usable hammer"};
+    case "repair": return here.brokenUntil && here.brokenUntil>(v.day??0) && a.inventory.filter(i=>i==="planks").length>=(hasTool(a,"repair") ? 1 : 2) ? {ok:true} : {ok:false,reason:"stand at a damaged building with two planks, or one plank and an equipped usable hammer"};
     case "propose_skill": {
       if(v.learning===false)return {ok:false,reason:"learning is disabled"};
       if((a.skills?.length??0)>=12)return {ok:false,reason:"the procedure library is full"};

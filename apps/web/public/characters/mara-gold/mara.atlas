@@ -1,0 +1,68 @@
+mara.png
+size: 2048,2048
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+body
+  rotate: false
+  xy: 12,12
+  size: 346,839
+  orig: 346,839
+  offset: 0,0
+  index: -1
+thigh-near
+  rotate: false
+  xy: 370,12
+  size: 171,418
+  orig: 171,418
+  offset: 0,0
+  index: -1
+thigh-far
+  rotate: false
+  xy: 553,12
+  size: 183,414
+  orig: 183,414
+  offset: 0,0
+  index: -1
+shin-far
+  rotate: false
+  xy: 748,12
+  size: 123,405
+  orig: 123,405
+  offset: 0,0
+  index: -1
+shin-near
+  rotate: false
+  xy: 883,12
+  size: 221,365
+  orig: 221,365
+  offset: 0,0
+  index: -1
+fore-far
+  rotate: false
+  xy: 1116,12
+  size: 112,345
+  orig: 112,345
+  offset: 0,0
+  index: -1
+fore-near
+  rotate: false
+  xy: 1240,12
+  size: 125,333
+  orig: 125,333
+  offset: 0,0
+  index: -1
+upper-far
+  rotate: false
+  xy: 1377,12
+  size: 142,262
+  orig: 142,262
+  offset: 0,0
+  index: -1
+upper-near
+  rotate: false
+  xy: 1531,12
+  size: 91,236
+  orig: 91,236
+  offset: 0,0
+  index: -1

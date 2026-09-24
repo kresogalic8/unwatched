@@ -100,6 +100,7 @@ export interface Budget {
 export interface OwnerLetter { id: number; text: string; t: number; read: boolean; /** set once the citizen has written back to this letter; one answer per letter */ answered?: boolean }
 
 export interface AgentState {
+  blueprints?: import("@unwatched/protocol").CitizenBlueprint[];
   itemInstances?: import("@unwatched/protocol").ItemInstance[];
   nextItemId?: number;
   equippedItem?: string | null;
@@ -293,6 +294,7 @@ export interface AgentSnapshot {
   appearance: Record<string, unknown> | null;
   arrivedAt: number;
   state: {
+    blueprints?: AgentState["blueprints"];
     itemInstances?: AgentState["itemInstances"];
     nextItemId?: number;
     equippedItem?: string | null;

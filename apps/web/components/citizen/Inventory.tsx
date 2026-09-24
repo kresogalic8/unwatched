@@ -20,6 +20,7 @@ export function Inventory({data, onAction}: {data: InventoryView; onAction?: (ac
       <Icon name="plus" size={16}/>
     </summary>
     <div className={s.story}>
+      {item.blueprint && <><p>{item.blueprint.spec.purpose}</p><p>{item.blueprint.spec.modules.map(m=>m === "carry" ? "+3 carrying slots while equipped" : "Repair buildings with one plank while equipped").join(" · ")}</p><small>{item.blueprint.prototype ? "Prototype" : "Crafted copy"} · Blueprint {item.blueprint.id}</small></>}
       {item.condition !== null && <label>Condition · {item.condition}%<progress max={100} value={item.condition} aria-label={`${item.name} condition`}/></label>}
       <ol>{item.history.map((event, i) => <li key={`${event.t}-${i}`}><small>Day {Math.floor(event.t / 1440) + 1} · {event.who}</small><span>{event.what}</span></li>)}</ol>
       {onAction && <div className={s.actions}>
@@ -39,7 +40,7 @@ export function Inventory({data, onAction}: {data: InventoryView; onAction?: (ac
     </div>
     {view === "pack" && <div className={s.grid}>{data.items.map(i => renderItem(i))}{!data.items.length && <p>The backpack is empty.</p>}</div>}
     {view === "home" && <div>{data.storage.filter(box => box.items.length).map(box => <div key={box.place}><h3 className={s.place}><Icon name="home" size={20}/>{box.place.replaceAll("-", " ")} <small>{box.items.length} / 48</small></h3><div className={s.grid}>{box.items.map(i => renderItem(i, true))}</div></div>)}{!data.storage.some(box => box.items.length) && <p className={s.empty}>Nothing stored yet. They can keep belongings at home or a place they own.</p>}</div>}
-    {view === "recipes" && <div className={s.recipes}>{data.recipes.map(r => {
+    {view === "recipes" && <div className={s.recipes}>{data.blueprints?.map(d=><article key={d.id}><strong>{d.spec.name}</strong><small>Citizen-authored · {d.prototyped?"Prototype assembled":"Design only"} · {d.made} made</small><p>{d.spec.purpose}</p><small>{d.spec.modules.flatMap(m=>m==="carry"?["timber","rope","rope"]:["timber","stone"]).join(" + ")}</small>{d.parent&&<small>Revision of {d.parent}</small>}<p>{d.prototyped?"Assembly is verified. Use determines its value.":"No physical item exists until materials are spent."}</p></article>)}{data.recipes.map(r => {
       const remaining = data.items.map(i => i.name); const ready = r.from.every(name => {const index=remaining.indexOf(name);if(index<0)return false;remaining.splice(index,1);return true;});
       return <article key={r.item}><strong>{r.item}</strong><small>{r.from.join(" + ")}</small><p>{r.why}</p>{onAction ? <button disabled={!ready || busy} onClick={() => act({kind:"craft",recipe:r.item})}>{ready ? "Craft in preview" : "Needs materials"}</button> : <span className={s.readiness}>{ready ? "Materials in the backpack" : "Materials still needed"}</span>}</article>;
     })}</div>}

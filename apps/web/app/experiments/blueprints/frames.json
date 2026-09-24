@@ -1,0 +1,663 @@
+[
+  {
+    "label": "A design, not an item",
+    "bag": {
+      "blueprints": [
+        {
+          "id": "5a502dda1e8fd3c87602",
+          "spec": {
+            "name": "Harbor work kit",
+            "purpose": "Keep supplies close while repairing the boatshed",
+            "modules": [
+              "carry",
+              "repair"
+            ]
+          },
+          "author": "ag_1",
+          "created": 360,
+          "prototyped": false,
+          "made": 0
+        }
+      ],
+      "capacity": 12,
+      "equipped": null,
+      "items": [],
+      "storage": [],
+      "recipes": [
+        {
+          "item": "planks",
+          "from": [
+            "timber"
+          ],
+          "why": "Cut timber into a usable plank."
+        },
+        {
+          "item": "fishing rod",
+          "from": [
+            "timber",
+            "rope"
+          ],
+          "why": "A reusable rod improves the chance of a catch."
+        },
+        {
+          "item": "hammer",
+          "from": [
+            "timber",
+            "stone"
+          ],
+          "why": "A hammer saves one plank when repairing a building."
+        },
+        {
+          "item": "axe",
+          "from": [
+            "planks",
+            "stone",
+            "rope"
+          ],
+          "why": "An axe gathers an extra timber when stock and carrying space allow."
+        },
+        {
+          "item": "basket",
+          "from": [
+            "timber",
+            "rope",
+            "rope"
+          ],
+          "why": "An equipped basket adds six carrying slots."
+        }
+      ]
+    },
+    "events": [
+      "Mara designed Harbor work kit; it has not been made yet."
+    ],
+    "damage": 1
+  },
+  {
+    "label": "An honest obstacle",
+    "bag": {
+      "blueprints": [
+        {
+          "id": "5a502dda1e8fd3c87602",
+          "spec": {
+            "name": "Harbor work kit",
+            "purpose": "Keep supplies close while repairing the boatshed",
+            "modules": [
+              "carry",
+              "repair"
+            ]
+          },
+          "author": "ag_1",
+          "created": 360,
+          "prototyped": false,
+          "made": 0
+        }
+      ],
+      "capacity": 12,
+      "equipped": null,
+      "items": [],
+      "storage": [],
+      "recipes": [
+        {
+          "item": "planks",
+          "from": [
+            "timber"
+          ],
+          "why": "Cut timber into a usable plank."
+        },
+        {
+          "item": "fishing rod",
+          "from": [
+            "timber",
+            "rope"
+          ],
+          "why": "A reusable rod improves the chance of a catch."
+        },
+        {
+          "item": "hammer",
+          "from": [
+            "timber",
+            "stone"
+          ],
+          "why": "A hammer saves one plank when repairing a building."
+        },
+        {
+          "item": "axe",
+          "from": [
+            "planks",
+            "stone",
+            "rope"
+          ],
+          "why": "An axe gathers an extra timber when stock and carrying space allow."
+        },
+        {
+          "item": "basket",
+          "from": [
+            "timber",
+            "rope",
+            "rope"
+          ],
+          "why": "An equipped basket adds six carrying slots."
+        }
+      ]
+    },
+    "events": [
+      "Mara tried to prototype_item but requires timber, rope, rope, timber, stone."
+    ],
+    "damage": 1
+  },
+  {
+    "label": "Materials received",
+    "bag": {
+      "blueprints": [
+        {
+          "id": "5a502dda1e8fd3c87602",
+          "spec": {
+            "name": "Harbor work kit",
+            "purpose": "Keep supplies close while repairing the boatshed",
+            "modules": [
+              "carry",
+              "repair"
+            ]
+          },
+          "author": "ag_1",
+          "created": 360,
+          "prototyped": false,
+          "made": 0
+        }
+      ],
+      "capacity": 12,
+      "equipped": null,
+      "items": [
+        {
+          "id": "ag_2:item:2",
+          "name": "timber",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_2:item:1",
+          "name": "timber",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_2:item:4",
+          "name": "rope",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_2:item:3",
+          "name": "rope",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_2:item:5",
+          "name": "stone",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_2:item:6",
+          "name": "planks",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        }
+      ],
+      "storage": [],
+      "recipes": [
+        {
+          "item": "planks",
+          "from": [
+            "timber"
+          ],
+          "why": "Cut timber into a usable plank."
+        },
+        {
+          "item": "fishing rod",
+          "from": [
+            "timber",
+            "rope"
+          ],
+          "why": "A reusable rod improves the chance of a catch."
+        },
+        {
+          "item": "hammer",
+          "from": [
+            "timber",
+            "stone"
+          ],
+          "why": "A hammer saves one plank when repairing a building."
+        },
+        {
+          "item": "axe",
+          "from": [
+            "planks",
+            "stone",
+            "rope"
+          ],
+          "why": "An axe gathers an extra timber when stock and carrying space allow."
+        },
+        {
+          "item": "basket",
+          "from": [
+            "timber",
+            "rope",
+            "rope"
+          ],
+          "why": "An equipped basket adds six carrying slots."
+        }
+      ]
+    },
+    "events": [
+      "Nika gave Mara timber.",
+      "Nika gave Mara timber.",
+      "Nika gave Mara rope.",
+      "Nika gave Mara rope.",
+      "Nika gave Mara stone.",
+      "Nika gave Mara planks."
+    ],
+    "damage": 1
+  },
+  {
+    "label": "A real prototype",
+    "bag": {
+      "blueprints": [
+        {
+          "id": "5a502dda1e8fd3c87602",
+          "spec": {
+            "name": "Harbor work kit",
+            "purpose": "Keep supplies close while repairing the boatshed",
+            "modules": [
+              "carry",
+              "repair"
+            ]
+          },
+          "author": "ag_1",
+          "created": 360,
+          "prototyped": true,
+          "made": 1
+        }
+      ],
+      "capacity": 12,
+      "equipped": null,
+      "items": [
+        {
+          "id": "ag_2:item:6",
+          "name": "planks",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_1:item:1",
+          "name": "Harbor work kit [crafted]",
+          "condition": 100,
+          "history": [
+            {
+              "t": 363,
+              "who": "Mara",
+              "what": "Assembled prototype from timber, rope, rope, timber, stone"
+            }
+          ],
+          "madeBy": "Mara",
+          "blueprint": {
+            "id": "5a502dda1e8fd3c87602",
+            "author": "ag_1",
+            "spec": {
+              "name": "Harbor work kit",
+              "purpose": "Keep supplies close while repairing the boatshed",
+              "modules": [
+                "carry",
+                "repair"
+              ]
+            },
+            "prototype": true
+          }
+        }
+      ],
+      "storage": [],
+      "recipes": [
+        {
+          "item": "planks",
+          "from": [
+            "timber"
+          ],
+          "why": "Cut timber into a usable plank."
+        },
+        {
+          "item": "fishing rod",
+          "from": [
+            "timber",
+            "rope"
+          ],
+          "why": "A reusable rod improves the chance of a catch."
+        },
+        {
+          "item": "hammer",
+          "from": [
+            "timber",
+            "stone"
+          ],
+          "why": "A hammer saves one plank when repairing a building."
+        },
+        {
+          "item": "axe",
+          "from": [
+            "planks",
+            "stone",
+            "rope"
+          ],
+          "why": "An axe gathers an extra timber when stock and carrying space allow."
+        },
+        {
+          "item": "basket",
+          "from": [
+            "timber",
+            "rope",
+            "rope"
+          ],
+          "why": "An equipped basket adds six carrying slots."
+        }
+      ]
+    },
+    "events": [
+      "Mara assembled Harbor work kit as a prototype from timber, rope, rope, timber, stone."
+    ],
+    "damage": 1
+  },
+  {
+    "label": "Equipped: 15 slots",
+    "bag": {
+      "blueprints": [
+        {
+          "id": "5a502dda1e8fd3c87602",
+          "spec": {
+            "name": "Harbor work kit",
+            "purpose": "Keep supplies close while repairing the boatshed",
+            "modules": [
+              "carry",
+              "repair"
+            ]
+          },
+          "author": "ag_1",
+          "created": 360,
+          "prototyped": true,
+          "made": 1
+        }
+      ],
+      "capacity": 15,
+      "equipped": "ag_1:item:1",
+      "items": [
+        {
+          "id": "ag_2:item:6",
+          "name": "planks",
+          "condition": null,
+          "history": [
+            {
+              "t": 362,
+              "who": "Nika",
+              "what": "Already carried when the item ledger began"
+            },
+            {
+              "t": 362,
+              "who": "Mara",
+              "what": "Received as a gift from Nika"
+            }
+          ]
+        },
+        {
+          "id": "ag_1:item:1",
+          "name": "Harbor work kit [crafted]",
+          "condition": 100,
+          "history": [
+            {
+              "t": 363,
+              "who": "Mara",
+              "what": "Assembled prototype from timber, rope, rope, timber, stone"
+            }
+          ],
+          "madeBy": "Mara",
+          "blueprint": {
+            "id": "5a502dda1e8fd3c87602",
+            "author": "ag_1",
+            "spec": {
+              "name": "Harbor work kit",
+              "purpose": "Keep supplies close while repairing the boatshed",
+              "modules": [
+                "carry",
+                "repair"
+              ]
+            },
+            "prototype": true
+          }
+        }
+      ],
+      "storage": [],
+      "recipes": [
+        {
+          "item": "planks",
+          "from": [
+            "timber"
+          ],
+          "why": "Cut timber into a usable plank."
+        },
+        {
+          "item": "fishing rod",
+          "from": [
+            "timber",
+            "rope"
+          ],
+          "why": "A reusable rod improves the chance of a catch."
+        },
+        {
+          "item": "hammer",
+          "from": [
+            "timber",
+            "stone"
+          ],
+          "why": "A hammer saves one plank when repairing a building."
+        },
+        {
+          "item": "axe",
+          "from": [
+            "planks",
+            "stone",
+            "rope"
+          ],
+          "why": "An axe gathers an extra timber when stock and carrying space allow."
+        },
+        {
+          "item": "basket",
+          "from": [
+            "timber",
+            "rope",
+            "rope"
+          ],
+          "why": "An equipped basket adds six carrying slots."
+        }
+      ]
+    },
+    "events": [
+      "Mara equipped Harbor work kit [crafted]."
+    ],
+    "damage": 1
+  },
+  {
+    "label": "Used: building repaired",
+    "bag": {
+      "blueprints": [
+        {
+          "id": "5a502dda1e8fd3c87602",
+          "spec": {
+            "name": "Harbor work kit",
+            "purpose": "Keep supplies close while repairing the boatshed",
+            "modules": [
+              "carry",
+              "repair"
+            ]
+          },
+          "author": "ag_1",
+          "created": 360,
+          "prototyped": true,
+          "made": 1
+        }
+      ],
+      "capacity": 15,
+      "equipped": "ag_1:item:1",
+      "items": [
+        {
+          "id": "ag_1:item:1",
+          "name": "Harbor work kit [crafted]",
+          "condition": 90,
+          "history": [
+            {
+              "t": 363,
+              "who": "Mara",
+              "what": "Assembled prototype from timber, rope, rope, timber, stone"
+            }
+          ],
+          "madeBy": "Mara",
+          "blueprint": {
+            "id": "5a502dda1e8fd3c87602",
+            "author": "ag_1",
+            "spec": {
+              "name": "Harbor work kit",
+              "purpose": "Keep supplies close while repairing the boatshed",
+              "modules": [
+                "carry",
+                "repair"
+              ]
+            },
+            "prototype": true
+          }
+        }
+      ],
+      "storage": [],
+      "recipes": [
+        {
+          "item": "planks",
+          "from": [
+            "timber"
+          ],
+          "why": "Cut timber into a usable plank."
+        },
+        {
+          "item": "fishing rod",
+          "from": [
+            "timber",
+            "rope"
+          ],
+          "why": "A reusable rod improves the chance of a catch."
+        },
+        {
+          "item": "hammer",
+          "from": [
+            "timber",
+            "stone"
+          ],
+          "why": "A hammer saves one plank when repairing a building."
+        },
+        {
+          "item": "axe",
+          "from": [
+            "planks",
+            "stone",
+            "rope"
+          ],
+          "why": "An axe gathers an extra timber when stock and carrying space allow."
+        },
+        {
+          "item": "basket",
+          "from": [
+            "timber",
+            "rope",
+            "rope"
+          ],
+          "why": "An equipped basket adds six carrying slots."
+        }
+      ]
+    },
+    "events": [
+      "Mara used 1 plank to repair the boat shed; it is working again."
+    ],
+    "damage": 0
+  }
+]

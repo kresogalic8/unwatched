@@ -222,3 +222,43 @@ describe('provider cost attribution',()=>{
   }finally{time.mockRestore();}
  });
 });
+
+it('isolates an injected experiment transport and reports its usage', async () => {
+  const network = vi.fn(); vi.stubGlobal('fetch', network);
+  const transport = vi.fn(async () => new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({happened:'Nothing changed.',plausible:true})}}],usage:{prompt_tokens:100,completion_tokens:20,cost:.001}})));
+  const b = new OpenRouterBrain({apiKey:'test',allowFallback:false,transport});
+  const report = vi.fn(); b.onUsage=report;
+  await b.judge({agent:citizen('ada'),what:'observe',withName:null,place:'square',placeKind:'square',hour:9,weather:'clear',nearby:[],inventory:[],coins:0,stock:[]} as JudgeContext);
+  expect(transport).toHaveBeenCalledTimes(1); expect(network).not.toHaveBeenCalled();
+  expect(report).toHaveBeenCalledWith(expect.objectContaining({costUsd:.001,promptTokens:100}));
+});
+
+it('counts nested optional parameters in provider schemas', async () => {
+  const {optionalPropertyCount}=await import('../src/openrouter.ts');
+  expect(optionalPropertyCount({type:'object',properties:{action:{anyOf:[{type:'object',properties:{kind:{const:'wait'},note:{type:'string'}},required:['kind']}]},intent:{type:'string'}},required:['action']})).toBe(2);
+});
+
+it('validates large Anthropic decision schemas locally while keeping small schemas structured', async () => {
+  const {Town,Rng}=await import('@unwatched/engine');
+  const {seedPersonas}=await import('../src/index.ts');
+  const town=new Town({seed:19,brain:new MockBrain(19)});
+  const a=town.addAgent({persona:seedPersonas(new Rng(19),1)[0]!});
+  const {bodies}=fakeFetch([{action:{kind:'wait'}},{happened:'Quiet.',plausible:true}]);
+  const brain=new OpenRouterBrain({apiKey:'test',routine:'anthropic/claude-haiku-4.5',allowFallback:false});
+  expect((await brain.decide(town.perceive(a),a,1)).action).toEqual({kind:'wait'});
+  expect(bodies[0]).not.toHaveProperty('response_format');
+  expect(JSON.stringify(bodies[0]?.messages)).toContain('JSON schema');
+  await brain.judge({agent:a,what:'observe',withName:null,place:'square',placeKind:'square',hour:9,weather:'clear',nearby:[],inventory:[],coins:0,stock:[]} as JudgeContext);
+  expect(bodies[1]).toHaveProperty('response_format');
+});
+
+it('omits desire linkage when none exists and constrains links to active IDs', async()=>{
+ const {Town,Rng}=await import('@unwatched/engine');const {seedPersonas}=await import('../src/index.ts');
+ const town=new Town({seed:19,brain:new MockBrain(19)});const a=town.addAgent({persona:seedPersonas(new Rng(19),1)[0]!});
+ const {bodies}=fakeFetch([{action:{kind:'wait'},desire_id:'An invented goal '.repeat(5)},{action:{kind:'wait'},desire_id:'active-one'}]);
+ const brain=new OpenRouterBrain({apiKey:'test',routine:'anthropic/claude-haiku-4.5',allowFallback:false});
+ expect((await brain.decide(town.perceive(a),a,1)).desire_id).toBeUndefined();
+ a.desires=[{id:'active-one',title:'Build something',why:'Curiosity',state:'active',since:0,updated:0,attempts:[],history:[]}];
+ expect((await brain.decide(town.perceive(a),a,1)).desire_id).toBe('active-one');
+ expect(JSON.stringify(bodies[1]?.messages)).toContain('active-one');
+});

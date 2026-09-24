@@ -19,3 +19,13 @@
 .entry blockquote { border-left: 2px solid var(--rule, #cdd0c4); padding-left: 12px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
 .entry blockquote span { display: block; font-size: 10px; color: var(--muted, #606557); margin-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) { .desire summary svg { transition: none; } }
+
+.journey { list-style: none; margin: 24px 0; padding: 0 0 0 20px; border-left: 1px solid var(--rule, #cdd0c4); }
+.journey li { position: relative; padding: 0 0 22px 8px; max-width: 65ch; }
+.journey li:last-child { padding-bottom: 0; }
+.journey li::before { content: ""; position: absolute; left: -25px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--ink, #263326); }
+.journey li[data-blocked="true"]::before { background: #b34322; }
+.journey small { display: block; color: var(--muted, #606557); font-size: 11px; margin-bottom: 6px; }
+.journey strong { display: block; font-size: 15px; }
+.journey p { margin: 6px 0 0; }
+.origin p { color: var(--muted, #606557); }
