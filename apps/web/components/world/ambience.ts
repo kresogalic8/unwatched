@@ -42,20 +42,42 @@ export class Ambience {
     if (!this.ctx) {
       this.ctx = new AudioContext(); this.master = this.ctx.createGain(); this.master.gain.value = 0.9; this.master.connect(this.ctx.destination);
       try { this.manifest = (await (await fetch("/sound/manifest.json", { cache: "no-store" })).json()) as Manifest; } catch { this.manifest = {}; }
-      await Promise.all(Object.entries(this.manifest).map(async ([name, file]) => { try { const ab = await (await fetch(`/sound/${file}`)).arrayBuffer(); this.files.set(name, await this.ctx!.decodeAudioData(ab)); } catch { /* the stand-in plays */ } }));
+      // effects load now; music beds are large once decoded, so each is fetched when its scene first plays (see bedFor)
+      await Promise.all(Object.entries(this.manifest).filter(([name]) => !name.startsWith("music-")).map(async ([name, file]) => { try { const ab = await (await fetch(`/sound/${file}`)).arrayBuffer(); this.files.set(name, await this.ctx!.decodeAudioData(ab)); } catch { /* the stand-in plays */ } }));
       this.build();
     }
     await this.ctx.resume(); this.muted = false;
   }
   async disable(): Promise<void> { this.muted = true; await this.ctx?.suspend(); }
   /** Which layers play from files, for the ops room and the toggle's title. */
-  sources(): Record<string, "file" | "synth" | "none"> { const out: Record<string, "file" | "synth" | "none"> = {}; for (const n of [...LAYERS, ...ONESHOTS]) out[n] = this.files.has(n) ? "file" : "synth"; for (const m of MUSIC) out[`music-${m}`] = this.files.has(`music-${m}`) ? "file" : "none"; return out; }
+  sources(): Record<string, "file" | "synth" | "none"> { const out: Record<string, "file" | "synth" | "none"> = {}; for (const n of [...LAYERS, ...ONESHOTS]) out[n] = this.files.has(n) ? "file" : "synth"; for (const m of MUSIC) out[`music-${m}`] = this.manifest[`music-${m}`] ? "file" : "none"; return out; }
 
-  private loopFile(name: string, dest: AudioNode): boolean {
-    const buf = this.files.get(name); if (!buf || !this.ctx) return false;
+  private loopFile(name: string, dest: AudioNode): AudioBufferSourceNode[] | null {
+    const buf = this.files.get(name); if (!buf || !this.ctx) return null;
     // two overlapping copies so the loop seam never clicks
-    for (const offset of [0, buf.duration / 2]) { const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true; const g = this.ctx.createGain(); g.gain.value = 0.7; src.connect(g); g.connect(dest); src.start(this.ctx.currentTime + 0.01, offset % buf.duration); }
-    return true;
+    const sources: AudioBufferSourceNode[] = [];
+    for (const offset of [0, buf.duration / 2]) { const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true; const g = this.ctx.createGain(); g.gain.value = 0.7; src.connect(g); g.connect(dest); src.start(this.ctx.currentTime + 0.01, offset % buf.duration); sources.push(src); }
+    return sources;
+  }
+  /** The playing copies of each loaded bed, and when it last fell silent, so a bed nobody has heard for a while can be let go. */
+  private bedSources = new Map<MusicScene, AudioBufferSourceNode[]>(); private bedLoading = new Set<MusicScene>(); private bedQuietSince = new Map<MusicScene, number>();
+  /** Fetch and start a scene's bed the first time it is wanted; its layer's level is already easing, so it comes in under the crossfade. */
+  private bedFor(m: MusicScene): void {
+    const name = `music-${m}` as const, file = this.manifest[name], L = this.beds.get(m);
+    if (!file || !L || !this.ctx || this.bedSources.has(m) || this.bedLoading.has(m)) return;
+    this.bedLoading.add(m);
+    void fetch(`/sound/${file}`).then((r) => r.arrayBuffer()).then((ab) => this.ctx!.decodeAudioData(ab)).then((buf) => { this.files.set(name, buf); const src = this.loopFile(name, L.gain); if (src) this.bedSources.set(m, src); }).catch(() => { /* silence under the effects, never a substitute */ }).finally(() => this.bedLoading.delete(m));
+  }
+  /** A bed silent for a minute is stopped and its decoded audio dropped; it is fetched again (from the HTTP cache) if its scene returns. */
+  private releaseQuietBeds(): void {
+    const now = performance.now();
+    for (const [m, src] of this.bedSources) {
+      if (m === this.bed) { this.bedQuietSince.delete(m); continue; }
+      const since = this.bedQuietSince.get(m); if (since === undefined) { this.bedQuietSince.set(m, now); continue; }
+      if (now - since < 60000) continue;
+      for (const s of src) { try { s.stop(); } catch { /* already stopped */ } s.disconnect(); }
+      this.bedSources.delete(m); this.bedQuietSince.delete(m); this.files.delete(`music-${m}`);
+    }
   }
   private build(): void {
     const ctx = this.ctx!, out = this.master!; const noise = noiseBuffer(ctx);
@@ -89,7 +111,7 @@ export class Ambience {
     make("forest", (d) => { const f = looped(d, (n) => { n.type = "bandpass"; n.frequency.value = 900; n.Q.value = 4; }); lfo(f.frequency, 0.05, 500); });
     make("night", (d) => { const f = looped(d, (n) => { n.type = "bandpass"; n.frequency.value = 3800; n.Q.value = 12; }); lfo(f.frequency, 5.5, 60, "square"); });
     // music beds: only from files, one per scene, crossfaded in tick(); Lyria writes them, the world never synthesizes music
-    for (const m of MUSIC) { if (!this.files.has(`music-${m}`)) continue; const L = new Layer(ctx, out); this.loopFile(`music-${m}`, L.gain); this.beds.set(m, L); }
+    for (const m of MUSIC) { if (!this.manifest[`music-${m}`]) continue; this.beds.set(m, new Layer(ctx, out)); } // silent until bedFor fetches the file
     // a kept fire: a low draw up the flue and the pops of the wood, at the pace of a fire not a fuse
     make("hearth", (d) => { const low = ctx.createGain(); low.gain.value = 0.35; low.connect(d); looped(low, (n) => { n.type = "lowpass"; n.frequency.value = 140; }); const pop = () => { if (!this.ctx) return; const lv = this.layers.get("hearth")?.gain.gain.value ?? 0; if (lv > 0.01) { const t = ctx.currentTime; const src = ctx.createBufferSource(); src.buffer = noise; src.loop = true; const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1400 + Math.random() * 1800; f.Q.value = 2.5; const g = ctx.createGain(); g.gain.setValueAtTime(0.9 + Math.random() * 0.6, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.02 + Math.random() * 0.03); src.connect(f); f.connect(g); g.connect(d); src.start(t, Math.random() * 3); src.stop(t + 0.1); } setTimeout(pop, 90 + Math.random() * 420); }; pop(); });
     // dry leaves in the wind, autumn only
@@ -142,7 +164,8 @@ export class Ambience {
     this.walking = !!s.walking; if (this.walking && !this.stepAt) { this.stepAt = 1; const cob = s.district === "old town" || s.district === "harbor"; const walk = () => { if (!this.walking || this.muted || !this.ctx) { this.stepAt = 0; return; } this.step(this.master!, cob); setTimeout(walk, 400 + Math.random() * 60); }; walk(); }
     // the bed for this scene, crossfaded over a few seconds; a missing bed means silence under the effects, never a substitute
     const scene: MusicScene = s.mood ? s.mood : s.weather === "storm" ? "storm" : s.weather === "fog" ? "fog" : (s.place === "tavern" || s.place === "inn") && s.hour >= 17 && s.crowd > 1 ? "tavern" : night ? "night" : rain > 0 ? "rain" : s.season === "winter" ? "winter" : "day";
-    if (scene !== this.bed) { this.bed = scene; for (const [m, L] of this.beds) L.set(m === scene ? 0.32 : 0, 4); }
+    if (scene !== this.bed) { this.bed = scene; this.bedFor(scene); for (const [m, L] of this.beds) L.set(m === scene ? 0.32 : 0, 4); }
+    this.releaseQuietBeds();
     const now = performance.now();
     if (!night && rain < 0.7 && coast && now - this.lastGull > 4000 + Math.random() * 9000) { this.lastGull = now; this.gull(); if (Math.random() < 0.4) setTimeout(() => !this.muted && this.gull(), 300 + Math.random() * 400); }
     if (s.district === "harbor" && now - this.lastCreak > 6000 + Math.random() * 8000) { this.lastCreak = now; this.creak(); }

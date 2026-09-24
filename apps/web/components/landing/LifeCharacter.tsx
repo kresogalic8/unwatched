@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Application, Graphics } from "pixi.js";
-import { Citizen, lookFor, type Pose } from "../world/citizen";
+import { lookFor, type Pose } from "../world/citizen";
+import { Figurine, FIGURE_SCALE } from "../world/figurine";
 
 export default function LifeCharacter({ phase, motion, onReady, onError }: { phase: number; motion: boolean; onReady: () => void; onError: () => void }) {
   const host = useRef<HTMLDivElement>(null);
@@ -21,7 +22,7 @@ export default function LifeCharacter({ phase, motion, onReady, onError }: { pha
       if (disposed) { a.destroy({ removeView: true, releaseGlobalResources: false }, { children: true }); return; }
       app = a; el.appendChild(a.canvas);
       const shadow = new Graphics(); a.stage.addChild(shadow);
-      const person = new Citizen(lookFor("Mara — illustrative landing story", { hair: "Curls", hairColor: "Brown", top: "Cream", bottom: "Teal", hat: "None", carrying: "Nothing", beard: "None", skin: 0xb98460, coral: "Buttons" }), .4);
+      const person = new Figurine(lookFor("Mara — illustrative landing story", { hair: "Curls", hairColor: "Brown", top: "Cream", bottom: "Teal", hat: "None", carrying: "Nothing", beard: "None", skin: 0xb98460, coral: "Buttons" }), .4);
       person.age(32); person.facing4("front"); a.stage.addChild(person);
       let visible = true, time = 0, lastPhase = -1;
       const draw = () => {
@@ -38,7 +39,7 @@ export default function LifeCharacter({ phase, motion, onReady, onError }: { pha
       const layout = () => {
         const w = el.clientWidth, h = el.clientHeight;
         a.renderer.resize(w, h);
-        person.scale.set(Math.min(h / 94, w / 70));
+        person.scale.set(Math.min(h / 94, w / 70) * FIGURE_SCALE);
         person.position.set(w / 2, h * .94);
         shadow.clear().ellipse(w / 2, h * .94, w * .24, 9).fill({ color: 0x454d3b, alpha: .14 });
         draw(); a.render();

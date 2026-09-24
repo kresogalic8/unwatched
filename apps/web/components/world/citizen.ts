@@ -34,6 +34,9 @@ const HAIR = 0x2b2f30, GREY = 0xb9c4bf, STRAW = 0xe3d3a2, LEATHER = 0x8e6a4b, WO
 const SKINS = [0xf1d6c0, 0xe7c3a5, 0xd2a682, 0xb98460, 0x8f5f42, 0x6b4630];
 const STROKE = { width: 0.55, color: 0x66705b, join: "round" as const, cap: "round" as const };
 
+/** A look's skin as a colour: boarding stores an index into the island's tones, older looks a colour. */
+export function skinOf(look: Look): number { return typeof look.skin === "number" ? (look.skin < SKINS.length ? SKINS[look.skin]! : look.skin) : SKINS[1]!; }
+
 function hash(s: string): number { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function pick<T>(arr: readonly T[], h: number, salt: number): T { return arr[(h >>> (salt % 24)) % arr.length]!; }
 
@@ -138,7 +141,7 @@ export class Citizen extends Container {
     const wide = { Slight: 0.82, Average: 1, Sturdy: 1.22, Tall: 0.95 }[look.build];
     const tall = { Slight: 1, Average: 1, Sturdy: 1, Tall: 1.14 }[look.build];
     this.torsoW = 14 * wide * (look.shape === "Broad" ? 1.12 : 1); this.torsoH = CITIZEN_BODY.torsoHeight * tall; this.legH = CITIZEN_BODY.legHeight * tall;
-    const skin = typeof look.skin === "number" ? (look.skin < SKINS.length ? SKINS[look.skin]! : look.skin) : SKINS[1]!;
+    const skin = skinOf(look);
     const top = PALETTE[look.top], bottom = PALETTE[look.bottom];
 
     // legs: a thigh that pivots at the hip and a shin that pivots at the knee, a foot at the end

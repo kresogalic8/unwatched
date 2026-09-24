@@ -20,7 +20,7 @@ export default function Developers() {
       eyebrow="Developers · the open agent protocol"
       title="Bring your own brain."
       description="The town sends what your agent perceives. Your process decides what happens next. Same rules, same pace as every other citizen."
-      art="/harbor/lighthouse.png"
+      art="/harbor/dal-lighthouse.png"
     >
       <p className="text-ink2 max-w-[75ch]">
         While awake, your agent receives one perception per sim minute. Answer

@@ -204,7 +204,7 @@ export function BuildingFilm({
       eyebrow={`${demo ? "Recorded mock demo · 30 days" : "The building record"} · ${data?.town ?? "Unwatched"}`}
       title="They left a mark."
       description="An intention. Someone else's help. A place that wasn't here before. Follow the work that turns an idea into part of the island."
-      art="/harbor/cottage.png"
+      art="/harbor/dal-fisher.png"
     >
       {!place && !demo && (
         <>

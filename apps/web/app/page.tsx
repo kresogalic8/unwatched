@@ -166,20 +166,20 @@ export default function Landing() {
           <Image
             sizes="(max-width: 639px) 35vw, 30vw"
             className={s.buildHouse}
-            src="/harbor/house.png"
-            alt="A citizen's Mediterranean house with terracotta tiles"
-            width="600"
-            height="800"
+            src="/harbor/dal-stone.png"
+            alt="A citizen's stone house with a stair to the first floor and a terracotta roof"
+            width="560"
+            height="631"
             loading="lazy"
             data-building
           />
           <Image
             sizes="(max-width: 639px) 35vw, 30vw"
             className={s.buildInn}
-            src="/harbor/inn.png"
-            alt="The harbor inn, with green shutters and climbing plants"
-            width="632"
-            height="838"
+            src="/harbor/dal-townhouse.png"
+            alt="The harbor inn, a town house with a balcony and green shutters"
+            width="540"
+            height="741"
             loading="lazy"
             data-building
           />

@@ -37,7 +37,7 @@ export default function LifeStory() {
       <div className={s.sun} /><div className={s.ground} />
       <div className={s.harbor}><Image src="/harbor/pier.png" alt="" fill sizes="35vw" /></div>
       <div className={s.tree}><Image src="/harbor/tree-large.png" alt="" fill sizes="20vw" /></div>
-      <div className={s.bakery}><Image src="/harbor/bakery.png" alt="" fill sizes="(max-width: 640px) 45vw, 30vw" /></div>
+      <div className={s.bakery}><Image src="/harbor/dal-bakery.png" alt="" fill sizes="(max-width: 640px) 45vw, 30vw" /></div>
       <div className={s.stall}><Image src="/harbor/stall.png" alt="" fill sizes="25vw" /></div>
       <div className={s.character}>{!failed && <Character phase={phase} motion={motion} onReady={() => setReady(true)} onError={() => setFailed(true)} />}{failed && <span className={s.monogram}>M</span>}</div>
       <div className={s.name}>MARA <span>{chapter.caption}</span></div>

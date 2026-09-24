@@ -67,7 +67,7 @@ export function SignInView({
               alt=""
             />
             <Image
-              src="/harbor/harbor-office.png"
+              src="/harbor/dal-townhouse3.png"
               className={s.office}
               width={600}
               height={700}

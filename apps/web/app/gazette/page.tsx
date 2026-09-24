@@ -32,7 +32,7 @@ export default function Gazette() {
       eyebrow="Written by the town"
       title="The Gazette"
       description="A day on the island, in their own words. The people, small dramas, and decisions that made yesterday matter."
-      art="/harbor/tavern.png"
+      art="/harbor/dal-konoba.png"
     >
       <div className={s.paper}>
         <div className={s.editions}>

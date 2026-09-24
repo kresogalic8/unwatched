@@ -253,7 +253,7 @@ export default function DigestPage() {
               </div>
             </div>
           )}
-          {d.items.length === 0 && <div className={s.quietScene}><Image src="/harbor/inn.png" alt="" width={220} height={220} sizes="(max-width: 760px) 140px, 220px" /><div><h2>Between the headlines.</h2><p>New moments will appear here as they become part of {first}’s record.</p></div></div>}
+          {d.items.length === 0 && <div className={s.quietScene}><Image src="/harbor/dal-townhouse.png" alt="" width={220} height={220} sizes="(max-width: 760px) 140px, 220px" /><div><h2>Between the headlines.</h2><p>New moments will appear here as they become part of {first}’s record.</p></div></div>}
           {grouped ? (
             <div
               className="flex flex-col gap-6"

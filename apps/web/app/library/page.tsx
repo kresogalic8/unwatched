@@ -43,7 +43,7 @@ export default function Library() {
       eyebrow="The library · written by the town"
       title="Every life the island kept."
       description="When someone leaves the island, or dies, the town writes their book from the record alone and puts it on this shelf. Nothing here is invented, and nothing here is deleted."
-      art="/harbor/house.png"
+      art="/harbor/dal-stone.png"
     >
       {error && <p role="alert">{error}</p>}
       {lives === null && !error && <Loading what="Opening the library." />}
