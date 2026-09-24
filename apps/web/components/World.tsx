@@ -263,6 +263,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const onTable = new Container(); onTable.addChild(table, plinthShadow); onTable.mask = tableCut; // the table and the plinth's shadow on it, only past the rim
       const model = new Container(); model.addChild(onTable, tableCut, plinth); model.visible = false; world.addChild(model);
       const scene = new Container(); scene.sortableChildren = true; world.addChild(scene);
+      // place names ride above everything on the ground, so the cat by the door or a barrel in front never hides one; weather stays over them
+      const names = new Container(); names.zIndex = 150000; scene.addChild(names); const nameOf = new Map<string, Text>();
       // everything standing on the ground is drawn in code, in one projection, at its natural size; props may be scaled
       const shadows = new Graphics(); shadows.zIndex = 0.5; scene.addChild(shadows);
       // the ring under a selected person, and the pulse that marks the actors of a picked event
@@ -319,7 +321,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const drawn = new Map<string, Container>();
       const drawnMarks = new Map<string, Container>();
       const drawPlace = (p: PlaceView) => {
-        drawn.get(p.id)?.destroy({ children: true });
+        drawn.get(p.id)?.destroy({ children: true }); nameOf.get(p.id)?.destroy(); nameOf.delete(p.id);
         const g = new Container(); g.sortableChildren = true; g.zIndex = p.y; scene.addChild(g); drawn.set(p.id, g);
         const local = (name: string, w?: number) => { const d=drawThing(name);if(!d)return null;const s=d.c;if(w)s.scale.set(w/d.w);s.zIndex=0;g.addChild(s);shadowUnder(p.x,p.y,w??d.w); if(BUILDING.test(name)){const t=BLD_TINTS[Math.floor(vhash(p.x,p.y,5)*BLD_TINTS.length)]??0xffffff;for(const ch of s.children)if("tint" in ch)(ch as {tint:number}).tint=mulTint((ch as {tint:number}).tint,t);} return s; };
         if (p.kind === "plot" && !p.site) {
@@ -379,7 +381,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           }
           chest.zIndex=3;g.addChild(chest);
         }
-        const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(0, p.site ? 22 : 6); t.zIndex = 100000; g.addChild(t);
+        const t = new Text({ text: p.name.replace(/^the /, "").replace(/^an? /, "").toUpperCase(), style: nameStyle }); t.anchor.set(0.5, 0); t.position.set(p.x, p.y + (p.site ? 22 : 6)); names.addChild(t); nameOf.set(p.id, t);
         const marks = drawPlaceMarks(p.decorations ?? [], i=>markPosition(i,p,{x:cx,y:cy},inside)); g.addChild(marks); drawnMarks.set(p.id, marks);
         g.position.set(p.x, p.y);
         g.eventMode = "static"; g.cursor = "pointer"; const bounds=g.getLocalBounds(); g.hitArea=new Rectangle(bounds.x-8,bounds.y-8,bounds.width+16,bounds.height+16);
