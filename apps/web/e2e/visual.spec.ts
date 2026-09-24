@@ -15,8 +15,9 @@ async function freeze(page: Page): Promise<void> {
 /** open the town at a moment and a look, let it settle for a few seconds of its own time, and hide what is not the island */
 async function town(page: Page, query: string): Promise<void> {
   await freeze(page);
+  const said: string[] = []; page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") said.push(`${m.type()}: ${m.text()}`); }); page.on("pageerror", (e) => said.push(`pageerror: ${e.message}`));
   await page.goto(`/town?clean=1&${query}`);
-  await page.locator('[data-world-ready="1"]').waitFor({ timeout: 60_000 });
+  await page.locator('[data-world-ready="1"]').waitFor({ timeout: 60_000 }).catch((e: Error) => { throw new Error(`the town never came up:\n${said.slice(0, 20).join("\n")}\n${e.message}`); });
   await page.clock.runFor(6000);
 }
 
