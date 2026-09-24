@@ -37,7 +37,7 @@ export function reviseDesires(current: Desire[], updates: unknown[], evidence: T
 export function recordDesireAttempt(desires: Desire[], id: string | undefined, t: number, action: string, accepted: boolean, events: TownEvent[]) {
   const d = desires.find(d => d.id === id && d.state === "active");
   if (!d) return;
-  d.attempts.push({ t, action, accepted, events: events.slice(-3).map(e => ({ id: e.id, text: e.text.slice(0, 600) })) });
+  d.attempts.push({ t, action, accepted, events: events.slice(-3).map(e => ({ id: e.id, text: e.text.slice(0, 600), kind: e.kind })) });
   d.attempts = d.attempts.slice(-8);
 }
 
@@ -45,6 +45,18 @@ export function recordDesireAttempt(desires: Desire[], id: string | undefined, t
 export function desiresForMind(desires: Desire[] = []) {
   return [...desires.filter(d => d.state === "active"), ...desires.filter(d => d.state !== "active").sort((a,b) => b.updated-a.updated).slice(0,2)].slice(0,5).map(d => {
     const last = d.attempts.at(-1);
-    return { id:d.id, title:d.title, why:d.why, state:d.state, since:d.since, updated:d.updated, ...(last ? {last_attempt:{t:last.t,action:last.action,accepted:last.accepted}} : {}) };
+    return { id:d.id, title:d.title, why:d.why, state:d.state, since:d.since, updated:d.updated, ...(last ? {last_attempt:{t:last.t,action:last.action,accepted:last.accepted}, recent_attempts:d.attempts.slice(-3).map(a => ({t:a.t,action:a.action,accepted:a.accepted,outcomes:a.events.slice(-2).map(e => ({...e,text:e.text.slice(0,240)}))}))} : {}) };
   });
+}
+
+const concreteOutcomes = new Set(["agent.move","action.rejected","building.repaired","item.crafted","agent.give","agent.trade","agent.work","agent.hired","agent.build","town.built"]);
+/** Recent personal facts, including travel: semantic memory retrieval can miss repetition. */
+export function recentActionOutcomes(events: TownEvent[], agent: string, t: number) {
+  const result: {t:number;kind:string;text:string}[]=[];
+  for(let i=events.length-1;i>=0&&result.length<6;i--){
+    const e=events[i]!;
+    if(e.t<t-1440)break;
+    if(e.t<=t&&e.actors.includes(agent)&&concreteOutcomes.has(e.kind)) result.push({t:e.t,kind:e.kind,text:e.text.slice(0,240)});
+  }
+  return result.reverse();
 }

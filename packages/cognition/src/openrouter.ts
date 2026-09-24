@@ -7,6 +7,8 @@ import { WORLD, personaBlock, decidePrompt, conversePrompt, reflectPrompt, paper
 export interface ProviderUsage { agentId: string | null; kind: CallKind; model: string; promptTokens: number; completionTokens: number; cachedTokens: number; costUsd: number | null; }
 
 export interface OpenRouterBrainOptions {
+  /** Optional transport for isolated experiments and tests. */
+  transport?: typeof fetch;
   /** Production must not deliver mock output as a paid model response. */
   allowFallback?: boolean;
   apiKey?: string;
@@ -84,6 +86,7 @@ const TOWN = Object.freeze({ id: "town", owner: null, brainKind: "hosted", funde
 export class OpenRouterBrain implements Brain {
   readonly name = "openrouter";
   private key: string;
+  private transport: typeof fetch;
   private allowFallback: boolean;
   private blockedUntil = 0;
   private models: Models;
@@ -97,6 +100,7 @@ export class OpenRouterBrain implements Brain {
   constructor(o: OpenRouterBrainOptions = {}) {
     const key = o.apiKey ?? process.env.OPENROUTER_API_KEY;
     if (!key) throw new Error("OPENROUTER_API_KEY is not set");
+    this.transport = o.transport ?? fetch;
     this.key = key; this.allowFallback = o.allowFallback ?? true;
     this.models = {
       routine: o.routine ?? process.env.UW_OR_MODEL_ROUTINE ?? "anthropic/claude-haiku-4.5",
@@ -142,7 +146,7 @@ export class OpenRouterBrain implements Brain {
       if (Date.now() < this.blockedUntil) throw new Error("Provider unavailable; retry after cooldown");
       // the whole attempt is inside the try: the deadline aborts the body as well as the headers, so an answer that arrives half-read must fall back like any other
       try {
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const res = await this.transport("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json", "HTTP-Referer": "https://unwatched.town", "X-Title": "Unwatched" },
           body: JSON.stringify(body),
@@ -174,7 +178,14 @@ export class OpenRouterBrain implements Brain {
       { type: "text", text: `${system.shared}${this.primer ? `\n\n${this.primer}` : ""}\n\nAnswer with a single JSON object matching this JSON schema exactly, no prose:\n${JSON.stringify(jsonSchema)}`, cache_control: { type: "ephemeral" } },
       ...(system.own ? [system.cacheOwn ? { type: "text", text: system.own, cache_control: { type: "ephemeral" } } : { type: "text", text: system.own }] : []),
     ] }, { role: "user", content: user }];
-    const body = { model, max_tokens: maxTokens, messages, response_format: { type: "json_schema", json_schema: { name, strict: true, schema: jsonSchema } } };
+    // Anthropic rejects grammars containing more than 24 optional properties.
+    // Keep the identical schema in the prompt and validate locally when it cannot compile.
+    const promptOnly = model.includes("anthropic/") && optionalPropertyCount(jsonSchema) > 24;
+    if (promptOnly) {
+      const blocks = messages[0]!.content as { type: string; text: string }[];
+      blocks.push({type:"text",text:"Output contract: return only the JSON object described above. Character voice belongs inside its string fields, never outside JSON. Copy identifiers exactly from the supplied context. Omit optional identifiers when no matching identifier exists. When the requested schema is action_proposal, a minimal valid example is {\"action\":{\"kind\":\"wait\"},\"remember\":[]}. Choose your own action; this example is format only."});
+    }
+    const body = { model, max_tokens: maxTokens, messages, ...(!promptOnly ? { response_format: { type: "json_schema", json_schema: { name, strict: true, schema: jsonSchema } } } : {}) };
     for (let attempt = 0; attempt < 2; attempt++) {
       const got = await this.post(body, model, name, slot, agentId); if (!got) return null;
       const text = got.text;
@@ -194,7 +205,9 @@ export class OpenRouterBrain implements Brain {
 
   async decide(p: Perception, a: AgentState, tier: Tier): Promise<ActionProposal> {
     const { model, slot } = this.pick("action_proposal", a, tier >= 2 ? "stakes" : "routine");
-    const out = await this.call("action_proposal", model, slot, { shared: WORLD, own: personaBlock(a), cacheOwn: this.cachePersona(a) }, decidePrompt(p), ActionProposal, 1024, a.id);
+    const ids = (a.desires ?? []).filter(d => d.state === "active").map(d => d.id);
+    const proposalSchema = ids.length ? ActionProposal.extend({desire_id:z.enum(ids).optional()}) : ActionProposal.omit({desire_id:true});
+    const out = await this.call<ActionProposal>("action_proposal", model, slot, { shared: WORLD, own: personaBlock(a), cacheOwn: this.cachePersona(a) }, decidePrompt(p), proposalSchema, 1024, a.id);
     return out ?? this.stood("action_proposal", model, await this.fallback.decide(p, a, tier));
   }
   async converse(ctx: ConverseContext): Promise<Dialogue> {
@@ -281,3 +294,12 @@ function stripNulls(x: unknown): unknown {
   return x;
 }
 const wantsStrict = (model: string) => model.startsWith("openai/") || model.startsWith("~openai/");
+
+export function optionalPropertyCount(schema: unknown): number {
+  if (Array.isArray(schema)) return schema.reduce((n, s) => n + optionalPropertyCount(s), 0);
+  if (!schema || typeof schema !== "object") return 0;
+  const node = schema as Record<string, unknown>;
+  const required = new Set(Array.isArray(node.required) ? node.required : []);
+  const own = node.properties && typeof node.properties === "object" ? Object.keys(node.properties).filter(k => !required.has(k)).length : 0;
+  return own + Object.values(node).reduce<number>((n, s) => n + optionalPropertyCount(s), 0);
+}

@@ -59,3 +59,39 @@ describe("self-directed desires", () => {
     expect(Reflection.parse({summary:"quiet",insights:[],opinions:[],intentions:[],letter_to_owner:null}).desires).toBeUndefined();
   });
 });
+
+it('closes the outcome loop: obstacle, real help, repair, and memory survive reload', async () => {
+  const town=new Town({seed:7,brain:{...base,async decide(_p,a){return {action:{kind:'repair'},remember:[],desire_id:a.desires![0]!.id};}}});
+  const a=town.addAgent({persona});
+  const neighbor=town.addAgent({persona:{...persona,name:'Nika'}});
+  neighbor.asleep=true;neighbor.needs.rest=1;
+  a.location=neighbor.location='boatshed';
+  const place=town.places.get('boatshed')!;place.brokenUntil=town.day+1;
+  a.desires=reviseDesires([],[{...update,title:'Restore the boatshed'}],[{...event,t:0,actors:[a.id]}],0,a.id);
+  a.plan={day:1,mood:'determined',goals:[],steps:[]};a.hint='Consider your own wants';
+  await town.tick();
+  expect(a.desires[0]!.attempts.at(-1)?.accepted).toBe(false);
+  neighbor.asleep=false;neighbor.location=a.location;neighbor.inventory=['planks','planks'];
+  expect(town.apply(neighbor,{kind:'give',to:a.id,item:'planks'},'test')).toBe(true);
+  expect(town.apply(neighbor,{kind:'give',to:a.id,item:'planks'},'test')).toBe(true);
+  a.hint='New supplies arrived';a.lastThought=-100;
+  await town.tick();
+  expect(a.desires[0]!.attempts.at(-1)?.accepted).toBe(true);
+  expect(place.brokenUntil).toBe(town.day);
+  expect(a.inventory).not.toContain('planks');
+  expect(a.desires[0]!.state).toBe('active'); // Engine does not decide personal fulfilment.
+  const restored=new Town({seed:7,brain:base});restored.restore(structuredClone(town.snapshot()));
+  const context=Perception.parse(restored.perceive(restored.agents.get(a.id)!)).self.desires![0]!;
+  expect(context.recent_attempts?.map(x=>x.accepted)).toEqual([false,true]);
+  expect(context.recent_attempts?.[0]?.outcomes[0]?.kind).toBe('action.rejected');
+  expect(context.recent_attempts?.[1]?.outcomes[0]?.kind).toBe('building.repaired');
+});
+
+it('keeps recent concrete outcomes available even without a desire, bounded and private to the actor',()=>{
+ const town=new Town({seed:7,brain:base});const a=town.addAgent({persona});town.t=100;
+ for(let i=0;i<10;i++)town.events.push({id:100+i,t:90+i,day:1,kind:'agent.move',actors:[a.id],text:`Move ${i}`,importance:.02});
+ town.events.push({id:200,t:100,day:1,kind:'agent.move',actors:['other'],text:'Private other movement',importance:.02});
+ const context=Perception.parse(town.perceive(a)).self;
+ expect(context.desires).toBeUndefined();
+ expect(context.recent_outcomes?.map(e=>e.text)).toEqual(['Move 4','Move 5','Move 6','Move 7','Move 8','Move 9']);
+});

@@ -1,0 +1,213 @@
+[
+  {
+    "label": "A desire",
+    "desires": [
+      {
+        "id": "678c49d76da9e8a3860d",
+        "title": "Make the boatshed useful again",
+        "why": "I want somewhere to work with my hands.",
+        "state": "active",
+        "since": 600,
+        "updated": 600,
+        "history": [
+          {
+            "t": 600,
+            "title": "Make the boatshed useful again",
+            "why": "I want somewhere to work with my hands.",
+            "state": "active",
+            "evidence": [
+              {
+                "id": 1,
+                "t": 599,
+                "kind": "action.rejected",
+                "text": "The boatshed is damaged."
+              }
+            ]
+          }
+        ],
+        "attempts": []
+      }
+    ],
+    "inventory": [
+      "suitcase"
+    ],
+    "damage": 1,
+    "events": [
+      "Mara arrived on the boat.",
+      "Nika arrived on the boat."
+    ]
+  },
+  {
+    "label": "An obstacle",
+    "desires": [
+      {
+        "id": "678c49d76da9e8a3860d",
+        "title": "Make the boatshed useful again",
+        "why": "I want somewhere to work with my hands.",
+        "state": "active",
+        "since": 600,
+        "updated": 600,
+        "history": [
+          {
+            "t": 600,
+            "title": "Make the boatshed useful again",
+            "why": "I want somewhere to work with my hands.",
+            "state": "active",
+            "evidence": [
+              {
+                "id": 1,
+                "t": 599,
+                "kind": "action.rejected",
+                "text": "The boatshed is damaged."
+              }
+            ]
+          }
+        ],
+        "attempts": [
+          {
+            "t": 600,
+            "action": "repair",
+            "accepted": false,
+            "events": [
+              {
+                "id": 5,
+                "text": "Mara tried to repair but stand at a damaged building with two planks, or one plank and an equipped usable hammer.",
+                "kind": "action.rejected"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "inventory": [
+      "suitcase"
+    ],
+    "damage": 1,
+    "events": [
+      "Nika arrived on the boat.",
+      "Nika set out to find work before the coins run out.",
+      "Nika went to the harbor, on the way to the pinewood.",
+      "Mara tried to repair but stand at a damaged building with two planks, or one plank and an equipped usable hammer."
+    ]
+  },
+  {
+    "label": "Help from Nika",
+    "desires": [
+      {
+        "id": "678c49d76da9e8a3860d",
+        "title": "Make the boatshed useful again",
+        "why": "I want somewhere to work with my hands.",
+        "state": "active",
+        "since": 600,
+        "updated": 600,
+        "history": [
+          {
+            "t": 600,
+            "title": "Make the boatshed useful again",
+            "why": "I want somewhere to work with my hands.",
+            "state": "active",
+            "evidence": [
+              {
+                "id": 1,
+                "t": 599,
+                "kind": "action.rejected",
+                "text": "The boatshed is damaged."
+              }
+            ]
+          }
+        ],
+        "attempts": [
+          {
+            "t": 600,
+            "action": "repair",
+            "accepted": false,
+            "events": [
+              {
+                "id": 5,
+                "text": "Mara tried to repair but stand at a damaged building with two planks, or one plank and an equipped usable hammer.",
+                "kind": "action.rejected"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "inventory": [
+      "suitcase",
+      "planks",
+      "planks"
+    ],
+    "damage": 1,
+    "events": [
+      "Nika went to the harbor, on the way to the pinewood.",
+      "Mara tried to repair but stand at a damaged building with two planks, or one plank and an equipped usable hammer.",
+      "Nika gave Mara planks.",
+      "Nika gave Mara planks."
+    ]
+  },
+  {
+    "label": "A visible result",
+    "desires": [
+      {
+        "id": "678c49d76da9e8a3860d",
+        "title": "Make the boatshed useful again",
+        "why": "I want somewhere to work with my hands.",
+        "state": "active",
+        "since": 600,
+        "updated": 600,
+        "history": [
+          {
+            "t": 600,
+            "title": "Make the boatshed useful again",
+            "why": "I want somewhere to work with my hands.",
+            "state": "active",
+            "evidence": [
+              {
+                "id": 1,
+                "t": 599,
+                "kind": "action.rejected",
+                "text": "The boatshed is damaged."
+              }
+            ]
+          }
+        ],
+        "attempts": [
+          {
+            "t": 600,
+            "action": "repair",
+            "accepted": false,
+            "events": [
+              {
+                "id": 5,
+                "text": "Mara tried to repair but stand at a damaged building with two planks, or one plank and an equipped usable hammer.",
+                "kind": "action.rejected"
+              }
+            ]
+          },
+          {
+            "t": 601,
+            "action": "repair",
+            "accepted": true,
+            "events": [
+              {
+                "id": 9,
+                "text": "Mara used 2 planks to repair the boat shed; it is working again.",
+                "kind": "building.repaired"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "inventory": [
+      "suitcase"
+    ],
+    "damage": 0,
+    "events": [
+      "Nika gave Mara planks.",
+      "Nika gave Mara planks.",
+      "Nika went to the harbor, on the way to the pinewood.",
+      "Mara used 2 planks to repair the boat shed; it is working again."
+    ]
+  }
+]

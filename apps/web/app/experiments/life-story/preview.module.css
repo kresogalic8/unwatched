@@ -1,0 +1,20 @@
+.page { --ink:#253025; --muted:#687061; --rule:#ced1c5; background:#f2f1e9; color:var(--ink); min-height:100vh; padding:48px max(24px,calc((100vw - 1120px)/2)); }
+.page a { color:inherit; }
+.eyebrow { font-size:11px; letter-spacing:.13em; margin-top:38px; }
+.page h1 { font-size:clamp(40px,6vw,76px); line-height:1.04; letter-spacing:-.055em; margin:22px 0; }
+.intro { max-width:65ch; line-height:1.6; color:var(--muted); }
+.page nav { display:flex; flex-wrap:wrap; gap:8px; margin:32px 0; }
+.page button { border:1px solid var(--rule); background:transparent; padding:14px 18px; min-height:46px; cursor:pointer; color:inherit; }
+.page button:hover:not(:disabled) { background:#e1e4d8; }
+.page button[aria-pressed=true], .page footer button:last-child { background:#253025; color:#f2f1e9; }
+.page button:focus-visible { outline:2px solid #b34322; outline-offset:3px; }
+.page button:disabled { opacity:.4; cursor:default; }
+.columns { display:grid; grid-template-columns:1.3fr 1fr; gap:60px; }
+.columns aside { align-self:start; background:#e5e8dc; padding:28px; line-height:1.6; }
+.columns aside .eyebrow { margin-top:0; }
+.columns h2 { letter-spacing:-.03em; line-height:1.15; }
+.columns h3 { font-size:13px; margin-top:28px; }
+.note { font-size:12px; color:var(--muted); border-top:1px solid var(--rule); padding-top:18px; }
+.page footer { display:flex; justify-content:space-between; margin-top:30px; }
+@media(max-width:760px){.columns{grid-template-columns:1fr;gap:24px}.page{padding-top:24px}.page nav button{flex:1 1 40%}}
+.page button[aria-pressed=true]:hover:not(:disabled), .page footer button:last-child:hover:not(:disabled) { background:#354733; color:#f2f1e9; }

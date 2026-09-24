@@ -14,6 +14,15 @@ export function Desires({ desires, name }: { desires: Desire[]; name: string }) 
         <article key={d.id} className={s.desire}>
           <div className={s.meta}><span>{label[d.state]}</span><span>Since day {day(d.since)}</span></div>
           <h3>{d.title}</h3><p>{d.why}</p>
+          <ol className={s.journey} aria-label={`${name}'s recorded attempts`}>
+            <li className={s.origin}><small>Day {day(d.since)} · A desire took shape</small><p>{d.history[0]?.why ?? d.why}</p></li>
+            {d.attempts.slice(-3).map((a,i) => <li key={`${a.t}-${i}`} data-blocked={!a.accepted}>
+              <small>Day {day(a.t)} · {a.action.replaceAll("_", " ")}</small>
+              <strong>{!a.accepted ? "An obstacle" : a.events.some(e => ["building.repaired","item.crafted","agent.give","town.built","agent.hired","place.decorated"].includes(e.kind ?? "")) ? "Something changed" : "A step they took"}</strong>
+              {a.events.length ? a.events.map(e => <p key={e.id}>{e.text}</p>) : <p>{a.accepted ? "Action accepted. No separate outcome was recorded." : "The action could not be carried out. No reason was recorded."}</p>}
+            </li>)}
+          </ol>
+          {!d.attempts.length && <p className={s.note}>No action linked to this desire yet. Their next choice is still theirs.</p>}
           <details><summary>How this took shape <Icon name="plus" size={16} /></summary>
             <p className={s.note}>Their interpretation of recorded experiences. Feeling fulfilled does not certify a completed project or someone else’s feelings.</p>
             {d.history.slice().reverse().map((h,i) => <div className={s.entry} key={`${h.t}-${i}`}><small>Day {day(h.t)} · {label[h.state]}</small><p>{h.why}</p>{h.evidence.map(e => <blockquote key={e.id}><span>Recorded experience · day {day(e.t)}</span>{e.text}</blockquote>)}</div>)}

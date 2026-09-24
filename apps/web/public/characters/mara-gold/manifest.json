@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "character": "Mara",
+  "source": "source/mara-master-v1.png",
+  "spine": "4.2",
+  "animations": [
+    "idle",
+    "walk",
+    "wave",
+    "think"
+  ],
+  "construction": "Fresh overlapping masks cut only from the approved gold master",
+  "limitations": [
+    "First articulation pass; face remains part of the body layer.",
+    "Walk requires visual foot-contact review before production."
+  ],
+  "generator": "scripts/characters/build-mara-gold.py"
+}

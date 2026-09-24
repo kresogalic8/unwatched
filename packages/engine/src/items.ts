@@ -19,11 +19,14 @@ export function syncItems(a: AgentState, t: number) {
   if (!a.itemInstances.some(i => i.id === a.equippedItem)) a.equippedItem = null;
 }
 export function equipped(a: AgentState) { return a.itemInstances?.find(i => i.id === a.equippedItem && (i.condition ?? 0) > 0); }
-export function capacity(a: AgentState) { return BACKPACK_CAPACITY + (equipped(a)?.name === "basket" ? 6 : 0); }
+export function hasTool(a: AgentState, capability: "repair" | "carry") {
+ const tool=equipped(a);return !!tool && (tool.blueprint?.spec.modules.includes(capability) || tool.name === (capability === "repair" ? "hammer" : "basket"));
+}
+export function capacity(a: AgentState) { const tool=equipped(a);return BACKPACK_CAPACITY + (tool?.blueprint?.spec.modules.includes("carry") ? 3 : tool?.name === "basket" ? 6 : 0); }
 export function recipe(name: string) { return CRAFT_RECIPES.find(r => r.item === name); }
 export function bagView(a: AgentState, t: number, compact = false): InventoryView {
   syncItems(a, t);
-  return {capacity: capacity(a), equipped: a.equippedItem ?? null, items: a.itemInstances!.map(i => ({...structuredClone(i), history: structuredClone(compact ? i.history.slice(-2) : i.history)})), storage: (a.storage ?? []).map(box => ({place: box.place, items: box.items.map(i => ({...structuredClone(i), history: compact ? [] : structuredClone(i.history)}))})), recipes: CRAFT_RECIPES.map(r => ({...r, from: [...r.from]}))};
+  return {blueprints: structuredClone(a.blueprints ?? []), capacity: capacity(a), equipped: a.equippedItem ?? null, items: a.itemInstances!.map(i => ({...structuredClone(i), history: structuredClone(compact ? i.history.slice(-2) : i.history)})), storage: (a.storage ?? []).map(box => ({place: box.place, items: box.items.map(i => ({...structuredClone(i), history: compact ? [] : structuredClone(i.history)}))})), recipes: CRAFT_RECIPES.map(r => ({...r, from: [...r.from]}))};
 }
 export function wearTool(a: AgentState, t: number, amount: number) {
   const tool = equipped(a); if (!tool || tool.condition === null) return;

@@ -1,0 +1,201 @@
+{
+  "at": "2026-09-21T18:28:12.391Z",
+  "model": "anthropic/claude-haiku-4.5",
+  "attempts": 9,
+  "cost": 0.0280963,
+  "usage": [
+    {
+      "agentId": "ag_1",
+      "kind": "reflection",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 5452,
+      "completionTokens": 355,
+      "cachedTokens": 4537,
+      "costUsd": 0.0031437
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 7785,
+      "completionTokens": 228,
+      "cachedTokens": 6542,
+      "costUsd": 0.0030372
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 7835,
+      "completionTokens": 315,
+      "cachedTokens": 6542,
+      "costUsd": 0.0035222
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 8173,
+      "completionTokens": 172,
+      "cachedTokens": 6542,
+      "costUsd": 0.0031452
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 7896,
+      "completionTokens": 249,
+      "cachedTokens": 6542,
+      "costUsd": 0.0032532
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 8168,
+      "completionTokens": 176,
+      "cachedTokens": 6542,
+      "costUsd": 0.0031602
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 7896,
+      "completionTokens": 183,
+      "cachedTokens": 6542,
+      "costUsd": 0.0029232
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 7896,
+      "completionTokens": 190,
+      "cachedTokens": 6542,
+      "costUsd": 0.0029582
+    },
+    {
+      "agentId": "ag_1",
+      "kind": "action_proposal",
+      "model": "anthropic/claude-haiku-4.5",
+      "promptTokens": 7896,
+      "completionTokens": 189,
+      "cachedTokens": 6542,
+      "costUsd": 0.0029532
+    }
+  ],
+  "error": null,
+  "frames": [
+    {
+      "label": "What Mara chose to want",
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": [],
+      "action": null
+    },
+    {
+      "label": "Decision 1",
+      "action": {
+        "kind": "move",
+        "to": "council hall"
+      },
+      "intent": "It's council day and I've just arrived. I should see what the island is about and who runs it. The council hall is where decisions get made, and if I want meaningful work here, I need to understand how things work. Plus I'm new and there will be people there.",
+      "accepted": true,
+      "deferred": false,
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": [
+        "Mara went to the harbor, on the way to the council hall."
+      ]
+    },
+    {
+      "label": "Decision 2",
+      "action": {
+        "kind": "move",
+        "to": "council hall"
+      },
+      "intent": "Head to council day to see who the town trusts as mayor and what business comes up. I need to understand how this place works and not miss what people are deciding.",
+      "accepted": true,
+      "deferred": false,
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": [
+        "Mara went to the market square, on the way to the council hall."
+      ]
+    },
+    {
+      "label": "Decision 3",
+      "action": {
+        "kind": "move",
+        "to": "council"
+      },
+      "intent": "Head to the council hall to see the day's business and meet the community on council day.",
+      "accepted": true,
+      "deferred": false,
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": [
+        "Mara went to the council hall."
+      ]
+    },
+    {
+      "label": "Decision 4",
+      "action": {
+        "kind": "wait"
+      },
+      "accepted": true,
+      "deferred": false,
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": []
+    },
+    {
+      "label": "Decision 5",
+      "action": {
+        "kind": "wait"
+      },
+      "intent": "I arrived this morning and made my way to the council hall for the mayor election. It's early yet and no one's here—I'll wait for others to gather rather than wander the empty square on my first day. Council day matters, and I want to see how things work here before I speak.",
+      "accepted": true,
+      "deferred": false,
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": []
+    },
+    {
+      "label": "Decision 6",
+      "action": {
+        "kind": "wait"
+      },
+      "intent": "I just arrived at the council hall for the day's business. The place is empty right now, so I'll wait here for people to gather. Council day brings everyone together—a good time to see who's doing what and find where I might be useful. I've got time before things start.",
+      "accepted": true,
+      "deferred": false,
+      "desires": [],
+      "inventory": [
+        "planks",
+        "planks"
+      ],
+      "events": []
+    }
+  ],
+  "limitation": "Six decision opportunities in a controlled starting scene. No full-day simulation. Dialogue and free-form adjudication are deferred; no synthetic fallback."
+}

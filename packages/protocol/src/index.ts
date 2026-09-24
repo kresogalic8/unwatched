@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { InventoryView, ItemInstance } from "./items";
+import { InventoryView, ItemInstance, BlueprintSpec } from "./items";
 export * from "./items";
 
 /** Identifiers */
@@ -59,7 +59,7 @@ export const TravellingSkill = z.object({recipe:SkillRecipe,origin:z.object({isl
 
 /** The action kinds the town can carry out. Nothing else exists. */
 export const ActionKind = z.enum([
-  "craft", "equip", "stow", "retrieve", "drop", "pickup", "repair_tool",
+  "design_item", "prototype_item", "craft_design", "craft", "equip", "stow", "retrieve", "drop", "pickup", "repair_tool",
   "fish",
   "decorate", "move", "say", "give", "take", "use", "work", "apply", "quit", "trade",
   "propose", "vote", "write", "build", "message_owner", "sleep", "wait",
@@ -82,6 +82,9 @@ export const Decoration = z.object({ kind: z.enum(["flowers", "bench", "cairn"])
 export type Decoration = z.infer<typeof Decoration>;
 
 export const Action = z.discriminatedUnion("kind", [
+  z.object({kind:z.literal("design_item"),spec:BlueprintSpec,parent:z.string().max(40).optional(),desire_id:z.string().max(40).optional()}),
+  z.object({kind:z.literal("prototype_item"),blueprint:z.string().max(40)}),
+  z.object({kind:z.literal("craft_design"),blueprint:z.string().max(40)}),
   z.object({kind:z.literal("craft"),recipe:z.string().min(1).max(40)}),
   z.object({kind:z.literal("equip"),item:z.string().nullable()}),
   z.object({kind:z.literal("stow"),item:z.string()}),
@@ -166,7 +169,7 @@ export type DesireUpdate = z.infer<typeof DesireUpdate>;
 export const Desire = z.object({
   id: z.string(), title: z.string(), why: z.string(), state: z.enum(["active", "set_aside", "fulfilled"]), since: z.number(), updated: z.number(),
   history: z.array(z.object({ t: z.number(), title: z.string(), why: z.string(), state: z.enum(["active", "set_aside", "fulfilled"]), evidence: z.array(z.object({ id: z.number(), t: z.number(), kind: z.string(), text: z.string() })) })),
-  attempts: z.array(z.object({ t: z.number(), action: z.string(), accepted: z.boolean(), events: z.array(z.object({ id: z.number(), text: z.string() })) })),
+  attempts: z.array(z.object({ t: z.number(), action: z.string(), accepted: z.boolean(), events: z.array(z.object({ id: z.number(), text: z.string(), kind: z.string().optional() })) })),
 });
 export type Desire = z.infer<typeof Desire>;
 
@@ -241,7 +244,8 @@ export const Perception = z.object({
     /** What this person chose to keep an eye on. */
     watching: z.array(z.string()).optional(),
     /** What they are working toward over weeks, and where each stands. */
-    desires: z.array(Desire.pick({ id: true, title: true, why: true, state: true, since: true, updated: true }).extend({ last_attempt: z.object({ t: z.number(), action: z.string(), accepted: z.boolean() }).optional() })).max(5).optional(),
+    recent_outcomes: z.array(z.object({ t: z.number(), kind: z.string(), text: z.string().max(240) })).max(6).optional(),
+    desires: z.array(Desire.pick({ id: true, title: true, why: true, state: true, since: true, updated: true }).extend({ last_attempt: z.object({ t: z.number(), action: z.string(), accepted: z.boolean() }).optional(), recent_attempts: z.array(z.object({ t: z.number(), action: z.string(), accepted: z.boolean(), outcomes: z.array(z.object({ id: z.number(), text: z.string(), kind: z.string().optional() })).max(2) })).max(3).optional() })).max(5).optional(),
     projects: z.array(z.object({ title: z.string(), progress: z.string(), since_day: z.number().int(), construction: z.object({ site: PlaceId, labor: z.number().int(), needed: z.number().int() }).optional() })).optional(),
     food_advice: z.array(z.object({ from: AgentId, name: z.string(), place: PlaceId, item: z.string(), confidence: z.number(), source_t: z.number(), shared_t: z.number(), trust: z.number(), tested: z.boolean().optional() })).optional(),
     /** What they believe, and how sure they are. Not necessarily true. */
