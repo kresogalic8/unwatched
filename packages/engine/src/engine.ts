@@ -13,7 +13,7 @@ import type { AgentState, Deal, Brain, Budget, EventSink, Job, Place, Tier, Memo
 import { makeJobs, makePlaces, FOOD_ITEMS, PERISHABLE, MINUTES_PER_DAY, SEASONS, BUILDS, GARDEN, WORKS, buildKind, lookHash, siteName, stockShelf, ISLAND, type WorldPack } from "./world.ts";
 import { retrieve, compress, age, drift, memoryForMind } from "./memory.ts";
 import { sha256, canonicalEvent } from "./hash.ts";
-import { validate } from "./validator.ts";
+import { validate, ROUGH_SEA } from "./validator.ts";
 import { habit } from "./habit.ts";
 import { routineReady, salience, wantsConversation, dueThought } from "./salience.ts";
 
@@ -50,7 +50,7 @@ export interface AddAgentOptions {
   coins?: number;
 }
 
-const WEATHERS = ["clear", "clear", "clear", "rain", "rain", "wind", "fog", "storm"] as const; // "snow" only ever comes from the real sky
+const WEATHERS = ["clear", "clear", "clear", "rain", "rain", "wind", "fog", "storm", "bura", "jugo"] as const; // "snow" only ever comes from the real sky
 
 /** Work that happens under the sky: the weather takes its share of what these places make. */
 const OUTDOOR_WORK = new Set(["fishhouse", "fields", "orchard", "quarry", "pinewood", "sawpit"]);
@@ -319,7 +319,7 @@ export class Town {
   private advanceFishing(a: AgentState): boolean {
     const activity = a.activity;
     if (activity?.kind !== "fish") return false;
-    if (a.asleep || a.location !== activity.place || this.weather === "storm" || a.needs.hunger > .9 || a.needs.rest > .9) {
+    if (a.asleep || a.location !== activity.place || ROUGH_SEA.has(this.weather) || a.needs.hunger > .9 || a.needs.rest > .9) {
       a.activity = null;
       this.emit("agent.fishing-ended", [a.id], activity.place, `${a.persona.name} packed away the line without a catch.`, .15, {caught: 0, interrupted: true});
       return false;
@@ -462,7 +462,7 @@ export class Town {
       owner_letters: [...(a.instructions ? [{ id: 0, text: `Standing instructions from whoever sent you: ${a.instructions}` }] : []), ...a.letters.filter((l) => !l.read).map((l) => ({ id: l.id, text: l.text }))],
       ...(a.hint ? { hint: a.hint } : {}), ...(a.crossroads ? { crossroads: a.crossroads } : {}),
       today: a.plan?.day === this.day && a.plan.goals.length ? { mood: a.plan.mood, goals: a.plan.goals, steps: a.plan.steps } : null,
-      options: [...OPTIONS_DEFAULT, "craft", "equip", "drop", "pickup", "stow", "retrieve", "repair_tool", ...(here.kind === "harbor" && this.weather !== "storm" && a.lastFishingDay !== this.day && a.starving < 2 ? ["fish" as const] : []), ...(!here.site && (here.owner===a.id || (!here.owner && ["public","harbor","market","wild"].includes(here.kind))) && (here.decorations?.length??0)<6 ? ["decorate" as const] : []), ...(here.institution ? ["join_institution" as const,"leave_institution" as const] : here.owner===a.id ? ["found_institution" as const] : []), ...(here.brokenUntil && here.brokenUntil>this.day ? ["repair" as const] : []), ...(this.learning ? ["propose_skill" as const, ...(a.skills?.length ? ["test_skill" as const, "practice_skill" as const, "share_skill" as const] : [])] : []), ...(here.kind === "plot" && !here.site && !here.community ? ["build" as const, "start_project" as const] : []), ...(here.community ? ["contribute_project" as const, "withdraw_project" as const] : []), ...(this.learning && nearby.length && a.foodLessons?.length ? ["teach" as const] : []), ...(here.owner === a.id ? ["hire" as const] : []), ...([...this.places.values()].some((p) => p.owner === a.id && p.beds) && nearby.length ? ["lodge" as const] : []), ...(nearby.length && a.coins > 0 ? ["lend" as const] : []), ...(here.kind === "harbor" && this.boatRunning ? ["leave" as const] : []), ...(here.kind === "civic" ? ["accuse" as const, ...(this.mayor === a.id ? ["fund" as const] : [])] : []), ...(here.owner === a.id ? ["stock" as const] : []), ...((here.owner === a.id || (a.job && this.jobs.get(a.job)?.place === here.id)) && Object.keys(here.stock).length ? ["make" as const] : []), ...(here.kind !== "wild" ? ["call" as const] : []), ...(this.residentsOf(here).some((r) => r.id !== a.id) && !this.residentsOf(here).some((r) => r.id !== a.id && r.location === here.id) ? ["search" as const] : [])],
+      options: [...OPTIONS_DEFAULT, "craft", "equip", "drop", "pickup", "stow", "retrieve", "repair_tool", ...(here.kind === "harbor" && !ROUGH_SEA.has(this.weather) && a.lastFishingDay !== this.day && a.starving < 2 ? ["fish" as const] : []), ...(!here.site && (here.owner===a.id || (!here.owner && ["public","harbor","market","wild"].includes(here.kind))) && (here.decorations?.length??0)<6 ? ["decorate" as const] : []), ...(here.institution ? ["join_institution" as const,"leave_institution" as const] : here.owner===a.id ? ["found_institution" as const] : []), ...(here.brokenUntil && here.brokenUntil>this.day ? ["repair" as const] : []), ...(this.learning ? ["propose_skill" as const, ...(a.skills?.length ? ["test_skill" as const, "practice_skill" as const, "share_skill" as const] : [])] : []), ...(here.kind === "plot" && !here.site && !here.community ? ["build" as const, "start_project" as const] : []), ...(here.community ? ["contribute_project" as const, "withdraw_project" as const] : []), ...(this.learning && nearby.length && a.foodLessons?.length ? ["teach" as const] : []), ...(here.owner === a.id ? ["hire" as const] : []), ...([...this.places.values()].some((p) => p.owner === a.id && p.beds) && nearby.length ? ["lodge" as const] : []), ...(nearby.length && a.coins > 0 ? ["lend" as const] : []), ...(here.kind === "harbor" && this.boatRunning ? ["leave" as const] : []), ...(here.kind === "civic" ? ["accuse" as const, ...(this.mayor === a.id ? ["fund" as const] : [])] : []), ...(here.owner === a.id ? ["stock" as const] : []), ...((here.owner === a.id || (a.job && this.jobs.get(a.job)?.place === here.id)) && Object.keys(here.stock).length ? ["make" as const] : []), ...(here.kind !== "wild" ? ["call" as const] : []), ...(this.residentsOf(here).some((r) => r.id !== a.id) && !this.residentsOf(here).some((r) => r.id !== a.id && r.location === here.id) ? ["search" as const] : [])],
       deadline_ms: 8000,
     };
   }
@@ -1451,8 +1451,8 @@ export class Town {
   private produce(place: Place): void {
     if (place.brokenUntil && place.brokenUntil > this.day) return;
     // the weather is physics too: nothing comes off the sea or the land in a storm, and half of it in rain
-    const outdoors = OUTDOOR_WORK.has(place.id); const weatherCut = outdoors ? (this.weather === "storm" ? 0 : this.weather === "rain" || this.weather === "snow" ? 0.5 : 1) : 1;
-    if (weatherCut === 0) { if (!this.dry.has(place.id)) { this.dry.add(place.id); this.emit("economy.price", [], place.id, `${place.name} made nothing today: no one works ${place.id === "fishhouse" ? "the sea" : "the land"} in a storm.`, 0.45); } return; }
+    const outdoors = OUTDOOR_WORK.has(place.id); const weatherCut = outdoors ? (this.weather === "storm" || (this.weather === "bura" && place.id === "fishhouse") ? 0 : this.weather === "rain" || this.weather === "snow" || this.weather === "bura" ? 0.5 : 1) : 1;
+    if (weatherCut === 0) { if (!this.dry.has(place.id)) { this.dry.add(place.id); this.emit("economy.price", [], place.id, `${place.name} made nothing today: no one works ${place.id === "fishhouse" ? "the sea" : "the land"} in ${this.weather === "bura" ? "the bura" : "a storm"}.`, 0.45); } return; }
     for (const pr of this.pack.produce) {
       if (pr.place !== place.id) continue;
       if (pr.seasons && !pr.seasons.includes(this.season)) continue;

@@ -235,7 +235,7 @@ export class Weather {
       f.position.set(x, y); f.scale.set(sd.size); f.tint = o.night > 0.3 ? 0xffffff : 0xcfd9de; f.alpha = sd.a;
     }
     // fog: banks that drift with the wind; a thin haze in rain; nothing on a clear day
-    this.fogTarget = o.weather === "fog" ? 1 : raining ? 0.22 : 0;
+    this.fogTarget = o.weather === "fog" ? 1 : o.weather === "jugo" ? 0.42 : raining ? 0.22 : 0; // the jugo hangs a warm damp haze over everything
     this.fogAlpha += (this.fogTarget - this.fogAlpha) * (1 - Math.pow(0.94, o.dt ?? 1));
     this.fog.visible = this.fogAlpha > 0.01;
     this.veil.tint = o.fogColor; this.veil.alpha = 0.34 * this.fogAlpha * (1 - o.night * 0.5);
@@ -263,10 +263,10 @@ export class Clouds {
   }
   update(o: { tick: number; wind: number; sunUp: number; night: number; weather: string; /** the low sun on their undersides */ warm?: number }): void {
     const { W } = this; const t = o.tick;
-    const overcast = o.weather === "storm" || o.weather === "rain" || o.weather === "snow";
+    const overcast = o.weather === "storm" || o.weather === "rain" || o.weather === "snow" || o.weather === "jugo";
     const show = o.weather !== "fog"; this.puffs.visible = show; this.shadows.visible = show && o.sunUp > 0.05;
     if (!show) return;
-    const puffTint = o.weather === "storm" ? 0xb9c1c8 : overcast ? 0xdfe4e8 : mix(0xffffff, 0xffc4a0, o.warm ?? 0);
+    const puffTint = o.weather === "storm" ? 0xb9c1c8 : o.weather === "jugo" ? 0xd8d2c4 : overcast ? 0xdfe4e8 : mix(0xffffff, 0xffc4a0, o.warm ?? 0);
     for (let i = 0; i < this.seeds.length; i++) {
       const sd = this.seeds[i]!;
       const x = ((sd.x + t * sd.speed * (0.6 + o.wind * 1.6) + 400) % (W + 800)) - 400, y = sd.y + Math.sin(t / 700 + i) * 12;

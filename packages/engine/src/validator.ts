@@ -3,6 +3,9 @@ import { blueprintVerdict } from "./blueprints.ts";
 import { hasTool, capacity, equipped, itemVerdict, recipe } from "./items.ts";
 import { teachable } from "./learning.ts";
 import { gardenReady } from "./community.ts";
+/** The sea too high to put out on: a storm, or the bura, the cold north-easterly that comes down off the hills in gusts. The jugo, the
+ * warm damp south-easterly, raises a long swell but a boat can work in it. */
+export const ROUGH_SEA = new Set(["storm", "bura"]);
 import type { Action } from "@unwatched/protocol";
 import { BUILDS, GARDEN, WORKS, buildKind, FOOD_ITEMS } from "./world.ts";
 import type { AgentState, Place, Job } from "./types.ts";
@@ -41,7 +44,7 @@ export function validate(a: AgentState, action: Action, v: ValidatorView): Verdi
     }
     case "fish": {
       if (here.kind !== "harbor") return { ok: false, reason: "fish from the harbor pier" };
-      if (v.weather === "storm" || a.starving >= 2) return { ok: false, reason: "too stormy or weak to fish safely" };
+      if (ROUGH_SEA.has(v.weather ?? "") || a.starving >= 2) return { ok: false, reason: v.weather === "bura" ? "no one puts out in the bura" : "too stormy or weak to fish safely" };
       if (a.lastFishingDay === v.day || a.activity?.kind === "fish") return { ok: false, reason: "one fishing attempt per day" };
       if (a.inventory.length >= capacity(a)) return { ok: false, reason: "make room for a catch first" };
       return { ok: true };
