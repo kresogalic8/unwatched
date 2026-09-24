@@ -6,35 +6,151 @@ import { Figurine, FIGURE_SCALE } from "@/components/world/figurine";
 
 export type InteriorPerson = { id: string; name: string; asleep: boolean; job: string | null; appearance: Record<string, unknown> | null; age?: number; carrying?: string | null; pose?: "sleep" | "work" | "sit" | "idle" };
 
-import { KELP as INK, CREAM as WALL, CREAM_DARK as WALL2, WOOD as FLOOR, WOOD_DARK as FLOOR2, WOOD_DARK as WOOD, TEAL as CLOTH, CORAL, CREAM, GLASS, SAND, DRIFT, LIGHT } from "@/components/world/palette";
+import { KELP as INK, CREAM, CORAL, LIGHT, SAND } from "@/components/world/palette";
 
-/** The furniture a kind of place keeps, drawn in the same dimetric hand as the buildings, flat to the back wall. */
-function furnish(g: Graphics, kind: string, sprite: string, W: number, H: number, floorY: number, stock: Record<string,number>): { seats: [number, number][]; beds: [number, number][]; benches: [number, number][] } {
-  const seats: [number, number][] = [], beds: [number, number][] = [], benches: [number, number][] = [];
-  const bed = (x: number) => { g.roundRect(x, floorY - 26, 58, 22, 4).fill(WOOD).stroke({ width: .7, color: INK }); g.roundRect(x + 3, floorY - 30, 52, 12, 3).fill(CREAM).stroke({ width: .65, color: INK }); g.roundRect(x + 6, floorY - 33, 14, 7, 3).fill(CLOTH); beds.push([x + 30, floorY - 22]); };
-  const table = (x: number, w = 70) => { g.rect(x, floorY - 30, w, 5).fill(WOOD).stroke({ width: .65, color: INK }); g.rect(x + 6, floorY - 25, 4, 22).fill(WOOD); g.rect(x + w - 10, floorY - 25, 4, 22).fill(WOOD); for (const cx of [x-10,x+w+10]) { g.moveTo(cx-7,floorY-1).lineTo(cx-7,floorY-32).lineTo(cx+7,floorY-32).lineTo(cx+7,floorY-1).moveTo(cx-7,floorY-14).lineTo(cx+7,floorY-14).stroke({width:1.8,color:WOOD}); } seats.push([x - 10, floorY - 2], [x + w + 10, floorY - 2]); };
-  const bench = (x: number, w = 80) => { g.rect(x, floorY - 34, w, 8).fill(WOOD).stroke({ width: .65, color: INK }); g.rect(x + 6, floorY - 26, 5, 24).fill(WOOD); g.rect(x + w - 11, floorY - 26, 5, 24).fill(WOOD); benches.push([x + w / 2, floorY - 2]); };
-  const shelf = (x: number, y: number, w: number) => { g.rect(x, y, w, 4).fill(WOOD); for (let i = 0; i < Math.floor(w / 14); i++) g.roundRect(x + 4 + i * 14, y - 12, 9, 12, 2).fill([CLOTH, CORAL, FLOOR, DRIFT][i % 4]!); };
-  const window_ = (x: number, y: number) => { g.rect(x-3,y-3,40,37).fill(0xd6ceb4).stroke({width:.6,color:0xa5a58b}); g.rect(x-4,y+31,43,3).fill(0xeee2c6); g.roundRect(x, y, 34, 30, 3).fill(GLASS).stroke({ width: .7, color: INK }); g.moveTo(x+2,y+3).lineTo(x+15,y+3).lineTo(x+2,y+24).closePath().fill({color:0xe5ebd0,alpha:.3}); g.moveTo(x + 17, y).lineTo(x + 17, y + 30).stroke({ width: .65, color: INK }); g.moveTo(x, y + 15).lineTo(x + 34, y + 15).stroke({ width: .65, color: INK }); };
-  const oven = (x: number) => { g.roundRect(x, floorY - 54, 54, 54, 6).fill(DRIFT).stroke({ width: .7, color: INK }); g.roundRect(x + 10, floorY - 34, 34, 18, 9).fill(0x2b2f31); g.roundRect(x + 14, floorY - 30, 26, 10, 5).fill(CORAL); benches.push([x + 27, floorY - 2]); };
-  const barrel = (x: number) => { g.roundRect(x, floorY - 26, 20, 26, 5).fill(WOOD).stroke({ width: .65, color: INK }); g.rect(x, floorY - 18, 20, 2).fill(INK); g.rect(x, floorY - 9, 20, 2).fill(INK); };
-  window_(W * 0.18, 26); window_(W * 0.7, 26);
-  switch (["bakery","smithy","mill","fishhouse"].includes(sprite)?"workplace":sprite==="tavern"?"tavern":kind) {
-    case "tavern": table(30,70); table(W-125,70); barrel(W/2-10); shelf(W/2-40,50,80);break;
-    case "inn": bed(20); bed(W - 80); table(W / 2 - 35); shelf(W / 2 - 40, 34, 80); break;
-    case "home": bed(W - 82); table(24, 60); shelf(28, 40, 56); break;
-    case "civic": table(W / 2 - 70, 140); g.roundRect(W / 2 - 16, 18, 32, 40, 3).fill(CLOTH).stroke({ width: .65, color: INK }); break;
-    case "market": bench(16, 70); bench(W - 86, 70); shelf(W / 2 - 30, 44, 60); barrel(W / 2 - 10); break;
-    case "shop": shelf(16, 40, W - 32); shelf(16, 62, W - 32); bench(W / 2 - 45, 90); break;
-    case "harbor": table(20, 60); barrel(W - 70); barrel(W - 46); g.moveTo(W - 90, 14).lineTo(W - 20, 14).stroke({ width: 3, color: WOOD }); break;
-    case "public": bench(20, 60); bench(W - 80, 60); break;
-    default:
-      if (sprite === "bakery") { oven(18); bench(W - 100, 84); shelf(W / 2 - 20, 40, 60); }
-      else if (sprite === "fishhouse") { bench(35,110); bench(W-145,110); shelf(W/2-35,40,70); for(let i=0;i<Math.min(5,stock.fish??0);i++){g.ellipse(52+i*17,floorY-37,7,2).fill(0x91b6ac);g.moveTo(58+i*17,floorY-37).lineTo(63+i*17,floorY-40).lineTo(63+i*17,floorY-34).closePath().fill(0x91b6ac);} barrel(W/2-12); }
-      else if (sprite === "smithy") { oven(W - 72); bench(16, 84); }
-      else if (sprite === "mill") { g.circle(W * 0.3, floorY - 46, 30).stroke({ width: 4, color: WOOD }); g.circle(W * 0.3, floorY - 46, 6).fill(INK); bench(W - 100, 84); }
-      else { bench(16, 84); bench(W - 100, 84); shelf(W / 2 - 25, 40, 50); }
+/** The island's own stone, plaster and timber, the same as the houses outside (components/world/dalmatian.ts). */
+const STONES = [0xd8cfbb, 0xcdc3ad, 0xddd5c3, 0xc6bca5, 0xd3c9b2, 0xe0d8c6], MORTAR = 0xa89e87, PLASTER = 0xece4d2, PLASTER_SHADE = 0xd9cfb9;
+const BEAM = 0x6e5641, BEAM_DARK = 0x4f3d2e, PLANK = 0x8a6d51, TIMBER = 0xa0805e, SHUTTER = 0x4f7a5a, SHUTTER_DARK = 0x3d6147, SLAB = [0xcfc4ad, 0xc5b9a1, 0xd6ccb6], COTTO = [0xc98a66, 0xbf7d5a, 0xd29574];
+const CLAY = 0xbb6443, COPPER = 0xb8703f, IRON = 0x3a3d3f, WINE = 0x6d2c33, OLIVE = 0x7d8a52, NET = 0x7a8872, SEA = 0x6f9c9a, SKY_DAY = 0xbfdde4, SKY_NIGHT = 0x1d2b40;
+
+function rnd(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const seedOf = (s: string) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+
+/** What a room is, from what the town calls the place: the konoba, the workshops, a home, the loggia, a shop, the harbour's store. */
+export type Room = "konoba" | "home" | "inn" | "bakery" | "smithy" | "mill" | "fishhouse" | "loggia" | "shop" | "harbor" | "hall";
+export function roomOf(kind: string, sprite: string): Room {
+  if (sprite === "tavern" || kind === "tavern") return "konoba";
+  if (sprite === "bakery" || sprite === "smithy" || sprite === "mill" || sprite === "fishhouse") return sprite;
+  if (/chandlery|boatshed|harbor-office/.test(sprite) || kind === "harbor") return "harbor";
+  if (kind === "civic" || /chapel|council/.test(sprite)) return "loggia";
+  if (kind === "inn") return "inn";
+  if (kind === "shop" || kind === "market") return "shop";
+  if (kind === "home") return "home";
+  return "hall";
+}
+
+/** The shell of the room: a back wall of dressed stone (plastered to the waist in homes), the beams over it, a floor of slabs or cotto, deep stone windows with the škure open, and the arched door. */
+function shell(g: Graphics, room: Room, W: number, H: number, floorY: number, r: () => number) {
+  const plastered = room === "home" || room === "inn" || room === "shop" || room === "loggia";
+  // dressed stone courses, laid in rows of random lengths
+  g.rect(0, 0, W, floorY).fill(MORTAR);
+  for (let y = 14, row = 0; y < floorY; y += 17, row++) {
+    let x = -(row % 2) * 18 - r() * 10;
+    while (x < W) { const w = 26 + r() * 30; g.roundRect(x + 1, y + 1, w - 2, 15, 2).fill(STONES[Math.floor(r() * STONES.length)]!); g.moveTo(x + 3, y + 14).lineTo(x + w - 3, y + 14).stroke({ width: .6, color: MORTAR, alpha: .7 }); x += w; }
   }
+  if (plastered) {
+    // lime plaster over the stone, worn through here and there so the stone shows
+    g.rect(0, 14, W, floorY - 60).fill(PLASTER);
+    for (let i = 0; i < 5; i++) { const x = r() * (W - 60), y = 30 + r() * (floorY - 110), w = 24 + r() * 40, h = 12 + r() * 16; g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2).fill(STONES[i % STONES.length]!); g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2).stroke({ width: .6, color: PLASTER_SHADE }); }
+    g.rect(0, floorY - 46, W, 2).fill(PLASTER_SHADE);
+  }
+  // the ceiling: planks, and the beams they rest on, end-on as they run into the back wall
+  g.rect(0, 0, W, 14).fill(PLANK); for (let x = 0; x < W; x += 16) g.rect(x, 0, 1, 14).fill({ color: BEAM_DARK, alpha: .5 });
+  for (let x = 10; x < W; x += 58) { g.rect(x, 0, 16, 20).fill(BEAM).stroke({ width: .6, color: BEAM_DARK }); g.rect(x + 2, 17, 12, 3).fill({ color: BEAM_DARK, alpha: .5 }); }
+  // the floor
+  const slabs = room === "home" || room === "inn" || room === "konoba" ? COTTO : SLAB;
+  g.rect(0, floorY, W, H - floorY).fill(slabs[0]!);
+  for (let y = floorY, row = 0; y < H; row++) {
+    const h = 12 + row * 4; let x = -r() * 30;
+    while (x < W) { const w = (room === "home" || room === "inn" || room === "konoba" ? 28 : 36 + r() * 30) + row * 6; g.rect(x + 1, y + 1, w - 2, h - 2).fill(slabs[Math.floor(r() * slabs.length)]!); x += w; }
+    g.rect(0, y, W, 1).fill({ color: INK, alpha: .18 }); y += h;
+  }
+  g.rect(0, floorY - 1, W, 2).fill({ color: INK, alpha: .35 });
+  // the side walls fall away into shadow
+  g.poly([0, 0, 22, 14, 22, floorY, 0, H]).fill({ color: BEAM_DARK, alpha: .22 });
+  g.poly([W, 0, W - 22, 14, W - 22, floorY, W, H]).fill({ color: BEAM_DARK, alpha: .22 });
+}
+
+/** Where the windows are, as fractions of the wall: none behind the hearth's hood or the forge's. */
+const windowsOf = (room: Room) => room === "home" ? [0.76] : room === "smithy" ? [0.14] : [0.14, 0.76];
+
+/** A window deep in the stone, the škure folded back, the sea or the night beyond. */
+function window_(g: Graphics, x: number, y: number, night: boolean) {
+  const w = 38, h = 46;
+  g.rect(x - 6, y - 6, w + 12, h + 12).fill(STONES[2]!).stroke({ width: .7, color: MORTAR });
+  g.rect(x - 8, y + h + 4, w + 16, 5).fill(STONES[5]!).stroke({ width: .6, color: MORTAR });
+  g.rect(x, y, w, h).fill(night ? SKY_NIGHT : SKY_DAY);
+  if (night) { g.circle(x + 28, y + 11, 4).fill(LIGHT.star); g.circle(x + 26, y + 10, 4).fill(SKY_NIGHT); for (const [sx, sy] of [[8, 8], [16, 20], [30, 26]] as const) g.circle(x + sx, y + sy, .8).fill(LIGHT.star); }
+  g.rect(x, y + h * .62, w, h * .38).fill(night ? 0x223449 : SEA); g.rect(x, y + h * .62, w, 1).fill({ color: CREAM, alpha: night ? .2 : .6 });
+  g.rect(x + w / 2 - 1, y, 2, h).fill(TIMBER); g.rect(x, y + h / 2 - 1, w, 2).fill(TIMBER); g.rect(x, y, w, h).stroke({ width: 2, color: TIMBER });
+  // the shutters, open against the wall on either side
+  for (const [sx, dir] of [[x - 22, -1], [x + w + 6, 1]] as const) {
+    g.rect(sx, y - 2, 16, h + 4).fill(SHUTTER).stroke({ width: .7, color: SHUTTER_DARK });
+    for (let i = 4; i < h; i += 5) g.moveTo(sx + 2, y + i).lineTo(sx + 14, y + i).stroke({ width: .7, color: SHUTTER_DARK });
+    g.rect(dir < 0 ? sx + 14 : sx, y + 6, 2, 6).fill(IRON);
+  }
+}
+
+/** The door: a round arch of voussoirs over a plank door with iron studs. */
+function door(g: Graphics, cx: number, floorY: number) {
+  const w = 46, h = 84, top = floorY - h;
+  for (let i = 0; i <= 8; i++) { const a0 = Math.PI + (i / 9) * Math.PI, a1 = Math.PI + ((i + 1) / 9) * Math.PI; const R = w / 2 + 9, r0 = w / 2; g.poly([cx + Math.cos(a0) * r0, top + w / 2 + Math.sin(a0) * r0, cx + Math.cos(a0) * R, top + w / 2 + Math.sin(a0) * R, cx + Math.cos(a1) * R, top + w / 2 + Math.sin(a1) * R, cx + Math.cos(a1) * r0, top + w / 2 + Math.sin(a1) * r0]).fill(STONES[i % STONES.length]!).stroke({ width: .6, color: MORTAR }); }
+  g.rect(cx - w / 2 - 9, top + w / 2, 9, h - w / 2).fill(STONES[3]!).stroke({ width: .6, color: MORTAR }); g.rect(cx + w / 2, top + w / 2, 9, h - w / 2).fill(STONES[1]!).stroke({ width: .6, color: MORTAR });
+  g.moveTo(cx - w / 2, floorY).lineTo(cx - w / 2, top + w / 2).arc(cx, top + w / 2, w / 2, Math.PI, 0).lineTo(cx + w / 2, floorY).closePath().fill(TIMBER).stroke({ width: .8, color: BEAM_DARK });
+  for (let x = cx - w / 2 + 9; x < cx + w / 2; x += 9) g.moveTo(x, top + 6 + Math.abs(cx - x) * .5).lineTo(x, floorY).stroke({ width: .7, color: BEAM, alpha: .7 });
+  for (const y of [top + 34, floorY - 16]) for (let x = cx - w / 2 + 5; x < cx + w / 2; x += 9) g.circle(x, y, 1.1).fill(IRON);
+  g.circle(cx + 14, floorY - 42, 2.2).stroke({ width: 1.2, color: IRON });
+}
+
+/** The furniture each room keeps, and the spots in it where a person sleeps, sits or works. */
+function furnish(g: Graphics, room: Room, W: number, floorY: number, stock: Record<string, number>, r: () => number): { seats: [number, number][]; beds: [number, number][]; benches: [number, number][] } {
+  const seats: [number, number][] = [], beds: [number, number][] = [], benches: [number, number][] = [];
+  const ink = { width: .7, color: INK };
+  const chair = (cx: number) => { g.moveTo(cx - 7, floorY - 1).lineTo(cx - 7, floorY - 34).moveTo(cx + 7, floorY - 1).lineTo(cx + 7, floorY - 16).moveTo(cx - 7, floorY - 16).lineTo(cx + 7, floorY - 16).moveTo(cx - 7, floorY - 26).lineTo(cx - 1, floorY - 26).stroke({ width: 2, color: TIMBER }); g.rect(cx - 8, floorY - 18, 16, 3).fill(0xc9a86a); };
+  const table = (x: number, w = 76, jug = true) => {
+    g.rect(x, floorY - 32, w, 6).fill(TIMBER).stroke(ink); g.rect(x + 5, floorY - 26, 5, 25).fill(BEAM); g.rect(x + w - 10, floorY - 26, 5, 25).fill(BEAM);
+    if (jug) { g.roundRect(x + w * .3, floorY - 46, 10, 14, 4).fill(CREAM).stroke(ink); g.moveTo(x + w * .3 + 10, floorY - 43).quadraticCurveTo(x + w * .3 + 15, floorY - 40, x + w * .3 + 9, floorY - 36).stroke({ width: 1, color: INK }); g.rect(x + w * .62, floorY - 50, 5, 18).fill(WINE); g.rect(x + w * .62 + 1, floorY - 54, 3, 4).fill(WINE); g.ellipse(x + w * .8, floorY - 33, 7, 2).fill(CREAM); }
+    for (const cx of [x - 11, x + w + 11]) chair(cx);
+    seats.push([x - 11, floorY - 2], [x + w + 11, floorY - 2]);
+  };
+  const bench = (x: number, w = 84) => { g.rect(x, floorY - 36, w, 8).fill(TIMBER).stroke(ink); g.rect(x + 6, floorY - 28, 5, 27).fill(BEAM); g.rect(x + w - 11, floorY - 28, 5, 27).fill(BEAM); benches.push([x + w / 2, floorY - 2]); };
+  const shelf = (x: number, y: number, w: number, goods: number[] = [OLIVE, CLAY, CREAM, WINE]) => { g.rect(x, y, w, 4).fill(TIMBER).stroke({ width: .5, color: BEAM_DARK }); g.poly([x + 4, y + 4, x + 10, y + 4, x + 4, y + 12]).fill(BEAM); g.poly([x + w - 4, y + 4, x + w - 10, y + 4, x + w - 4, y + 12]).fill(BEAM); for (let i = 0; i < Math.floor(w / 13); i++) { const c = goods[i % goods.length]!, tall = 9 + ((i * 7) % 5); if (i % 3 === 1) g.roundRect(x + 4 + i * 13, y - tall, 9, tall, 3).fill(c).stroke({ width: .5, color: INK }); else { g.rect(x + 5 + i * 13, y - tall, 7, tall).fill(c).stroke({ width: .5, color: INK }); g.rect(x + 7 + i * 13, y - tall - 3, 3, 3).fill(c); } } };
+  const barrel = (x: number, y = floorY, s = 1) => { g.roundRect(x, y - 30 * s, 24 * s, 30 * s, 7 * s).fill(0x9b7650).stroke(ink); for (const k of [.2, .8]) g.rect(x, y - 30 * s * (1 - k) - 1, 24 * s, 2).fill(IRON); for (let i = 1; i < 4; i++) g.moveTo(x + i * 6 * s, y - 28 * s).lineTo(x + i * 6 * s, y - 2 * s).stroke({ width: .5, color: BEAM_DARK, alpha: .6 }); };
+  const lyingBarrel = (x: number, y: number) => { g.ellipse(x, y, 16, 13).fill(0x9b7650).stroke(ink); g.ellipse(x, y, 9, 8).stroke({ width: .6, color: BEAM_DARK }); g.circle(x, y + 3, 1.6).fill(BEAM_DARK); };
+  const amphora = (x: number) => { g.moveTo(x, floorY - 2).quadraticCurveTo(x - 12, floorY - 20, x - 5, floorY - 34).lineTo(x - 3, floorY - 42).lineTo(x + 3, floorY - 42).lineTo(x + 5, floorY - 34).quadraticCurveTo(x + 12, floorY - 20, x, floorY - 2).closePath().fill(CLAY).stroke(ink); g.moveTo(x - 3, floorY - 40).quadraticCurveTo(x - 10, floorY - 38, x - 6, floorY - 32).moveTo(x + 3, floorY - 40).quadraticCurveTo(x + 10, floorY - 38, x + 6, floorY - 32).stroke({ width: 1, color: INK }); };
+  const strings = (x: number, n: number, color: number) => { for (let i = 0; i < n; i++) { const sx = x + i * 11; g.moveTo(sx, 20).lineTo(sx, 34 + (i % 2) * 8).stroke({ width: .6, color: BEAM_DARK }); for (let k = 0; k < 4; k++) g.ellipse(sx + (k % 2 ? 2 : -2), 30 + (i % 2) * 8 + k * 6, 3, 4).fill(color); } };
+  const ham = (x: number) => { g.moveTo(x, 20).lineTo(x, 30).stroke({ width: .7, color: BEAM_DARK }); g.moveTo(x - 3, 30).quadraticCurveTo(x - 12, 52, x - 2, 62).quadraticCurveTo(x + 10, 56, x + 5, 30).closePath().fill(0x9d5a44).stroke(ink); g.moveTo(x - 2, 34).quadraticCurveTo(x - 7, 48, x - 1, 58).stroke({ width: 1.4, color: 0xe7d2b9, alpha: .7 }); };
+  const bed = (x: number) => { g.rect(x, floorY - 24, 72, 20).fill(TIMBER).stroke(ink); g.rect(x - 2, floorY - 46, 8, 45).fill(BEAM).stroke(ink); g.rect(x, floorY - 32, 70, 10).fill(CREAM).stroke(ink); g.rect(x + 18, floorY - 33, 54, 16).fill(0x9c4a3c).stroke({ width: .6, color: INK }); for (let i = 22; i < 70; i += 8) g.moveTo(x + i, floorY - 33).lineTo(x + i, floorY - 17).stroke({ width: .6, color: CREAM, alpha: .6 }); g.roundRect(x + 4, floorY - 38, 16, 8, 3).fill(CREAM).stroke({ width: .5, color: INK }); beds.push([x + 36, floorY - 22]); };
+  // the ognjište: a raised stone hearth under a plastered komin hood, a copper pot on its chain over the embers
+  const hearth = (x: number, w = 92) => {
+    g.poly([x - 8, floorY - 118, x + w + 8, floorY - 118, x + w, floorY - 70, x, floorY - 70]).fill(PLASTER).stroke(ink); g.rect(x + w * .35, 20, w * .3, floorY - 138).fill(PLASTER).stroke(ink); g.rect(x - 10, floorY - 122, w + 20, 5).fill(TIMBER).stroke(ink);
+    g.poly([x + 4, floorY - 70, x + w - 4, floorY - 70, x + w - 12, floorY - 40, x + 12, floorY - 40]).fill({ color: IRON, alpha: .55 });
+    g.rect(x, floorY - 26, w, 26).fill(STONES[1]!).stroke(ink); for (let i = 0; i < w; i += 23) g.rect(x + i, floorY - 26, 1, 26).fill(MORTAR);
+    g.ellipse(x + w / 2, floorY - 29, 22, 4).fill(0x2b2f31); for (let i = 0; i < 5; i++) g.ellipse(x + w / 2 - 12 + i * 6, floorY - 30, 3, 2).fill(i % 2 ? CORAL : LIGHT.dusk);
+    g.moveTo(x + w / 2, floorY - 70).lineTo(x + w / 2, floorY - 52).stroke({ width: 1, color: IRON }); g.moveTo(x + w / 2 - 12, floorY - 52).quadraticCurveTo(x + w / 2, floorY - 30, x + w / 2 + 12, floorY - 52).closePath().fill(COPPER).stroke(ink);
+    benches.push([x + w / 2, floorY - 2]);
+  };
+  // the bread oven: a stone dome with its mouth glowing
+  const oven = (x: number) => { g.moveTo(x, floorY).lineTo(x, floorY - 44).arc(x + 34, floorY - 44, 34, Math.PI, 0).lineTo(x + 68, floorY).closePath().fill(STONES[3]!).stroke(ink); g.moveTo(x + 18, floorY - 20).lineTo(x + 18, floorY - 36).arc(x + 34, floorY - 36, 16, Math.PI, 0).lineTo(x + 50, floorY - 20).closePath().fill(0x2b2f31); g.ellipse(x + 34, floorY - 24, 12, 4).fill(CORAL); g.ellipse(x + 34, floorY - 25, 7, 2).fill(LIGHT.lamp); g.rect(x - 4, floorY - 20, 76, 5).fill(STONES[5]!).stroke(ink); benches.push([x + 34, floorY - 2]); };
+  const loaves = (x: number, n: number) => { for (let i = 0; i < n; i++) g.ellipse(x + i * 15, floorY - 40, 7, 4).fill(0xc9904f).stroke({ width: .5, color: BEAM_DARK }); };
+  const forge = (x: number) => { g.rect(x, floorY - 40, 70, 40).fill(STONES[1]!).stroke(ink); g.ellipse(x + 35, floorY - 41, 26, 5).fill(0x2b2f31); for (let i = 0; i < 6; i++) g.ellipse(x + 17 + i * 7, floorY - 42, 3, 2).fill(i % 2 ? CORAL : LIGHT.lamp); g.poly([x - 6, floorY - 120, x + 76, floorY - 120, x + 60, floorY - 70, x + 10, floorY - 70]).fill(IRON).stroke(ink); g.rect(x + 25, 20, 20, floorY - 140).fill(IRON); benches.push([x + 35, floorY - 2]); };
+  const anvil = (x: number) => { g.rect(x + 8, floorY - 22, 16, 22).fill(BEAM).stroke(ink); g.poly([x - 6, floorY - 34, x + 30, floorY - 34, x + 26, floorY - 26, x + 22, floorY - 22, x + 10, floorY - 22, x + 6, floorY - 26, x - 2, floorY - 28]).fill(IRON).stroke({ width: .6, color: INK }); };
+  const tools = (x: number) => { g.rect(x, 50, 70, 4).fill(TIMBER); for (let i = 0; i < 5; i++) { g.moveTo(x + 8 + i * 13, 54).lineTo(x + 8 + i * 13, 84).stroke({ width: 1.5, color: IRON }); g.rect(x + 4 + i * 13, 82, 8, 5).fill(IRON); } };
+  const net = (x: number, w: number) => { g.moveTo(x - 4, 60).lineTo(x + w + 4, 60).stroke({ width: 2, color: TIMBER }); for (let i = 0; i <= w; i += 8) g.moveTo(x + i, 60).quadraticCurveTo(x + i + 8, 90, x + i + (i % 16 ? 2 : -2), 118).stroke({ width: .7, color: NET, alpha: .75 }); for (let k = 0; k < 7; k++) g.moveTo(x, 66 + k * 8).quadraticCurveTo(x + w / 2, 76 + k * 7, x + w, 66 + k * 8).stroke({ width: .7, color: NET, alpha: .75 }); for (let i = 0; i < 4; i++) g.circle(x + 10 + i * (w - 20) / 3, 116, 3).fill(CORAL); };
+  const counter = (x: number, w: number) => { g.rect(x, floorY - 38, w, 38).fill(0xb3a88f).stroke(ink); for (let i = 0; i < w; i += 28) g.rect(x + i, floorY - 38, 1, 38).fill(MORTAR); g.rect(x - 3, floorY - 42, w + 6, 5).fill(STONES[5]!).stroke(ink); benches.push([x + w / 2, floorY - 2]); };
+  const fish = (x: number, n: number) => { for (let i = 0; i < n; i++) { g.ellipse(x + i * 17, floorY - 45, 7, 2.4).fill(0x91b6ac); g.moveTo(x + 6 + i * 17, floorY - 45).lineTo(x + 11 + i * 17, floorY - 48).lineTo(x + 11 + i * 17, floorY - 42).closePath().fill(0x91b6ac); } };
+  const rope = (x: number) => { for (let k = 0; k < 4; k++) g.ellipse(x, floorY - 5 - k * 4, 18 - k * 2, 5).stroke({ width: 2, color: 0xc9a86a }); };
+  const oars = (x: number) => { for (let i = 0; i < 3; i++) { g.moveTo(x + i * 10, floorY - 2).lineTo(x + 18 + i * 10, 40).stroke({ width: 2.2, color: TIMBER }); g.ellipse(x + 2 + i * 10, floorY - 14, 3.5, 11).fill(TIMBER).stroke({ width: .5, color: INK }); } };
+  const anchor = (x: number, y: number) => { g.circle(x, y, 4).stroke({ width: 1.6, color: IRON }); g.moveTo(x, y + 4).lineTo(x, y + 32).moveTo(x - 9, y + 12).lineTo(x + 9, y + 12).stroke({ width: 2, color: IRON }); g.moveTo(x - 14, y + 24).quadraticCurveTo(x, y + 40, x + 14, y + 24).stroke({ width: 2, color: IRON }); };
+  const crest = (x: number, y: number) => { g.rect(x - 22, y - 4, 44, 50).fill(STONES[5]!).stroke(ink); g.moveTo(x - 14, y + 2).lineTo(x + 14, y + 2).lineTo(x + 14, y + 22).quadraticCurveTo(x + 14, y + 36, x, y + 40).quadraticCurveTo(x - 14, y + 36, x - 14, y + 22).closePath().fill(CLAY).stroke(ink); g.moveTo(x - 14, y + 18).lineTo(x + 14, y + 18).stroke({ width: 2, color: CREAM }); };
+  const icon = (x: number, y: number) => { g.roundRect(x - 13, y, 26, 34, 12).fill(0xc9a86a).stroke(ink); g.roundRect(x - 9, y + 4, 18, 26, 9).fill(0x46708f); g.circle(x, y + 12, 4).fill(0xe6c79b); };
+  const lumin = (x: number) => { g.moveTo(x, 20).lineTo(x, 34).stroke({ width: .7, color: IRON }); g.moveTo(x - 7, 40).quadraticCurveTo(x, 34, x + 7, 40).quadraticCurveTo(x, 46, x - 7, 40).fill(COPPER).stroke({ width: .5, color: INK }); g.circle(x + 6, 38, 1.6).fill(LIGHT.lamp); };
+
+  const W2 = W / 2;
+  switch (room) {
+    case "konoba": for (let i = 0; i < 3; i++) lyingBarrel(40 + i * 34, floorY - 13); for (let i = 0; i < 2; i++) lyingBarrel(57 + i * 34, floorY - 38); table(W - 170, 96); amphora(W - 40); ham(W2 + 60); ham(W2 + 78); strings(W2 - 80, 3, CLAY); shelf(W - 160, 112, 100, [WINE, OLIVE, WINE, CREAM]); break;
+    case "home": hearth(24); table(W - 150, 70); strings(W - 40, 2, CREAM); shelf(W2 + 40, 60, 56, [CREAM, COPPER, CLAY]); amphora(W - 26); break;
+    case "inn": bed(28); bed(W - 104); table(W2 + 44, 50, true); shelf(W2 - 40, 52, 80, [CREAM, CLAY, OLIVE]); break;
+    case "bakery": oven(24); bench(W - 116, 90); loaves(W - 100, 5); shelf(W2 + 20, 60, 80, [0xc9904f, 0xd9a766, 0xc9904f]); strings(W2 - 30, 2, CREAM); break;
+    case "smithy": forge(W - 110); anvil(W - 170); bench(24, 84); tools(130); barrel(W - 200, floorY, .8); break;
+    case "mill": g.circle(W * .28, floorY - 50, 38).fill(STONES[3]!).stroke(ink); g.circle(W * .28, floorY - 50, 8).fill(IRON); for (let a = 0; a < 6; a++) g.moveTo(W * .28 + Math.cos(a) * 12, floorY - 50 + Math.sin(a) * 12).lineTo(W * .28 + Math.cos(a) * 34, floorY - 50 + Math.sin(a) * 34).stroke({ width: .7, color: MORTAR }); bench(W - 116, 90); for (let i = 0; i < 3; i++) g.roundRect(W - 110 + i * 26, floorY - 60, 22, 24, 6).fill(CREAM).stroke(ink); break;
+    case "fishhouse": counter(40, 150); counter(W - 190, 150); fish(56, Math.min(7, stock.fish ?? 3)); net(W2 - 60, 120); barrel(W - 34, floorY, .8); break;
+    case "loggia": crest(W2, 34); table(W2 + 70, 120, false); bench(26, 90); icon(W2 - 120, 60); break;
+    case "shop": counter(W - 190, 150); shelf(24, 125, 160); shelf(24, 160, 160, [CLAY, CREAM, OLIVE]); shelf(W - 180, 115, 150, [OLIVE, OLIVE, WINE]); amphora(W - 20); strings(W2 + 50, 3, CLAY); break;
+    case "harbor": table(30, 64, false); rope(W - 80); rope(W - 120); oars(W - 60); anchor(W2 + 60, 44); net(W2 - 110, 70); barrel(W2 + 80, floorY, .8); break;
+    default: bench(24, 84); bench(W - 108, 84); shelf(W2 - 30, 56, 60); break;
+  }
+  lumin(room === "konoba" ? W2 - 20 : W2 + 120);
   return { seats, beds, benches };
 }
 
@@ -58,26 +174,15 @@ export function Interior({ kind, sprite, hour, people, stock }: { kind: string; 
       el.replaceChildren(app.canvas);
       stage = new Container(); app.stage.addChild(stage);
       const night = hour < 6 || hour >= 21; const floorY = H - 85;
-      const room = new Graphics();
-      room.rect(0, 0, W, floorY).fill(night ? WALL2 : WALL); for (let i = 0; i < 6; i++) room.rect(0, 12 + i * 22, W, 1).fill({ color: WALL2, alpha: 0.8 });
-      room.rect(0, floorY, W, H - floorY).fill(FLOOR); for (let i = 0; i < 23; i++) room.rect(i * 22, floorY, 1, H - floorY).fill(FLOOR2);
-      room.rect(0,floorY-9,W,8).fill(0xc8c2a7); room.rect(0,floorY-10,W,1).fill(0xebe1c6);
-      for(let i=0;i<22;i++){const x=7+i*22;room.moveTo(x,floorY+4).quadraticCurveTo(x+4,floorY+13,x+2,H-3).stroke({width:.6,color:0x8d7d61,alpha:.45});}
-      room.rect(0, floorY - 1, W, 2).fill({color:INK,alpha:.4});
-      room.poly([0,0,18,13,18,floorY,0,H]).fill({color:WOOD,alpha:.13});
-      room.poly([W,0,W-18,13,W-18,floorY,W,H]).fill({color:WOOD,alpha:.13});
-      room.rect(0,0,W,8).fill(WOOD);room.rect(14,0,5,floorY).fill({color:WOOD,alpha:.4});room.rect(W-19,0,5,floorY).fill({color:WOOD,alpha:.4});
-      if(sprite==="fishhouse"){
-        for(let i=0;i<9;i++)room.moveTo(W-170+i*9,70).quadraticCurveTo(W-157+i*9,92,W-170+i*9,118).stroke({width:.7,color:0x7a8872,alpha:.55});
-        for(let i=0;i<7;i++)room.moveTo(W-170,70+i*8).quadraticCurveTo(W-135,84+i*7,W-98,70+i*8).stroke({width:.7,color:0x7a8872,alpha:.55});
-        room.moveTo(W-174,68).lineTo(W-96,68).stroke({width:2,color:WOOD});
-      }
-      room.poly([90,floorY+18,W-90,floorY+18,W-60,H-14,60,H-14]).fill({color:CLOTH,alpha:.13}).stroke({width:1,color:CLOTH,alpha:.25});
-      room.rect(W/2-20,floorY-78,40,77).fill(0x927f60).stroke({width:2,color:0xb4a487});
-      room.rect(W/2-15,floorY-73,30,67).stroke({width:1,color:0x6e705b});room.circle(W/2+11,floorY-39,2).fill(0xd7c49a);
+      const kindOfRoom = roomOf(kind, sprite); const r = rnd(seedOf(kind + sprite));
+      const room = new Graphics(); shell(room, kindOfRoom, W, H, floorY, r);
+      for (const wx of windowsOf(kindOfRoom)) window_(room, W * wx, 34, night); door(room, W / 2, floorY);
       stage.addChild(room);
-      const fur = new Graphics(); const spots = furnish(fur, kind, sprite, W, H, floorY, stock ?? {}); stage.addChild(fur);
-      if (night) { const lamp = new Graphics(); for(let i=6;i>0;i--)lamp.ellipse(W/2,65,20+i*10,25+i*11).fill({color:LIGHT.lamp,alpha:.025}); lamp.moveTo(W/2,8).lineTo(W/2,22).stroke({width:1,color:INK});lamp.poly([W/2-9,27,W/2,18,W/2+9,27]).fill(WOOD);lamp.circle(W / 2, 27, 3).fill(LIGHT.lamp); stage.addChild(lamp); }
+      const fur = new Graphics(); const spots = furnish(fur, kindOfRoom, W, floorY, stock ?? {}, r); stage.addChild(fur);
+      // daylight falls through the windows onto the floor; at night the lamp does the work
+      if (!night) { const sun = new Graphics(); for (const wx of windowsOf(kindOfRoom).map(x => x * W)) sun.poly([wx, 80, wx + 38, 80, wx + 90, H - 10, wx + 30, H - 10]).fill({ color: LIGHT.lamp, alpha: .08 }); stage.addChild(sun); }
+      // at night the room is dark but for the lumin, the oil lamp hung from a beam
+      if (night) { const lx = kindOfRoom === "konoba" ? W / 2 - 20 : W / 2 + 120; const dark = new Graphics(); dark.rect(0, 0, W, H).fill({ color: LIGHT.night, alpha: .32 }); for (let i = 7; i > 0; i--) dark.ellipse(lx, 60, 26 + i * 16, 22 + i * 14).fill({ color: LIGHT.lamp, alpha: .03 }); stage.addChild(dark); }
       // people, each at a spot that fits their pose
       const rigs: Figurine[] = []; let si = 0, bi = 0, wi = 0, xi = 0;
       for (const p of people.slice(0, 8)) {
