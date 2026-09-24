@@ -2,7 +2,7 @@ import { gardenArt } from "./garden-art";
 import { BENCH_SCALE_Y } from "./seating";
 import { Container, Graphics, Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import { HARBOR_ATLAS, HARBOR_SHEETS, LIGHT_SHEETS } from "./harbor-atlas";
-import { DALMATIAN_FOR, HOUSES, atlasName, bellAt, sailsAt, stockAt, type Kind } from "./dalmatian";
+import { DALMATIAN_FOR, HOUSES, atlasName, bellAt, kindOfDrawing, sailsAt, stockAt } from "./dalmatian";
 import { CROWNS } from "./dalmatian-props";
 import { KELP, CREAM, SAGE_DARK, CORAL, WOOD, WOOD_DARK, STONE } from "./palette";
 
@@ -52,7 +52,7 @@ let classicHouses = false;
 export function setClassicHouses(on: boolean): void { classicHouses = on; }
 /** The drawing that stands where the town has a `sprite`, or null to keep the town's own. `h` is a stable 0..1 for the place, choosing its colourway. */
 export function streetHouse(sprite: string, h: number): string | null { if (classicHouses) return null; const m = DALMATIAN_FOR[sprite]; return m ? atlasName(m.kind, m.variant ?? Math.floor(h * HOUSES[m.kind].ways)) : null; }
-const kindOf = (drawing: string): Kind | null => { const m = /^dal-([a-z]+)\d*$/.exec(drawing); return m && m[1]! in HOUSES ? (m[1] as Kind) : null; };
+const kindOf = kindOfDrawing;
 /** The crowns of a tree as drawn now, in its own frame: the Dalmatian trees' own, or where the classic drawings carry theirs. */
 const CLASSIC_CROWNS: Record<string, { x: number; y: number; rx: number; ry: number }[]> = {
   "tree-large": [{ x: 0, y: -95, rx: 60, ry: 38 }], "tree-small": [{ x: 0, y: -58, rx: 37, ry: 23 }], olive: [{ x: 0, y: -62, rx: 40, ry: 25 }],
