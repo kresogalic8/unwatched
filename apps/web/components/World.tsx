@@ -252,6 +252,29 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           if (big && rr() < 0.6) for (let k = 0; k < 3; k++) bed.moveTo(x + (k - 1) * 3, y).quadraticCurveTo(x + (k - 1) * 4 + 3, y - 5, x + (k - 1) * 3 + 1, y - 9 - rr() * 4).stroke({ width: 1.2, color: 0x4f7a5f, alpha: 0.45 * clear, cap: "round" });
         }
         world.addChildAt(bed, world.getChildIndex(tide)); } // over the ground's own shallows, under the tide's wet edge and the foam
+      // the coast has a character of its own: stretches of limestone boulders at the waterline, wet and dark where the sea reaches them,
+      // and pebble beaches between; the harbour's quay is left as it is. Drawn once, over the foam, so the rocks stand in it.
+      const coastline = new Graphics();
+      { const harbourAt = places.get("harbor"); let seed = 4411; const rr = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        const at = (a: number, r: number) => { const k = wobble(a) * r; return [cx + Rx * k * Math.cos(a), cy + Ry * k * Math.sin(a)] as const; };
+        const LIME = [0xd6d0c1, 0xc9c2b1, 0xbdb6a5, 0xe0dbcd];
+        for (let i = 0; i < 360; i++) {
+          const a = (i / 360) * Math.PI * 2; const [sx, sy] = at(a, 1);
+          if (harbourAt && Math.hypot(sx - harbourAt.x, sy - harbourAt.y) < 420) continue;
+          const kind = noise(Math.cos(a) * 3 + 11, Math.sin(a) * 3 + 7);
+          if (kind > 0.56) { // rocky: a dark wet band, boulders half in the water, foam against them
+            const [wx, wy] = at(a, 1.012); coastline.circle(wx, wy, 9).fill({ color: 0x6f7a6a, alpha: 0.18 });
+            if (rr() < 0.55) { const [bx, by] = at(a, 0.99 + rr() * 0.04); const w = 7 + rr() * 15, h = w * (0.55 + rr() * 0.25), c = LIME[Math.floor(rr() * LIME.length)]!;
+              coastline.ellipse(bx + 2, by + h * 0.45, w * 1.05, h * 0.45).fill({ color: 0x55655c, alpha: 0.35 });
+              coastline.poly([bx - w, by + h * 0.3, bx - w * 0.7, by - h * 0.6, bx - w * 0.1, by - h, bx + w * 0.6, by - h * 0.7, bx + w, by + h * 0.2, bx + w * 0.4, by + h * 0.55, bx - w * 0.5, by + h * 0.55]).fill(c).stroke({ width: 0.8, color: 0x8b8676, alpha: 0.8 });
+              coastline.poly([bx - w * 0.7, by - h * 0.6, bx - w * 0.1, by - h, bx + w * 0.3, by - h * 0.8, bx - w * 0.3, by - h * 0.35]).fill({ color: 0xffffff, alpha: 0.35 });
+              if (rr() < 0.6) coastline.ellipse(bx + (rr() - 0.5) * w, by + h * 0.6, w * 0.9, 2).fill({ color: 0xffffff, alpha: 0.55 }); }
+          } else if (kind < 0.36) { // a pebble beach: pale stones thick at the waterline, thinning up the shore
+            for (let k = 0; k < 3; k++) { const [px, py] = at(a + (rr() - 0.5) * 0.012, 0.955 + rr() * 0.045); coastline.ellipse(px, py, 1.6 + rr() * 2.2, 1 + rr() * 1.2).fill({ color: LIME[Math.floor(rr() * LIME.length)]!, alpha: 0.85 }); }
+          }
+        }
+      }
+      world.addChildAt(coastline, world.getChildIndex(foam) + 1);
       const tlerp = (p: [number, number], q: [number, number], f: number): [number, number] => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
       // what the camera sees, in world units, with a margin: the shore's foam and tide are drawn only there, not round the whole island
       const inView = (p: readonly number[], m = 220) => p[0]! > lightArea.x - m && p[0]! < lightArea.x + lightArea.width + m && p[1]! > lightArea.y - m && p[1]! < lightArea.y + lightArea.height + m;
