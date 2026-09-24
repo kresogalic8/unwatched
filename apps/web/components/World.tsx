@@ -213,6 +213,17 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const shoreLine = outline(1.012), shoreOut = outline(1.05); const tideMid = outline(1.0), tideIn = outline(0.984); const shallowLine = outline(1.03);
       const tide = new Graphics(); world.addChild(tide); // the wet sand the sea washes over, and light on the shallows, both under the white foam edge
       const foam = new Graphics(); world.addChild(foam);
+      // the seabed in the shallows: pebbles, flat stones and weed, seen through a hand's depth of clear water, fading as it deepens
+      { const bed = new Graphics(); let seed = 9173; const rr = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        const STONE = [0xcfc6ae, 0xbdb49c, 0xa9a48f, 0xd9d2bf], TINT = 0x8fc9bf;
+        for (let i = 0; i < 900; i++) {
+          const a = rr() * Math.PI * 2, depth = 1.012 + Math.pow(rr(), 1.6) * 0.1, r = wobble(a) * depth; const x = cx + Rx * r * Math.cos(a), y = cy + Ry * r * Math.sin(a);
+          const clear = 1 - (depth - 1.012) / 0.1; const big = rr() < 0.08; const w = big ? 9 + rr() * 8 : 2.5 + rr() * 4, h = w * (0.45 + rr() * 0.2);
+          const col = mix(STONE[Math.floor(rr() * STONE.length)]!, TINT, 0.35 + (1 - clear) * 0.4);
+          bed.ellipse(x, y, w, h).fill({ color: col, alpha: 0.35 + clear * 0.35 }); bed.ellipse(x - w * 0.25, y - h * 0.35, w * 0.45, h * 0.3).fill({ color: 0xeaf4ee, alpha: 0.18 * clear });
+          if (big && rr() < 0.6) for (let k = 0; k < 3; k++) bed.moveTo(x + (k - 1) * 3, y).quadraticCurveTo(x + (k - 1) * 4 + 3, y - 5, x + (k - 1) * 3 + 1, y - 9 - rr() * 4).stroke({ width: 1.2, color: 0x4f7a5f, alpha: 0.45 * clear, cap: "round" });
+        }
+        world.addChildAt(bed, world.getChildIndex(tide)); } // over the ground's own shallows, under the tide's wet edge and the foam
       const tlerp = (p: [number, number], q: [number, number], f: number): [number, number] => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
       const drawTide = (t: number) => {
         tide.clear();
@@ -371,6 +382,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // the konoba brings its own tables under its vine, so the tavern's terrace and parasol stay away
       const tavern = places.get("tavern"); const konoba = !classic && !!tavern && DALMATIAN_FOR[tavern.sprite]?.kind === "konoba";
       const decor = keepOffRoads(decorFor([...places.values()]), segs).filter((d) => !(konoba && tavern && /^(terrace|parasol)$/.test(d.sprite) && Math.hypot(d.x - tavern.x, d.y - tavern.y) < 160));
+      // the sea against the quay: wavelets swelling and breaking along the waterline of its face, and round its seaward end
+      const quay = decor.find((d) => d.sprite === "pier"); const lap = new Graphics(); if (quay) { lap.zIndex = quay.y + 36; scene.addChild(lap); }
       let trees: Container[] = [];
       /** which drawing each tree is, for where its crown sits */
       const treeKind = new WeakMap<Container, string>(); let snowCaps: Graphics[] = [];
@@ -900,6 +913,13 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
 
           }
         }
+        if (quay && every(2)) { lap.clear(); if (!still || every(30)) {
+          const qx = quay.x, qy = quay.y + 35, calm = weather === "storm" ? 2.2 : weather === "rain" ? 1.4 : 1;
+          const breathe = 0.5 + 0.5 * Math.sin(tick / 55); lap.moveTo(qx - 112, qy + 1 + breathe * 1.5).lineTo(qx + 140, qy + 1 + breathe * 1.5).stroke({ width: 1.4, color: 0xf6f3ea, alpha: 0.35 + 0.3 * breathe });
+          for (let k = 0; k < 16; k++) { const x = qx - 108 + k * 16 + Math.sin(k * 2.3) * 4, ph = tick / 38 + k * 0.9; const sw = (Math.sin(ph) + 1) / 2; if (sw < 0.25) continue;
+            lap.moveTo(x - 6 * calm, qy + 2).quadraticCurveTo(x, qy + 2 + (2 + sw * 3) * calm, x + 6 * calm, qy + 2).stroke({ width: 1.2, color: 0xffffff, alpha: (sw - 0.25) * 0.8, cap: "round" }); }
+          for (let k = 0; k < 3; k++) { const ph = (tick / 70 + k / 3) % 1; lap.ellipse(qx - 121, qy - 10, 10 + ph * 16 * calm, 5 + ph * 7 * calm).stroke({ width: 1.1, color: 0xffffff, alpha: 0.5 * (1 - ph) }); }
+        } }
         if (every(2)) { moths.clear(); if (night.alpha > 0.15 && !still) for (const d of decor) { if (d.sprite !== "lamp") continue; for (let i = 0; i < 3; i++) { const t = tick / (9 + i * 3) + i * 2; moths.circle(d.x + Math.cos(t) * (10 + i * 4) + Math.sin(t * 2.3) * 3, d.y - 58 + Math.sin(t * 1.7) * (7 + i * 2), 1.3).fill({ color: LIGHT.star, alpha: 0.8 }); } } }
         // smoke from a chimney where someone works
         perfMark("smoke");
