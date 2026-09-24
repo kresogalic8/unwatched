@@ -371,10 +371,17 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const g = new Container(); g.sortableChildren = true; g.zIndex = p.y; scene.addChild(g); drawn.set(p.id, g);
         const local = (name: string, w?: number) => { const d=drawThing(name);if(!d)return null;const s=d.c;if(w)s.scale.set(w/d.w);s.zIndex=0;g.addChild(s);shadowUnder(p.x,p.y,w??d.w); if(BUILDING.test(name)){const t=BLD_TINTS[Math.floor(vhash(p.x,p.y,5)*BLD_TINTS.length)]??0xffffff;for(const ch of s.children)if("tint" in ch)(ch as {tint:number}).tint=mulTint((ch as {tint:number}).tint,t);} return s; };
         if (p.kind === "plot" && !p.site) {
-          // pegged-out land: a dashed rectangle and four stakes
-          const r = new Graphics(); r.rect(-80, -60, 160, 70).fill({ color: C.sage, alpha: 0.3 });
-          r.moveTo(-80, -60).lineTo(80, -60).lineTo(80, 10).lineTo(-80, 10).closePath().stroke({ width: 1.2, color: 0xc9b58f }); // a rope between the stakes
-          for (let i = 0; i < 4; i++) { const x0 = -80 + (i % 2) * 160, y0 = -60 + Math.floor(i / 2) * 70; r.roundRect(x0 - 2.5, y0 - 14, 5, 15, 2).fill(0xc9b58f).stroke({ width: 1, color: C.kelp }); }
+          // pegged-out land, in the island's own projection: a diamond of turned earth with a ragged edge, four stakes with the rope
+          // sagging between them and a rag tied on it, a few tufts left standing; bought land gets its stone and planks waiting
+          const r = new Graphics(); const corner: [number, number][] = [[-96, -22], [0, -64], [96, -22], [0, 20]];
+          let hs = 0; for (const ch of p.id) hs = (hs * 31 + ch.charCodeAt(0)) >>> 0; const jr = (k: number) => ((((hs ^ Math.imul(k + 7, 2654435761)) >>> 0) % 1000) / 1000 - 0.5);
+          const edge: number[] = []; for (let k = 0; k < 4; k++) { const [ax, ay] = corner[k]!, [bx, by] = corner[(k + 1) % 4]!; for (let t = 0; t < 1; t += 0.2) edge.push(ax + (bx - ax) * t + jr(k * 10 + t * 50) * 10, ay + (by - ay) * t + jr(k * 10 + t * 50 + 3) * 5); }
+          r.poly(edge).fill({ color: 0xb9a57c, alpha: 0.55 });
+          for (let k = 1; k <= 5; k++) { const t = k / 6, [ax, ay] = corner[0]!, [bx, by] = corner[1]!, [dx, dy] = corner[3]!, [qx, qy] = corner[2]!; r.moveTo(ax + (bx - ax) * t, ay + (by - ay) * t).lineTo(dx + (qx - dx) * t, dy + (qy - dy) * t).stroke({ width: 1.1, color: 0xb3a27e, alpha: 0.45 }); } // furrows
+          for (let k = 0; k < 5; k++) { const tx = jr(k + 40) * 150, ty = -22 + jr(k + 60) * 50; r.moveTo(tx, ty).lineTo(tx - 2, ty - 5).moveTo(tx, ty).lineTo(tx + 2, ty - 6).stroke({ width: 1, color: 0x8f9a6a, alpha: 0.8 }); }
+          for (let k = 0; k < 4; k++) { const [ax, ay] = corner[k]!, [bx, by] = corner[(k + 1) % 4]!; r.moveTo(ax, ay - 12).quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 - 6, bx, by - 12).stroke({ width: 1, color: 0xb89f70 }); r.poly([(ax + bx) / 2, (ay + by) / 2 - 9, (ax + bx) / 2 + 5, (ay + by) / 2 - 7, (ax + bx) / 2, (ay + by) / 2 - 4]).fill(0xc4503f); }
+          for (const [x0, y0] of corner) { r.ellipse(x0 + 4, y0 + 1, 5, 2).fill({ color: 0x3a2f28, alpha: 0.2 }); r.roundRect(x0 - 2, y0 - 16, 4, 17, 1.5).fill(0xa8865c).stroke({ width: 0.8, color: 0x5b4636 }); r.circle(x0, y0 - 16, 2).fill(0x8a6a48); }
+          if (p.owner) { for (let k = 0; k < 5; k++) r.ellipse(52 + (k % 3) * 9, 2 - Math.floor(k / 3) * 6, 7, 4.5).fill(k % 2 ? 0xd6d0c1 : 0xc2bba9).stroke({ width: 0.7, color: 0x8b8676 }); r.roundRect(-70, -4, 40, 5, 1.5).fill(0xc4a47a).stroke({ width: 0.7, color: 0x6e5641 }); r.roundRect(-66, -9, 40, 5, 1.5).fill(0xb8986e).stroke({ width: 0.7, color: 0x6e5641 }); }
           if (p.owner) { r.roundRect(-16, -22, 32, 10, 2).fill(C.shell).stroke({ width: 1.2, color: C.kelp }); r.moveTo(0, -12).lineTo(0, 0).stroke({ width: 2, color: 0xc9b58f }); } // bought: a board on a post
           g.addChild(r);
           if(p.community) { const t = new Text({text:`${p.community.name} · ${p.community.coins}/${p.community.target} coins`,style:smallStyle});t.anchor.set(.5,0);t.position.set(0,16);g.addChild(t); }
