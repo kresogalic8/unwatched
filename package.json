@@ -16,15 +16,16 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "biome lint .",
     "soak": "pnpm --filter @unwatched/headless soak",
     "release": "node scripts/release.mjs"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
     "@types/node": "^22.15.0",
+    "tsx": "^4.23.0",
     "turbo": "^2.10.0",
     "typescript": "^5.8.0",
-    "vitest": "^5.0.0",
-    "tsx": "^4.23.0"
+    "vitest": "^5.0.0"
   }
 }

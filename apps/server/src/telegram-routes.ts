@@ -47,7 +47,7 @@ export function telegramRoutes(db: SupabaseClient, ownerOf: (req: Request) => Pr
     if(!webhookAuthorized(c.req.header('x-telegram-bot-api-secret-token')??'',config.secret))return c.json({error:'Unauthorized'},401);
     if(Number(c.req.header('content-length')??0)>16384)return c.json({error:'Too large'},413);
     const raw=await c.req.text();if(raw.length>16384)return c.json({error:'Too large'},413);
-    let update;try{update=JSON.parse(raw);}catch{return c.json({error:'Invalid JSON'},400);}
+    let update:any;try{update=JSON.parse(raw);}catch{return c.json({error:'Invalid JSON'},400);}
     const m=update?.message;
     if(m?.chat?.type!=='private'||!Number.isSafeInteger(m.chat.id)||typeof m.text!=='string')return c.json({ok:true});
     const match=/^\/start ([A-Za-z0-9_-]{32})$/.exec(m.text);if(!match)return c.json({ok:true});
