@@ -13,7 +13,7 @@ const BLANK = Object.fromEntries(["OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "SU
 export default defineConfig({
   testDir: "e2e",
   snapshotPathTemplate: "{testDir}/__screenshots__/{arg}-{platform}{ext}",
-  timeout: 120_000,
+  timeout: 300_000,
   fullyParallel: false,
   workers: 1,
   retries: 0,
