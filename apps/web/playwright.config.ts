@@ -18,7 +18,8 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
-  expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.015, threshold: 0.2, animations: "disabled" } },
+  // without a GPU (the CI runner) a picture of the town takes longer than the default five seconds to take
+  expect: { timeout: 90_000, toHaveScreenshot: { maxDiffPixelRatio: 0.015, threshold: 0.2, animations: "disabled" } },
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
     viewport: { width: 1280, height: 800 },
