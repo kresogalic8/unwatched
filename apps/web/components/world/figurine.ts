@@ -193,6 +193,7 @@ export class Figurine extends Container {
   hold(item: string | null): void {
     const it = (item ?? "").toLowerCase(); if (it === this.heldItem) return; this.heldItem = it; const g = this.held; g.clear();
     if (it === "fishing rod") { g.moveTo(0, 5).lineTo(3, -26).stroke({ width: 1.6, color: WOOD }); }
+    else if (it === "suitcase") { g.roundRect(-6, 0, 12, 9, 1.5).fill(0x8a5a3a).stroke(OUTLINE); g.moveTo(-2, 0).lineTo(-2, -2.5).lineTo(2, -2.5).lineTo(2, 0).stroke(OUTLINE); g.rect(-6, 4, 12, 1.1).fill(0x5d3b26); }
     else if (it === "hammer" || it === "axe") { g.roundRect(-1.2, -12, 2.4, 18, 1).fill(WOOD).stroke(OUTLINE); g.roundRect(-4.5, -15, it === "axe" ? 10 : 8, 5, 1).fill(IRON).stroke(OUTLINE); }
     else if (it === "basket") { g.roundRect(-5, 0, 10, 8, 2).fill(0xc79a5b).stroke(OUTLINE); g.moveTo(-4, 0).quadraticCurveTo(0, -7, 4, 0).stroke({ width: 1.1, color: 0x8a6437 }); }
     else if (/bread|loaf/.test(it)) g.ellipse(0, 3, 5.4, 3).fill(0xd9b26a).stroke(OUTLINE);

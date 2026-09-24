@@ -365,6 +365,7 @@ export class Citizen extends Container {
   hold(item: string | null): void {
     const it = (item ?? "").toLowerCase(); if (it === this.heldItem) return; this.heldItem = it; const g = this.held; g.clear();
     if (it === "fishing rod") {g.moveTo(0,8).lineTo(4,-35).stroke({width:2,color:WOOD_H});g.moveTo(4,-35).lineTo(9,6).stroke({width:.6,color:CREAM});}
+    else if (it === "suitcase") { g.roundRect(-8, 0, 16, 12, 2).fill(0x8a5a3a).stroke(STROKE); g.moveTo(-3, 0).lineTo(-3, -3).lineTo(3, -3).lineTo(3, 0).stroke(STROKE); g.rect(-8, 5, 16, 1.5).fill(0x5d3b26); }
     else if (it === "hammer" || it === "axe") {g.roundRect(-1.5,-16,3,24,1).fill(WOOD_H).stroke(STROKE);g.roundRect(-6,-20,it === "axe" ? 13 : 10,7,1).fill(KELP).stroke(STROKE);}
     else if (it === "basket") {g.roundRect(-7,0,14,12,3).fill(WOOD_H).stroke(STROKE);g.moveTo(-5,0).quadraticCurveTo(0,-10,5,0).stroke({width:1.5,color:WOOD_H});}
     else if (/bread|loaf/.test(it)) g.ellipse(0, 4, 7, 4).fill(0xd9b26a).stroke(STROKE);

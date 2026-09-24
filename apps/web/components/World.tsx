@@ -27,6 +27,7 @@ import { DALMATIAN_FOR, chimneyTop, forgeAt, kindOfDrawing, lanternAt, signPlace
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
 import { Life, type Critter } from "./world/life";
+import { Occasions } from "./world/occasions";
 import { Post, gradeFor, NEUTRAL, type Grade } from "./world/post";
 import { Particles } from "./world/particles";
 import { drawGround, drawRoads, segmentsOf, keepOffRoads, Wear, noise } from "./world/terrain";
@@ -89,7 +90,7 @@ function lookSvg(hash: string): Promise<string | null> {
   return p;
 }
 
-type Fig = { /** not on the island at this moment of the day played back: arrived later, or gone */ away?: boolean; speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Rig; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
+type Fig = { /** off the boat with a suitcase, until they have set it down somewhere */ bagUntil?: number; /** not on the island at this moment of the day played back: arrived later, or gone */ away?: boolean; speed?: number; walkFacing?: "left" | "right" | "front" | "back"; id: string; g: Container; rig: Rig; x: number; y: number; tx: number; ty: number; place: string; asleep: boolean; /** the place with their bed, if they have one */ home: string | null; mine: boolean; name: string; pose: Pose; facing: 1 | -1; weak: boolean; bench: boolean; seat?: Seat; boarding?: boolean; /** down to an animal until this tick */ react?: { until: number; ax: number; ay: number }; reactAt?: number; /** a short thing they are doing, from the record: a letter read, a meal, a greeting, an argument */ moment?: { pose: Pose; until: number; mood?: { anger?: number; surprise?: number; joy?: number } } };
 
 /** A moment worth marking on the day played back. */
 export type RewindMark = { t: number; text: string; importance: number; actors: string[] };
@@ -511,6 +512,11 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       // a Dalmatian house smokes from its own chimney
       if (!classic) for (const table of [CHIMNEYS, HEARTHS]) for (const id of Object.keys(table)) { const m = DALMATIAN_FOR[places.get(id)?.sprite ?? ""]; if (m) table[id] = chimneyTop(m.kind); }
       const harbor = places.get("harbor") ?? { x: 560, y: 1180 };
+      // ?stage=feast (or wedding, funeral), with &stageAt=market, previews a gathering's dressing without waiting for one
+      { const k = q?.get("stage"); const pl = places.get(q?.get("stageAt") ?? (k === "funeral" ? "chapel" : "market")); if (k && pl) staged.current = { kind: k, place: pl.id, x: pl.x, y: pl.y, actors: [], until: Infinity }; }
+      // out over the water from the harbour, away from the middle of the island: where a feast's fireworks go up
+      const seaward = (() => { const dx = harbor.x - W / 2, dy = harbor.y - H / 2, L = Math.hypot(dx, dy) || 1; return { x: harbor.x + (dx / L) * 520, y: harbor.y + (dy / L) * 320 - 240 }; })();
+      const occasions = new Occasions(); scene.addChild(occasions.root); // what a gathering puts up on the street; its fireworks go over the night, see below
       const dockX = harbor.x - 420, awayX = -760;
       const boat = put("boat", dockX, harbor.y + 20)!; boat.zIndex = harbor.y - 30; let boatTarget = dockX;
 
@@ -664,6 +670,8 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       poll = setInterval(() => { void fetch(`${apiUrl}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
       /** One moment of the record played onto the island: live as it happens, or `past` while the last day plays back, when nothing is
        * fetched and nobody boards for good; `quiet` while the day is wound to a moment, when only where everyone ends up matters. */
+      /** someone new steps off the boat with a suitcase, and whoever is on the quay turns and waves */
+      const welcome = (f: Fig, bagFor: number) => { f.bagUntil = Date.now() + bagFor; for (const o of figs.current.values()) if (o !== f && o.place === "harbor" && !o.asleep && !o.away) o.moment = { pose: "greet", until: Date.now() + 2600, mood: { joy: 0.5 } }; };
       const applyEvent = (e: TownEvent, past = false, quiet = false) => {
         const eventActor=agents.current.get(e.actors[0]!);
         if (eventActor && (e.kind === "agent.fishing" || e.kind === "agent.activity")) {
@@ -720,8 +728,8 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         if (e.kind === "boat.dock") { if (/docked/.test(e.text)) { if (!quiet) boat.position.x = awayX; boatTarget = dockX; if (!quiet) ambience.horn(); } }
         if (e.kind === "boat.depart") boatTarget = awayX;
         if (!past && (e.kind.startsWith("item.") || ["agent.trade", "agent.give", "agent.take", "agent.eat"].includes(e.kind)) && e.actors[0]) void fetch(`${apiUrl}/api/agents/${e.actors[0]}`, {cache: "no-store"}).then(r => r.ok ? r.json() : null).then((a: PublicAgent | null) => { if (alive && a?.id) ensure(a); }).catch(() => {});
-        if (e.kind === "agent.arrive" && past) { const f = figs.current.get(e.actors[0]!); if (f) { f.away = false; f.place = ""; moveTo(f.id, e.place ?? "harbor"); if (!quiet) { f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } } }
-        else if (e.kind === "agent.arrive") { void fetch(`${apiUrl}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); } }); }
+        if (e.kind === "agent.arrive" && past) { const f = figs.current.get(e.actors[0]!); if (f) { f.away = false; f.place = ""; moveTo(f.id, e.place ?? "harbor"); if (!quiet) { f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); welcome(f, 8000); } } }
+        else if (e.kind === "agent.arrive") { void fetch(`${apiUrl}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); welcome(f, 90000); } }); }
         if (!past && (e.kind.startsWith("item.") || e.kind === "town.recipe" || e.kind === "agent.trade" || e.kind === "agent.make" || e.kind === "place.decorated" || e.kind === "garden.harvest" || e.kind === "agent.build" || e.kind === "town.built" || (e.kind === "agent.work" && /mornings done/.test(e.text)))) void refreshPlaces();
         if (e.kind === "weather.change" && rw) rw.weather = /turned to (\w+)/.exec(e.text)?.[1] ?? rw.weather;
         if (e.importance >= 0.1 && e.kind !== "agent.move" && !quiet) setFeed((f) => [e, ...f].slice(0, 12));
@@ -820,6 +828,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       const perf: Record<string, number> = {}; let perfT = 0; let perfSection = "start"; (window as unknown as { __ftperf: Record<string, number>; __ftworld: Container; __ftscene: Container }).__ftperf = perf; (window as unknown as { __ftworld: Container }).__ftworld = world; (window as unknown as { __ftscene: Container }).__ftscene = scene;
       const perfMark = (next: string) => { const now = performance.now(); perf[perfSection] = (perf[perfSection] ?? 0) + (now - perfT); perfT = now; perfSection = next; };
       world.addChild(coastalLife.glow);
+      world.addChild(occasions.sky); // fireworks over everything, the night and its light included
       app.ticker.add(() => {
         if (!app) return; stepRewind(app.ticker.deltaMS); if(!quietMotion.matches)detailSeconds+=Math.min(app.ticker.deltaMS,50)/1000;
         const dtf = Math.min(app.ticker.deltaMS, 100) / (1000 / 60); // this frame, in 60 Hz frames: 0.5 on a 120 Hz screen, 2 on a 30 Hz one
@@ -1038,7 +1047,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
             for (const p of places.values()) if (p.crowd > 0 && indoors(p)) { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
-          sources.push(...life.lights);
+          sources.push(...life.lights, ...occasions.lights);
           lighting.update(night.alpha * (1 - golden * (1 - cover) * 0.55), sources, ft, flash.alpha, shadeTint); // the low sun holds the dark off a while
           weatherFx.update({ weather, wind, snowing, wet, tick: ft, dt: dtf, density: still ? 0.35 : 1, night: Math.min(1, night.alpha / 0.42), fogColor: weather === "jugo" ? 0xe4d9c2 : 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
           clouds.update({ tick: ft, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) }); if (miniRef.current) clouds.puffs.visible = clouds.shadows.visible = false; // no weather in the sky over a model on a table
@@ -1094,6 +1103,10 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           const shore = Math.max(0, Math.min(1, 1 - Math.abs(inside(ex, ey) - 1) / 0.3)); // 1 on the waterline, nothing a good way inland or out
           ambience.tick({ shore, far: cam.zoom < 0.55, fast: !!rw?.playing, mood: stagedNow ? (stagedNow.kind === "wedding" || stagedNow.kind === "feast" ? "tavern" : stagedNow.kind === "funeral" ? "night" : stagedNow.kind === "fire" ? "storm" : "day") : null, weather, hour: c.hour, season: c.season, district: p?.district ?? "old town", place: p?.id ?? "market", crowd: p?.crowd ?? 0, hearth: !!p && litHearths.has(p.id), walking: !!f && !f.asleep && Math.hypot(f.tx - f.x, f.ty - f.y) > 1.5, wind }); }
         // people
+        // the gathering's dressing: bunting, lanterns and petals, the coffin on its trestles, fireworks over the harbour on a feast night
+        { const pl = stagedNow ? places.get(stagedNow.place) : null; const sp = pl ? gather(pl) : null; const leads = stagedNow?.kind === "wedding" ? stagedNow.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === stagedNow.place) : [];
+          occasions.update(stagedNow && sp ? { kind: stagedNow.kind, x: sp.x, y: sp.y, w: sp.w, night: Math.min(1, night.alpha / 0.42), over: seaward, couple: leads.length ? { x: leads.reduce((a, f) => a + f.x, 0) / leads.length, y: leads.reduce((a, f) => a + f.y, 0) / leads.length } : null } : null, performance.now() / 1000, still);
+          if (occasions.popped) ambience.cue("boom", Math.hypot(seaward.x - (Wd / 2 - cam.x) / cam.zoom, seaward.y - (Hd / 2 - cam.y) / cam.zoom) * 0.4, seaward.x - (Wd / 2 - cam.x) / cam.zoom, 1); }
         perfMark("people");
         const now = Date.now(); const next: typeof labels = []; const secs = now / 1000;
         // in the miniature, people are posed twelve times a second, as if moved by hand between frames
@@ -1140,7 +1153,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           const activity = actual?.activity && actual.activity.place === f.place && actual.activity.until > (c?.t ?? 0) && !f.asleep ? actual.activity : null;
           const fishing = activity?.kind === "fish";
           f.rig.trade(fishing ? "angling" : actual?.gear?.name === "hammer" ? "smith" : actual?.gear?.name === "axe" ? "axe" : actual?.job ?? null);
-          f.rig.hold(fishing ? null : actual?.gear?.name ?? actual?.carrying ?? null);
+          f.rig.hold(fishing ? null : actual?.gear?.name ?? actual?.carrying ?? (f.bagUntil && f.bagUntil > now && f.place === "harbor" ? "suitcase" : null));
           f.rig.seatAt(!moving && f.seat ? f.seat.height / .82 : null);
           if (!moving && f.seat) { f.facing=f.seat.facing; f.rig.face(f.facing, true); }
           f.rig.setPose(f.asleep ? "sleep" : running ? "run" : moving ? "walk" : fishing ? "work" : petting ? "crouch" : moment && moment.pose !== "idle" ? moment.pose : b ? "talk" : f.bench ? "sit" : f.pose === "sit" || (f.pose === "work" && !activity) ? "idle" : f.pose);
