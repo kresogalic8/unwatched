@@ -40,6 +40,8 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 const processStarted = new Date().toISOString();
 const PORT = Number(process.env.PORT ?? 4000);
 const SEED = Number(process.env.UW_SEED ?? 42);
+/** What belongs to one citizen and their owner alone: never on the public stream, never on the street. */
+const PRIVATE_KINDS = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self", "agent.became"]);
 const MS_PER_SIM_MINUTE = Number(process.env.UW_MS_PER_SIM_MINUTE ?? 1000); // 60000 is real time
 const BRAIN = process.env.UW_BRAIN ?? "mock";
 const CITIZENS = Number(process.env.UW_CITIZENS ?? 10);
@@ -489,7 +491,6 @@ app.get("/api/events/:id/voice", async (c) => {
   catch (err) { log(`voice for letter ${id}: ${(err as Error).message}`); return c.json({ error: (err as Error).message }, 502); }
 });
 /** What never leaves a person's head, so it is never a moment to share: the same set the paper keeps out. */
-const PRIVATE_KINDS = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self", "agent.became"]);
 app.get("/api/moments/:id", (c) => {
   const id = Number(c.req.param("id")); const e = town.events.find((x) => x.id === id);
   if (!e || PRIVATE_KINDS.has(e.kind)) return c.json({ error: "that moment is not in the street's memory anymore" }, 404);
