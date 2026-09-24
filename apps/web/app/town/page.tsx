@@ -50,6 +50,7 @@ export default function Town() {
   const [rewinding, setRewinding] = useState(false);
   // a postcard of the island as it is on screen, to keep or send
   const photoCtl = useRef<(() => Photo | null) | null>(null);
+  const saveCard = useRef<HTMLAnchorElement>(null);
   const [card, setCard] = useState<{ url: string; blob: Blob; name: string; upright: boolean } | null>(null);
   const [snapshot, setSnapshot] = useState<WorldSnapshot>({
     clock: null,
@@ -158,6 +159,7 @@ export default function Town() {
     const sub = `Day ${c.day} · ${String(c.hour).padStart(2, "0")}:${String(c.minute % 60).padStart(2, "0")}${c.weather ? ` · ${c.weather}` : ""}`;
     const drawn = postcard(shot.canvas, { title, sub, day: c.day }); drawn.toBlob((blob) => { if (!blob) return; setCard((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(blob), blob, name: `unwatched-day-${c.day}.png`, upright: drawn.height > drawn.width }; }); }, "image/png");
   }
+  useEffect(() => { if (card) saveCard.current?.focus(); }, [card]); // the postcard comes up with its Save in hand, for the keyboard
   async function shareCard() {
     if (!card) return; const file = new File([card.blob], card.name, { type: "image/png" });
     try { if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "A postcard from the island" }); } catch {}
@@ -455,7 +457,7 @@ export default function Town() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={card.url} data-upright={card.upright} alt="A postcard of the island as it looked a moment ago" />
                 <div className={s.cardActions}>
-                  <a className={s.ctaBig} href={card.url} download={card.name} autoFocus><ArrowIcon name="download" size={20} />Save the postcard</a>
+                  <a className={s.ctaBig} href={card.url} download={card.name} ref={saveCard}><ArrowIcon name="download" size={20} />Save the postcard</a>
                   {typeof navigator !== "undefined" && "canShare" in navigator && <button className={s.secondary} onClick={() => void shareCard()}><ArrowIcon name="share" size={20} />Send it</button>}
                   <button className={s.secondary} onClick={() => setCard(null)}>Close</button>
                 </div>
