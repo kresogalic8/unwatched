@@ -252,13 +252,18 @@ it('validates large Anthropic decision schemas locally while keeping small schem
   expect(bodies[1]).toHaveProperty('response_format');
 });
 
-it('omits desire linkage when none exists and constrains links to active IDs', async()=>{
+it('links only active desires and keeps the cached prefix the same for every citizen', async()=>{
  const {Town,Rng}=await import('@unwatched/engine');const {seedPersonas}=await import('../src/index.ts');
  const town=new Town({seed:19,brain:new MockBrain(19)});const a=town.addAgent({persona:seedPersonas(new Rng(19),1)[0]!});
- const {bodies}=fakeFetch([{action:{kind:'wait'},desire_id:'An invented goal '.repeat(5)},{action:{kind:'wait'},desire_id:'active-one'}]);
+ const {bodies}=fakeFetch([{action:{kind:'wait'},desire_id:'invented-goal'},{action:{kind:'wait'},desire_id:'active-one'}]);
  const brain=new OpenRouterBrain({apiKey:'test',routine:'anthropic/claude-haiku-4.5',allowFallback:false});
+ // an id the citizen does not hold is dropped, not passed to the engine
  expect((await brain.decide(town.perceive(a),a,1)).desire_id).toBeUndefined();
  a.desires=[{id:'active-one',title:'Build something',why:'Curiosity',state:'active',since:0,updated:0,attempts:[],history:[]}];
  expect((await brain.decide(town.perceive(a),a,1)).desire_id).toBe('active-one');
+ // the citizen's desires reach the model through the perception...
  expect(JSON.stringify(bodies[1]?.messages)).toContain('active-one');
+ // ...and not through the schema: the shared first block is byte for byte the same with desires or without, so it caches across citizens
+ const prefix=(i:number)=>(bodies[i]?.messages as {content:{text:string}[]}[])[0]!.content[0]!.text;
+ expect(prefix(1)).toBe(prefix(0));
 });
