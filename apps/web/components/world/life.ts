@@ -9,6 +9,8 @@
 import { Container, Graphics } from "pixi.js";
 import { CORAL, CREAM, DARK, KELP, LIGHT, WOOD_DARK } from "./palette";
 import type { LightSource } from "./fx";
+/** the comb and wattle on a painted hen */
+const RED_COMB = 0xc4503f;
 
 type Pt = { x: number; y: number };
 export type LifeSound = "gull" | "flap" | "bark" | "meow" | "cluck" | "oars";
@@ -179,7 +181,48 @@ export class Life {
     a.ellipse(x, y - 4.5, 6.5, 3.6).fill(CREAM).stroke({ width: 0.8, color: KELP, alpha: 0.7 }); a.ellipse(x - dir * 1.5, y - 5.2, 4.2, 1.9).fill({ color: 0xc9ccd0, alpha: 0.9 }); a.moveTo(x - dir * 6, y - 4.5).lineTo(x - dir * 9.5, y - 3.5).stroke({ width: 1.2, color: KELP, alpha: 0.7 });
     a.circle(x + dir * hx, y + hy, 2.5).fill(CREAM).stroke({ width: 0.8, color: KELP, alpha: 0.7 }); a.moveTo(x + dir * (hx + 2), y + hy + 0.3).lineTo(x + dir * (hx + 4.6), y + hy + 0.9).stroke({ width: 1.3, color: CORAL, cap: "round" }); a.circle(x + dir * (hx + 0.8), y + hy - 0.6, 0.55).fill(KELP);
   }
+  /** the animals as the people are drawn: painted figurines on a turned base, hopping as they are moved; false keeps the flat silhouettes */
+  figurine = true;
+  private drawFigurine(c: Critter, tick: number, night: number, moving: boolean): void {
+    const g = c.g; g.clear(); g.scale.x = c.facing;
+    const O = { width: 0.9, color: 0x2f302a, alpha: 0.85, join: "round" as const, cap: "round" as const };
+    const asleep = c.state === "sleep", sit = c.state === "sit" || c.state === "hide";
+    const hop = moving ? Math.abs(Math.sin(tick / (c.kind === "dog" ? 4 : c.kind === "hen" ? 3 : 5))) * (c.kind === "hen" ? 1.6 : 2.4) : 0;
+    const br = c.kind === "dog" ? 11 : c.kind === "cat" ? 9 : 6;
+    g.ellipse(0, 1.2, br + 2, 3.4).fill({ color: KELP, alpha: 0.16 });
+    if (!asleep) { g.ellipse(0, 1.2 - hop, br, 3.6).fill(0x2f3a2c); g.ellipse(0, -hop, br, 3.6).fill(0x4f6446).stroke({ width: 0.8, color: 0x2a3326 }); g.ellipse(0, -0.3 - hop, br - 1.4, 2.8).stroke({ width: 0.6, color: 0x8ea07c, alpha: 0.7 }); }
+    const y0 = asleep ? 0 : -1.5 - hop;
+    const eye = (x: number, y: number) => { if (night > 0.15 && c.kind === "cat") { g.circle(x, y, 0.9).fill(LIGHT.star); return; } g.ellipse(x, y, 0.8, 1).fill(0x1f1d1b); g.circle(x + 0.3, y - 0.3, 0.3).fill(0xffffff); };
+    const gloss = (x: number, y: number, rx: number) => g.ellipse(x, y, rx, rx * 0.5).fill({ color: 0xffffff, alpha: 0.28 });
+    if (c.kind === "cat") {
+      const fur = 0x7d756c, stripe = 0x544d46; const sw = Math.sin(tick / 16) * 2;
+      if (asleep) { g.ellipse(0, -4, 9.5, 5.2).fill(fur).stroke(O); g.moveTo(-8, -2).quadraticCurveTo(-1, 3, 7, -0.5).stroke({ width: 2.4, color: stripe, cap: "round" }); g.circle(6, -6.5, 3.8).fill(fur).stroke(O); g.moveTo(3.8, -9).lineTo(4.6, -12.5).lineTo(6.2, -9.6).moveTo(7, -9.6).lineTo(8.6, -12.5).lineTo(9.2, -9).fill(fur).stroke(O); for (const x of [5, 7.4]) g.moveTo(x - 0.8, -6.4).quadraticCurveTo(x, -5.8, x + 0.8, -6.4).stroke({ width: 0.6, color: 0x1f1d1b }); return; }
+      if (sit) { g.moveTo(-5, y0 - 2).quadraticCurveTo(-12, y0 - 2 + sw, -11, y0 - 10 + sw * 1.5).stroke({ width: 3, color: fur, cap: "round" }); g.ellipse(0, y0 - 6.5, 6.2, 7).fill(fur).stroke(O); for (const yy of [-9, -6, -3]) g.moveTo(-4, y0 + yy).quadraticCurveTo(-1, y0 + yy + 1.5, 2, y0 + yy).stroke({ width: 1, color: stripe, alpha: 0.7 }); g.ellipse(2.4, y0 - 5, 2.2, 3.4).fill(0xefe4c8); }
+      else { const lg = (x: number, k: number) => { const d = moving ? Math.sin(tick / 4 + k * Math.PI / 2) * 1.8 : 0; g.moveTo(x, y0 - 4).lineTo(x + d, y0).stroke({ width: 2.2, color: stripe, cap: "round" }); }; for (let k = 0; k < 4; k++) lg(-6 + k * 4, k); g.moveTo(-9, y0 - 6).quadraticCurveTo(-15, y0 - 9 + sw, -13, y0 - 16 + sw).stroke({ width: 2.8, color: fur, cap: "round" }); g.ellipse(0, y0 - 6, 10, 4.4).fill(fur).stroke(O); for (const x of [-5, -1.5, 2]) g.moveTo(x, y0 - 10).quadraticCurveTo(x + 1, y0 - 6, x, y0 - 2.5).stroke({ width: 1, color: stripe, alpha: 0.7 }); }
+      const hx = sit ? 2 : 8.5, hy = sit ? y0 - 14.5 : y0 - 10;
+      g.moveTo(hx - 3.6, hy - 1.6).lineTo(hx - 2.8, hy - 7.2).lineTo(hx - 0.2, hy - 3.6).closePath().fill(fur).stroke(O); g.moveTo(hx + 0.6, hy - 3.6).lineTo(hx + 2.8, hy - 7.2).lineTo(hx + 3.9, hy - 1.6).closePath().fill(fur).stroke(O);
+      g.circle(hx, hy, 4.3).fill(fur).stroke(O); g.ellipse(hx + 1.6, hy + 1.6, 2.2, 1.6).fill(0xefe4c8); eye(hx - 0.2, hy - 0.6); eye(hx + 2.6, hy - 0.6); g.circle(hx + 1.8, hy + 1, 0.6).fill(0xd98a86); gloss(hx - 1.6, hy - 2.4, 1.4);
+    } else if (c.kind === "dog") {
+      const coat = 0xb8864f, dark = 0x7a5534, chest = 0xefe4c8; const wag = c.state === "follow" || c.pinned > tick ? Math.sin(tick / 2) * 4 : Math.sin(tick / 12) * 1.5;
+      if (asleep) { g.ellipse(0, -4.5, 11.5, 5.6).fill(coat).stroke(O); g.ellipse(-3, -6, 4, 2.4).fill(dark); g.circle(8, -6, 4.4).fill(coat).stroke(O); g.ellipse(6.2, -8.2, 2.2, 3.4).fill(dark).stroke({ ...O, width: 0.6 }); g.ellipse(11, -5, 1.8, 1.4).fill(chest); g.circle(12.3, -5.2, 0.8).fill(0x1f1d1b); g.moveTo(7.4, -6).quadraticCurveTo(8.2, -5.4, 9, -6).stroke({ width: 0.6, color: 0x1f1d1b }); return; }
+      if (sit) { g.moveTo(-6, y0 - 2).quadraticCurveTo(-12, y0 - 1 + wag, -14, y0 - 6 + wag).stroke({ width: 2.8, color: coat, cap: "round" }); g.ellipse(0, y0 - 7, 7.4, 8).fill(coat).stroke(O); g.ellipse(2.4, y0 - 6.5, 3, 4.6).fill(chest); g.ellipse(-3, y0 - 9, 3, 2.2).fill(dark); }
+      else { const lg = (x: number, k: number) => { const d = moving ? Math.sin(tick / 3 + k * Math.PI / 2) * 2.2 : 0; g.moveTo(x, y0 - 5).lineTo(x + d, y0).stroke({ width: 2.6, color: dark, cap: "round" }); }; for (let k = 0; k < 4; k++) lg(-8 + k * 5, k); g.moveTo(-11, y0 - 8).quadraticCurveTo(-15, y0 - 12 + wag, -16, y0 - 15 + wag).stroke({ width: 2.8, color: coat, cap: "round" }); g.ellipse(0, y0 - 7.5, 12, 5.4).fill(coat).stroke(O); g.ellipse(-4, y0 - 9.5, 4, 2.4).fill(dark); g.ellipse(7, y0 - 6, 3.4, 3).fill(chest); }
+      const hx = sit ? 3 : 10.5, hy = sit ? y0 - 16 : y0 - 12;
+      g.circle(hx, hy, 4.8).fill(coat).stroke(O); g.ellipse(hx + 4, hy + 1.4, 3, 2.2).fill(chest).stroke({ ...O, width: 0.6 }); g.circle(hx + 6.4, hy + 0.8, 1).fill(0x1f1d1b); eye(hx + 1.6, hy - 1.2);
+      g.ellipse(hx - 2.4, hy + 0.4, 2.3, 4).fill(dark).stroke({ ...O, width: 0.6 }); gloss(hx - 0.6, hy - 2.8, 1.6);
+      if (c.state === "follow") g.moveTo(hx + 3.6, hy + 3).quadraticCurveTo(hx + 4.6, hy + 5.6, hx + 5.4, hy + 3.2).fill(0xd98a86);
+    } else {
+      const bob = c.state === "peck" ? Math.max(0, Math.sin(tick / 5)) * 4 : 0;
+      for (const [x, k] of [[-1.5, 0], [1.5, 1]] as const) { const d = moving ? Math.sin(tick / 3 + k * Math.PI) * 1.2 : 0; g.moveTo(x, y0 - 3).lineTo(x + d, y0).stroke({ width: 1.2, color: CORAL, cap: "round" }); }
+      g.moveTo(-4.5, y0 - 7).lineTo(-8.5, y0 - 12).lineTo(-3, y0 - 9).closePath().fill(0xe9dcc2).stroke(O);
+      g.ellipse(0, y0 - 5.8, 5.8, 4).fill(CREAM).stroke(O); g.ellipse(-0.8, y0 - 6.3, 3.2, 1.6).fill({ color: 0xd8cbb0, alpha: 0.9 });
+      const hx = 5, hy = y0 - 10 + bob; g.moveTo(3, y0 - 7).lineTo(hx, hy).stroke({ width: 2.6, color: CREAM });
+      g.moveTo(hx - 1.6, hy - 2.2).lineTo(hx - 0.8, hy - 4.6).lineTo(hx + 0.2, hy - 3).lineTo(hx + 1.2, hy - 4.8).lineTo(hx + 1.8, hy - 2.2).closePath().fill(RED_COMB);
+      g.circle(hx, hy, 2.6).fill(CREAM).stroke(O); g.moveTo(hx + 2.3, hy - 0.4).lineTo(hx + 4.8, hy + 0.3).lineTo(hx + 2.3, hy + 1).closePath().fill(0xd9a441); g.ellipse(hx + 0.6, hy + 2.4, 0.9, 1.3).fill(RED_COMB); eye(hx + 0.8, hy - 0.6); gloss(-2, y0 - 8, 1.8);
+    }
+  }
   private drawCritter(c: Critter, tick: number, night: number, moving: boolean): void {
+    if (this.figurine) { this.drawFigurine(c, tick, night, moving); return; }
     const g = c.g; g.clear(); g.scale.x = c.facing; const leg = (x: number, k: number, len: number, w: number) => { const dx = moving ? Math.sin(tick / (c.kind === "dog" ? 3 : 4) + k * Math.PI / 2) * 2.2 : 0; g.moveTo(x, -len).lineTo(x + dx, 0).stroke({ width: w, color: c.kind === "hen" ? CORAL : c.kind === "dog" ? WOOD_DARK : DARK, cap: "round" }); };
     if (c.kind === "cat") {
       g.ellipse(0, 0.5, 11, 3).fill({ color: KELP, alpha: 0.12 });

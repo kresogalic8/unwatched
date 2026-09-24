@@ -482,6 +482,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           meadows: [{ x: f.x - 40, y: f.y + 140, r: 220 }, { x: o.x, y: o.y + 40, r: 200 }, { x: pw.x - 60, y: pw.y + 120, r: 180 }], roosts: [{ x: lh.x, y: lh.y - 100 }, { x: ch.x, y: ch.y - 70 }],
         }, scene);
       })();
+      life.figurine = !classicFigures; // the cat, the dog and the hens are painted figurines too, unless the classic figures were asked for
       const particles = new Particles(scene); world.addChild(particles.glow); // embers and sparks above the night, dust and pollen in the scene
       const sunNow = { elev: 1, dir: 1, low: 0 }; const lastCart = { x: 0, y: 0 }; const lifeMeadows = (() => { const f = places.get("fields"), o = places.get("orchard"), pw = places.get("pinewood"); return [f && { x: f.x - 40, y: f.y + 140, r: 220 }, o && { x: o.x, y: o.y + 40, r: 200 }, pw && { x: pw.x - 60, y: pw.y + 120, r: 180 }].filter((m): m is { x: number; y: number; r: number } => !!m); })();
       world.addChild(life.glow); lighting.dark.addChild(life.cut); // the beam cuts the shade; what glows sits above it, so the night cannot dim it
