@@ -18,7 +18,7 @@ async function town(page: Page, query: string): Promise<void> {
   const said: string[] = []; page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") said.push(`${m.type()}: ${m.text()}`); }); page.on("pageerror", (e) => said.push(`pageerror: ${e.message}`));
   await page.goto(`/town?clean=1&${query}`);
   await page.locator('[data-world-ready="1"]').waitFor({ timeout: 60_000 }).catch((e: Error) => { throw new Error(`the town never came up:\n${said.slice(0, 20).join("\n")}\n${e.message}`); });
-  await page.clock.runFor(6000);
+  await page.clock.runFor(2000); // two seconds of the town's own time: enough to settle, and on a CI runner without a GPU every frame is drawn on the CPU
 }
 
 const SHOTS: [string, string][] = [
