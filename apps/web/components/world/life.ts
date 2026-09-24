@@ -11,6 +11,8 @@ import { CORAL, CREAM, DARK, KELP, LIGHT, WOOD_DARK } from "./palette";
 import type { LightSource } from "./fx";
 /** the comb and wattle on a painted hen */
 const RED_COMB = 0xc4503f;
+/** a herring gull's colours, as the figurines are painted */
+const GULL_WHITE = 0xf6f3ea, GULL_GREY = 0xa9b3b8, GULL_BEAK = 0xe8c24a;
 
 type Pt = { x: number; y: number };
 export type LifeSound = "gull" | "flap" | "bark" | "meow" | "cluck" | "oars";
@@ -174,12 +176,28 @@ export class Life {
     if (o.night > 0.22 && o.season !== "winter" && !wet) { const k = Math.min(1, (o.night - 0.22) / 0.15); for (const bt of this.bats) { const rs = P.roosts[bt.roost]!; const t = tick / 30; const bx = rs.x + Math.sin(t * 0.9 + bt.ph) * bt.r + Math.sin(t * 4.7 + bt.ph) * 14, by = rs.y - 60 + Math.cos(t * 0.6 + bt.ph * 2) * bt.r * 0.5 + Math.sin(t * 6.1) * 10; const fl = Math.sin(tick / 1.7 + bt.ph) * 4; a.moveTo(bx - 8, by + fl).quadraticCurveTo(bx - 4, by - 3, bx, by).quadraticCurveTo(bx + 4, by - 3, bx + 8, by + fl).stroke({ width: 1.6, color: DARK, alpha: 0.85 * k, cap: "round" }); } }
   }
 
-  private flyGull(x: number, y: number, tick: number, seed: number): void { const flap = Math.sin(tick / 5 + seed) * 4; this.air.moveTo(x - 9, y + flap).quadraticCurveTo(x - 4, y - 4, x, y).quadraticCurveTo(x + 4, y - 4, x + 9, y + flap).stroke({ width: 1.6, color: KELP, alpha: 0.7, cap: "round" }); }
+  /** a gull in flight, painted like the figurines: white body, grey wings with black tips, the beak yellow */
+  private flyGull(x: number, y: number, tick: number, seed: number): void {
+    const a = this.air; const flap = Math.sin(tick / 5 + seed) * 5; const O = { width: 0.8, color: 0x2f302a, alpha: 0.8, join: "round" as const };
+    for (const side of [-1, 1] as const) {
+      const tipX = x + side * 13, tipY = y - 2 + flap, elbowX = x + side * 6, elbowY = y - 4 - flap * 0.3;
+      a.moveTo(x + side * 2, y - 1).quadraticCurveTo(elbowX, elbowY - 2, tipX, tipY).lineTo(elbowX + side * 1.5, elbowY + 3.2).lineTo(x + side * 2, y + 1.5).closePath().fill(GULL_GREY).stroke(O);
+      a.moveTo(tipX, tipY).lineTo(tipX - side * 4, tipY + 0.4).lineTo(tipX - side * 2.6, tipY + 2.2).closePath().fill(0x2a2d30);
+    }
+    a.ellipse(x, y, 4.6, 2.4).fill(GULL_WHITE).stroke(O); a.circle(x + 4.4, y - 1.2, 1.9).fill(GULL_WHITE).stroke(O); a.moveTo(x + 6, y - 1).lineTo(x + 8.4, y - 0.5).lineTo(x + 6, y + 0.2).closePath().fill(GULL_BEAK);
+  }
+  /** a gull sat on a post: pink feet, white breast, the grey mantle with its black tip and white spots, a yellow beak with the red spot, a bright eye */
   private sitGull(x: number, y: number, dir: number, turned: boolean): void {
-    const a = this.air; const hx = turned ? 1.5 : 5.5, hy = turned ? -8.5 : -7.5;
-    a.moveTo(x - 1.5, y).lineTo(x - 1.5, y - 3).moveTo(x + 1.5, y).lineTo(x + 1.5, y - 3).stroke({ width: 1, color: CORAL });
-    a.ellipse(x, y - 4.5, 6.5, 3.6).fill(CREAM).stroke({ width: 0.8, color: KELP, alpha: 0.7 }); a.ellipse(x - dir * 1.5, y - 5.2, 4.2, 1.9).fill({ color: 0xc9ccd0, alpha: 0.9 }); a.moveTo(x - dir * 6, y - 4.5).lineTo(x - dir * 9.5, y - 3.5).stroke({ width: 1.2, color: KELP, alpha: 0.7 });
-    a.circle(x + dir * hx, y + hy, 2.5).fill(CREAM).stroke({ width: 0.8, color: KELP, alpha: 0.7 }); a.moveTo(x + dir * (hx + 2), y + hy + 0.3).lineTo(x + dir * (hx + 4.6), y + hy + 0.9).stroke({ width: 1.3, color: CORAL, cap: "round" }); a.circle(x + dir * (hx + 0.8), y + hy - 0.6, 0.55).fill(KELP);
+    const a = this.air; const O = { width: 0.85, color: 0x2f302a, alpha: 0.85, join: "round" as const, cap: "round" as const };
+    const hx = turned ? 1.2 : 5.2, hy = turned ? -9.5 : -8.5;
+    a.moveTo(x - 1.6, y).lineTo(x - 1.4, y - 3).moveTo(x + 1.6, y).lineTo(x + 1.4, y - 3).stroke({ width: 1.2, color: 0xe8a49a, cap: "round" });
+    a.moveTo(x - dir * 5.5, y - 5).lineTo(x - dir * 10.5, y - 4).lineTo(x - dir * 5.5, y - 3).closePath().fill(0x2a2d30).stroke({ ...O, width: 0.6 }); a.circle(x - dir * 9, y - 4, 0.6).fill(0xffffff);
+    a.ellipse(x, y - 5, 6.6, 4).fill(GULL_WHITE).stroke(O);
+    a.moveTo(x - dir * 6, y - 5.4).quadraticCurveTo(x - dir * 1, y - 9.6, x + dir * 3.2, y - 6.6).quadraticCurveTo(x, y - 4.2, x - dir * 6, y - 4).closePath().fill(GULL_GREY).stroke({ ...O, width: 0.6 });
+    a.circle(x + dir * hx, y + hy, 2.8).fill(GULL_WHITE).stroke(O);
+    a.moveTo(x + dir * (hx + 2.2), y + hy - 0.2).lineTo(x + dir * (hx + 5.4), y + hy + 0.6).lineTo(x + dir * (hx + 2.2), y + hy + 1.3).closePath().fill(GULL_BEAK).stroke({ ...O, width: 0.5 }); a.circle(x + dir * (hx + 4.2), y + hy + 0.8, 0.5).fill(0xc4503f);
+    a.circle(x + dir * (hx + 1), y + hy - 0.7, 0.7).fill(0x1f1d1b); a.circle(x + dir * (hx + 1.2), y + hy - 0.95, 0.25).fill(0xffffff);
+    a.ellipse(x - dir * 1.5, y - 6.6, 2.4, 1).fill({ color: 0xffffff, alpha: 0.35 }); // varnish
   }
   /** the animals as the people are drawn: painted figurines on a turned base, hopping as they are moved; false keeps the flat silhouettes */
   figurine = true;
