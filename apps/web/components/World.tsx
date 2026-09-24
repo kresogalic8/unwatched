@@ -13,7 +13,7 @@ import { previewZoom, coast } from "./world/camera-motion";
 import { constructionStage } from "@unwatched/protocol";
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef, useState } from "react";
-import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Text, TextStyle } from "pixi.js";
+import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Text, TextStyle, UPDATE_PRIORITY } from "pixi.js";
 import { BAY, PLINTH, TABLE, drawPlinth, drawTable } from "./world/diorama";
 import { API, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
 import { Citizen, lookFor, aged, type Look, type Pose } from "./world/citizen";
@@ -225,24 +225,26 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         }
         world.addChildAt(bed, world.getChildIndex(tide)); } // over the ground's own shallows, under the tide's wet edge and the foam
       const tlerp = (p: [number, number], q: [number, number], f: number): [number, number] => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+      // what the camera sees, in world units, with a margin: the shore's foam and tide are drawn only there, not round the whole island
+      const inView = (p: readonly number[], m = 220) => p[0]! > lightArea.x - m && p[0]! < lightArea.x + lightArea.width + m && p[1]! > lightArea.y - m && p[1]! < lightArea.y + lightArea.height + m;
       const drawTide = (t: number) => {
         tide.clear();
         for (let k = 0; k < tideMid.length; k++) {
-          const wet = Math.max(0, Math.sin(t / 30 + k * 0.35)); if (wet < 0.05) continue; // in step with the foam, so the wet reaches where the wave breaks
+          if (!inView(tideMid[k]!)) continue; const wet = Math.max(0, Math.sin(t / 30 + k * 0.35)); if (wet < 0.05) continue; // in step with the foam, so the wet reaches where the wave breaks
           const a = tideMid[k]!, b = tideMid[(k + 1) % tideMid.length]!, ia = tideIn[k]!, ib = tideIn[(k + 1) % tideIn.length]!;
           const wa = tlerp(a, ia, 0.3 + wet * 0.7), wb = tlerp(b, ib, 0.3 + wet * 0.7);
           tide.moveTo(a[0], a[1]).lineTo(b[0], b[1]).lineTo(wb[0], wb[1]).lineTo(wa[0], wa[1]).closePath().fill({ color: C.wetSand, alpha: 0.3 * wet });
         }
         // caustics: a soft moving glint on the shallow water just off the sand
-        for (let k = 0; k < shallowLine.length; k += 3) { const ph = Math.sin(t / 20 + k * 0.7); if (ph < 0.45) continue; const a = shallowLine[k]!, b = shallowLine[(k + 1) % shallowLine.length]!; tide.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2, color: C.foam, alpha: 0.14 * (ph - 0.45), cap: "round" }); }
+        for (let k = 0; k < shallowLine.length; k += 3) { if (!inView(shallowLine[k]!)) continue; const ph = Math.sin(t / 20 + k * 0.7); if (ph < 0.45) continue; const a = shallowLine[k]!, b = shallowLine[(k + 1) % shallowLine.length]!; tide.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2, color: C.foam, alpha: 0.14 * (ph - 0.45), cap: "round" }); }
       };
       const seaLife = new Graphics(); world.addChild(seaLife);
       const coastalLife = new CoastalLife((a, r) => ({ x: cx + Rx * wobble(a) * r * Math.cos(a), y: cy + Ry * wobble(a) * r * Math.sin(a) }), inside);
       world.addChild(coastalLife.root);
       const drawFoam = (t: number, rough: number) => {
         foam.clear();
-        for (let k = 0; k < shoreLine.length; k += 2) { const ph = Math.sin(t / 30 + k * 0.35); if (ph < -0.2) continue; const a = shoreLine[k]!, b = shoreLine[(k + 1) % shoreLine.length]!; foam.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2.5 + rough * 2, color: C.foam, alpha: 0.45 + 0.45 * ph, cap: "round" }); }
-        for (let k = 0; k < shoreOut.length; k += 3) { const ph = Math.sin(t / 42 + k * 0.5 + 1); if (ph < 0.3 && rough < 0.5) continue; const a = shoreOut[k]!, b = shoreOut[(k + 1) % shoreOut.length]!; foam.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2, color: C.foam, alpha: 0.25 + 0.3 * Math.max(0, ph) + rough * 0.3, cap: "round" }); }
+        for (let k = 0; k < shoreLine.length; k += 2) { if (!inView(shoreLine[k]!)) continue; const ph = Math.sin(t / 30 + k * 0.35); if (ph < -0.2) continue; const a = shoreLine[k]!, b = shoreLine[(k + 1) % shoreLine.length]!; foam.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2.5 + rough * 2, color: C.foam, alpha: 0.45 + 0.45 * ph, cap: "round" }); }
+        for (let k = 0; k < shoreOut.length; k += 3) { if (!inView(shoreOut[k]!)) continue; const ph = Math.sin(t / 42 + k * 0.5 + 1); if (ph < 0.3 && rough < 0.5) continue; const a = shoreOut[k]!, b = shoreOut[(k + 1) % shoreOut.length]!; foam.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 2, color: C.foam, alpha: 0.25 + 0.3 * Math.max(0, ph) + rough * 0.3, cap: "round" }); }
       };
 
       // everything with a foot on the ground sorts by y
@@ -501,6 +503,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       world.addChild(life.glow); lighting.dark.addChild(life.cut); // the beam cuts the shade; what glows sits above it, so the night cannot dim it
       const sky = new Graphics(); sky.alpha = 0; world.addChild(sky); // stars and the moon over the water, after the night shade so they stay bright
       let lastStop = -1; // the miniature's last posed frame
+      let frameMs = 16.7, lite: 0 | 1 | 2 = 0, calmSince = 0; // how long frames take here, smoothed, and how much of the post the device is spared
       const falling = new Map<number, { x: number; y: number }>();
       const STARS = Array.from({ length: 160 }, (_, i) => ({ x: ((i * 7919) % (W + 1600)) - 800, y: ((i * 104729) % (H + 1200)) - 600, r: i % 7 === 0 ? 4.5 : 2.6, tw: (i * 31) % 17 }));
       const moonPhase = () => { const days = (Date.now() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000; return (days / 29.530588) % 1; }; // 0 new, 0.5 full
@@ -806,6 +809,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         night.alpha += (nightAmt - night.alpha) * ease(0.05); dusk.alpha += (duskAmt - dusk.alpha) * ease(0.05); moonlit.alpha = 0.85 * Math.min(1, night.alpha / 0.42) * Math.max(0, 1 - flash.alpha * 1.4); worldLight.windowGlow = nightLook ? Math.min(1, night.alpha / 0.3) : 0;
         perfMark("life");
         for (let s = 0; s < steps; s++) cartTick();
+        // the device's budget: a slow frame for a couple of seconds lightens the bloom, then drops it; fast frames for a while bring it back
+        frameMs += (app.ticker.deltaMS - frameMs) * 0.03;
+        if (every(120) && !nofx.has("governor")) { if (frameMs > 24 && lite < 2) { lite = (lite + 1) as 0 | 1 | 2; post.setLite(lite); calmSince = tick; } else if (frameMs < 15 && lite > 0 && tick - calmSince > 900) { lite = (lite - 1) as 0 | 1 | 2; post.setLite(lite); calmSince = tick; } else if (frameMs >= 15) calmSince = tick; }
         const mini = miniRef.current;
         if (model.visible !== mini) { model.visible = mini; horizon.visible = celestial.visible = !mini; app.renderer.background.color = mini ? TABLE : C.water; }
         sky.visible = !mini; // no stars or moon over a table
@@ -821,7 +827,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         footfall.update(detailSeconds,livingPeople,wetness>.35,quietMotion.matches,inside);
         coastalLife.update(detailSeconds, night.alpha / 0.42, weather, [boat, ...boats].filter(b => b.visible), livingPeople, quietMotion.matches, coastalWonder(c?.day ?? 1,hour,forcedSeason ?? c?.season ?? "summer",weather));
         const lifeSounds: typeof life.sounds = [];
-        for (let s = 0; s < steps; s++) { life.update({ tick: prevTick + s + 1, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn }); lifeSounds.push(...life.sounds); }
+        for (let s = 0; s < steps; s++) { life.update({ draw: nofx.has("stepdraw") ? undefined : s === steps - 1 && (steps > 1 || (prevTick + s + 1) % 2 === 0), tick: prevTick + s + 1, hour, rise, set, night: night.alpha / 0.42, season: forcedSeason ?? c?.season ?? "summer", weather, wind, people: livingPeople, effects: effectsOn }); lifeSounds.push(...life.sounds); }
         for (const snd of lifeSounds) ambience.cue(snd.name, Math.hypot(snd.x - cam.x, snd.y - cam.y), snd.x - cam.x, snd.level ?? 1);
         if (effectsRef.current !== effectsOn) { effectsOn = effectsRef.current; sea.filters = effectsOn && !nofx.has("water") ? [water] : null; shadows.filters = effectsOn && !nofx.has("softshadow") ? [shadowBlur] : null; ripples.visible = !effectsOn; lamps.visible = !effectsOn; night.visible = !effectsOn; dusk.visible = !effectsOn; rain.visible = !effectsOn; if (!effectsOn) { sunGrade.veil.visible = sunGrade.glow.visible = sunGrade.halo.visible = false; } fog.visible = !effectsOn; if (!effectsOn) { for (const face of ["front", "side", "roof"] as const) { worldLight.shade[face] = 0; worldLight.glow[face] = 0; } lighting.dark.visible = false; lighting.glow.visible = false; weatherFx.rain.visible = false; weatherFx.snow.visible = false; weatherFx.fog.visible = false; clouds.puffs.visible = false; clouds.shadows.visible = false; } }
         rays.clear();
@@ -1014,8 +1020,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         if (labelsNow !== labelKey.current) { labelKey.current = labelsNow; setLabels(next); }
         perfMark("mini");
         if (every(20)) setMini({ w: W, h: H, places: [...places.values()].map((p) => ({ id: p.id, x: p.x, y: p.y, kind: p.kind, crowd: p.crowd })), view: { x: -cam.x / cam.zoom, y: -cam.y / cam.zoom, w: Wd / cam.zoom, h: Hd / cam.zoom }, people: [...figs.current.values()].map((f) => ({ x: f.x, y: f.y, mine: f.mine })) });
-        perfMark("end");
+        perfMark("render");
       });
+      // after the application has drawn the frame: what the draw cost lands in "render"
+      app.ticker.add(() => perfMark("idle"), undefined, UPDATE_PRIORITY.UTILITY);
     })().catch(() => { if(alive) setLoadError(true); });
     return () => { alive = false; stopWatching?.(); cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); clearNightGlow(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
