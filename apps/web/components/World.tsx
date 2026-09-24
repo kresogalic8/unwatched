@@ -202,6 +202,29 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // roads keep to the land: a point that would reach the shore is drawn back toward the island's middle, to a little inside the sand
       const onLand = (p: { x: number; y: number }) => { const r = inside(p.x, p.y); return r <= 0.9 ? p : { x: cx + (p.x - cx) * 0.9 / r, y: cy + (p.y - cy) * 0.9 / r }; };
       const segs = segmentsOf(places, OLD_TOWN, onLand); world.addChild(drawRoads(segs));
+      // the land between the districts is not bare: maquis and rock, olive terraces behind dry-stone walls, a pair of cypresses by a
+      // track. A loose grid over the island, nothing within reach of a place or on a road, each patch chosen by where it lies.
+      const wildlands = () => {
+        const out: { sprite: string; x: number; y: number; w?: number; flip?: boolean }[] = []; let seed = 7717; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        const open = new Set(["plot", "wild", "public"]); const near = (x: number, y: number) => [...places.values()].some((p) => Math.hypot(p.x - x, p.y - y) < (open.has(p.kind) ? 130 : 240));
+        const onRoad = (x: number, y: number) => segs.some((sg) => sg.pts.some((q) => Math.hypot(q.x - x, q.y - y) < 55));
+        for (let gx = cx - Rx * 1.1; gx < cx + Rx * 1.1; gx += 150) for (let gy = cy - Ry * 1.1; gy < cy + Ry * 1.1; gy += 130) {
+          const x = gx + (r() - 0.5) * 110, y = gy + (r() - 0.5) * 90;
+          if (inside(x, y) > 0.86 || near(x, y) || onRoad(x, y) || r() < 0.12) continue;
+          const zone = noise(x / 620, y / 620);
+          if (zone < 0.4) { // maquis: low scrub in clumps, a stone among it
+            for (let k = 0; k < 2 + Math.floor(r() * 3); k++) out.push({ sprite: "bush", x: x + (r() - 0.5) * 90, y: y + (r() - 0.5) * 44, w: 34 + r() * 26, flip: r() < 0.5 });
+            if (r() < 0.5) out.push({ sprite: "rock", x: x + (r() - 0.5) * 70, y: y + 16, w: 30 + r() * 20 });
+          } else if (zone < 0.62) { // an olive terrace: a dry-stone wall and a row of olives above it
+            out.push({ sprite: "wall", x, y: y + 34, w: 120 + r() * 30, flip: r() < 0.5 });
+            for (let k = 0; k < 3; k++) out.push({ sprite: "olive", x: x - 60 + k * 60 + (r() - 0.5) * 14, y: y - 6 + (r() - 0.5) * 10, w: 70 + r() * 20, flip: r() < 0.5 });
+          } else { // rocky ground: bare stone, a little scrub, now and then two cypresses
+            out.push({ sprite: "rock", x, y, w: 40 + r() * 26 }, { sprite: "bush", x: x + 40, y: y + 12, w: 30 + r() * 16 });
+            if (r() < 0.4) out.push({ sprite: "cypress", x: x - 50, y: y - 4 }, { sprite: "cypress", x: x - 28, y: y + 2 });
+          }
+        }
+        return out;
+      };
       const wear = new Wear(segs, (sg) => { const [a, b] = sg.key.split("|"); const hub = (id?: string) => id === "market" || id === "harbor" || id === "lane"; return (hub(a) ? 30 : 0) + (hub(b) ? 30 : 0) + (sg.cobbled ? 20 : 6); }); world.addChild(wear);
       // T2: desire-lines. Where feet cross the grass off the roads, the ground wears to a pale path — a light baseline for the shortcuts near each place, deepening with real traffic.
       const trails = new Graphics(); world.addChild(trails);
@@ -390,7 +413,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       for (const p of places.values()) drawPlace(p);
       // the konoba brings its own tables under its vine, so the tavern's terrace and parasol stay away
       const tavern = places.get("tavern"); const konoba = !classic && !!tavern && DALMATIAN_FOR[tavern.sprite]?.kind === "konoba";
-      const decor = keepOffRoads(decorFor([...places.values()]), segs).filter((d) => !(konoba && tavern && /^(terrace|parasol)$/.test(d.sprite) && Math.hypot(d.x - tavern.x, d.y - tavern.y) < 160));
+      const decor = keepOffRoads([...decorFor([...places.values()]), ...wildlands()], segs).filter((d) => !(konoba && tavern && /^(terrace|parasol)$/.test(d.sprite) && Math.hypot(d.x - tavern.x, d.y - tavern.y) < 160));
       // the sea against the quay: wavelets swelling and breaking along the waterline of its face, and round its seaward end
       const quay = decor.find((d) => d.sprite === "pier"); const lap = new Graphics(); if (quay) { lap.zIndex = quay.y + 36; scene.addChild(lap); }
       let trees: Container[] = [];
