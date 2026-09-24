@@ -572,7 +572,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         return [...availableSeats,...addedSeats].filter(seat => !takenBenches.has(seat.key) && Math.hypot(seat.x-p.x,seat.y-p.y)<260)
           .sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0] ?? null;
       };
-      const spot = (place: string, seat: number) => { const p = places.get(place) ?? places.get("market")!; const g = gather(p); const cols = 5; return { x: g.x + 20 + (seat % cols) * ((g.w - 40) / (cols - 1)), y: g.y + Math.floor(seat / cols) * 26 }; };
+      // where the n-th person at a place stands: a loose knot in front of the door, each a little further out at a golden-angle turn,
+      // jittered by the place's name, so a crowd reads as people standing about and never as a row
+      const spot = (place: string, seat: number) => {
+        const p = places.get(place) ?? places.get("market")!; let h = 0; for (const ch of p.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+        const jitter = (k: number) => (((h ^ Math.imul(seat + 1, 2654435761) ^ k) >>> 0) % 1000) / 1000 - 0.5;
+        const r = 18 + 26 * Math.sqrt(seat) + jitter(1) * 10, a = seat * 2.39996 + (h % 628) / 100;
+        return { x: p.x + Math.cos(a) * r * 1.5 + jitter(2) * 8, y: p.y + 58 + Math.sin(a) * r * 0.55 + jitter(3) * 6 };
+      };
       const ensure = (a: PublicAgent) => {
         agents.current.set(a.id, a);
         let f = figs.current.get(a.id);
