@@ -199,7 +199,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // the ground: kinds blended where they meet, tufts and stones and flowers, contours on the hill, a wrack line on the shore
       const ground = drawGround({ W, H, cx, cy, inside, outline, places, oldTown: OLD_TOWN }, seasonNow); world.addChild(ground);
       // roads: an edge, a centre, cobbles in courses in the old town; and over them the wear, pale where feet actually go
-      const segs = segmentsOf(places, OLD_TOWN); world.addChild(drawRoads(segs));
+      // roads keep to the land: a point that would reach the shore is drawn back toward the island's middle, to a little inside the sand
+      const onLand = (p: { x: number; y: number }) => { const r = inside(p.x, p.y); return r <= 0.9 ? p : { x: cx + (p.x - cx) * 0.9 / r, y: cy + (p.y - cy) * 0.9 / r }; };
+      const segs = segmentsOf(places, OLD_TOWN, onLand); world.addChild(drawRoads(segs));
       const wear = new Wear(segs, (sg) => { const [a, b] = sg.key.split("|"); const hub = (id?: string) => id === "market" || id === "harbor" || id === "lane"; return (hub(a) ? 30 : 0) + (hub(b) ? 30 : 0) + (sg.cobbled ? 20 : 6); }); world.addChild(wear);
       // T2: desire-lines. Where feet cross the grass off the roads, the ground wears to a pale path — a light baseline for the shortcuts near each place, deepening with real traffic.
       const trails = new Graphics(); world.addChild(trails);
