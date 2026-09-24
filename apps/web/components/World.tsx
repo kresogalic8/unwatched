@@ -191,7 +191,23 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       // the horizon: other islands, far off, as soft silhouettes on the sea; the sun crosses over them by day
       const horizon = new Graphics(); world.addChild(horizon);
       const ISLETS: [number, number, number, number][] = [[cx + Rx * 0.95, cy - Ry * 1.1, 190, 34], [cx - Rx * 0.9, cy - Ry * 1.12, 150, 28], [cx - Rx * 1.1, cy + Ry * 0.75, 200, 36], [cx + Rx * 1.12, cy + Ry * 0.6, 130, 26], [cx + Rx * 0.35, cy - Ry * 1.2, 110, 22]];
-      for (const [ix, iy, iw, ih] of ISLETS) { horizon.ellipse(ix, iy + 2, iw * 1.12, ih * 0.7).fill({ color: C.shallow, alpha: 0.9 }); horizon.moveTo(ix - iw, iy).quadraticCurveTo(ix - iw * 0.5, iy - ih, ix - iw * 0.1, iy - ih * 0.6).quadraticCurveTo(ix + iw * 0.3, iy - ih * 1.1, ix + iw, iy).closePath().fill(0xa9bfb8); horizon.moveTo(ix - iw * 0.6, iy - 2).quadraticCurveTo(ix - iw * 0.2, iy - ih * 0.8, ix + iw * 0.2, iy - 4).stroke({ width: 1.2, color: C.kelp, alpha: 0.18 }); }
+      // other islands, far off: a soft halo of shallows, two ridges of hills (the back one paler with the haze), maquis on the slopes,
+      // a cypress or two, a white house on some and a lighthouse on one, and a line of foam where they meet the sea
+      ISLETS.forEach(([ix, iy, iw, ih], n) => {
+        for (let k = 3; k > 0; k--) horizon.ellipse(ix, iy + 3, iw * (1.05 + k * 0.1), ih * (0.45 + k * 0.12)).fill({ color: C.shallow, alpha: 0.12 });
+        const ridge = (w: number, h: number, dy: number, color: number, bumps: number) => {
+          horizon.moveTo(ix - w, iy + dy);
+          for (let b = 0; b < bumps; b++) { const x0 = ix - w + (2 * w * b) / bumps, x1 = ix - w + (2 * w * (b + 1)) / bumps; const peak = h * (0.55 + 0.45 * Math.abs(Math.sin((b + n) * 1.7))); horizon.quadraticCurveTo((x0 + x1) / 2, iy + dy - peak * 1.6, x1, iy + dy - (b === bumps - 1 ? 0 : peak * 0.5)); }
+          horizon.lineTo(ix + w, iy + dy).closePath().fill(color);
+        };
+        ridge(iw * 0.78, ih * 1.05, -2, 0xb9ccc6, 3);
+        ridge(iw, ih * 0.8, 2, 0x9fb6ad, 4);
+        for (let k = 0; k < 9; k++) { const t = (k + 0.5) / 9 - 0.5; horizon.ellipse(ix + t * iw * 1.6, iy - ih * (0.22 + 0.18 * Math.abs(Math.sin(k * 2.3 + n))), 5 + (k % 3) * 2, 3).fill({ color: 0x7f9a8b, alpha: 0.55 }); }
+        if (n % 2 === 0) for (let k = 0; k < 2; k++) horizon.roundRect(ix + iw * (0.18 + k * 0.06), iy - ih * 0.9, 3, ih * 0.5, 1.5).fill({ color: 0x6f8a7c, alpha: 0.8 });
+        if (n !== 3) { const hx = ix - iw * (0.25 - n * 0.08); horizon.rect(hx, iy - ih * 0.5, 9, 6).fill(0xeef0ea); horizon.poly([hx - 1, iy - ih * 0.5, hx + 4.5, iy - ih * 0.5 - 4, hx + 10, iy - ih * 0.5]).fill(0xc98a6b); }
+        if (n === 3) { horizon.rect(ix + iw * 0.4, iy - ih * 1.3, 4, ih * 0.9).fill(0xeef0ea); horizon.rect(ix + iw * 0.4 - 1, iy - ih * 1.4, 6, 3).fill(0xc4503f); }
+        horizon.moveTo(ix - iw * 0.98, iy + 3).quadraticCurveTo(ix, iy + 7, ix + iw * 0.98, iy + 3).stroke({ width: 1.2, color: 0xffffff, alpha: 0.45 });
+      });
       const celestial = new Graphics(); world.addChild(celestial);
       const gather = (p: PlaceView) => ({ x: p.x - 110, y: p.y + 40, w: 220 });
       const OLD_TOWN = ["market", "lane", "council", "chapel", "bakery", "smithy", "tavern", "chandlery"];
