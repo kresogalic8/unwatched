@@ -6,9 +6,9 @@
  * Files: /sound/manifest.json maps a layer, a one-shot, or a music bed (music-<scene>) to a file.
  * `scripts/gen-music.mjs` makes the beds with Lyria; effects can be recordings or generated any way, by the same names.
  */
-export type Scene = { weather: string; hour: number; district: string; place: string; crowd: number; season: string; mood?: MusicScene | null; /** a fire is kept where the camera is */ hearth?: boolean; /** the one the camera follows is on their feet */ walking?: boolean; wind?: number };
+export type Scene = { weather: string; hour: number; district: string; place: string; crowd: number; season: string; mood?: MusicScene | null; /** a fire is kept where the camera is */ hearth?: boolean; /** the one the camera follows is on their feet */ walking?: boolean; wind?: number; /** how near the camera is to the waterline: 1 on it, 0 well inland or out at sea */ shore?: number; /** the camera is far out, over the whole island: the near sounds fall away */ far?: boolean; /** the day is playing back fast: no clock bell, no footsteps */ fast?: boolean };
 
-export const LAYERS = ["sea", "rain", "wind", "murmur", "work", "forest", "night", "market", "hearth", "leaves"] as const;
+export const LAYERS = ["sea", "rain", "wind", "murmur", "work", "forest", "night", "market", "hearth", "leaves", "cicadas"] as const;
 export const ONESHOTS = ["gull", "bell", "horn", "creak", "thunder", "bark", "meow", "cluck", "flap", "oars", "step"] as const;
 export const MUSIC = ["day", "rain", "night", "tavern", "storm", "fog", "winter"] as const;
 export type MusicScene = (typeof MUSIC)[number];
@@ -114,6 +114,8 @@ export class Ambience {
     for (const m of MUSIC) { if (!this.manifest[`music-${m}`]) continue; this.beds.set(m, new Layer(ctx, out)); } // silent until bedFor fetches the file
     // a kept fire: a low draw up the flue and the pops of the wood, at the pace of a fire not a fuse
     make("hearth", (d) => { const low = ctx.createGain(); low.gain.value = 0.35; low.connect(d); looped(low, (n) => { n.type = "lowpass"; n.frequency.value = 140; }); const pop = () => { if (!this.ctx) return; const lv = this.layers.get("hearth")?.gain.gain.value ?? 0; if (lv > 0.01) { const t = ctx.currentTime; const src = ctx.createBufferSource(); src.buffer = noise; src.loop = true; const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1400 + Math.random() * 1800; f.Q.value = 2.5; const g = ctx.createGain(); g.gain.setValueAtTime(0.9 + Math.random() * 0.6, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.02 + Math.random() * 0.03); src.connect(f); f.connect(g); g.connect(d); src.start(t, Math.random() * 3); src.stop(t + 0.1); } setTimeout(pop, 90 + Math.random() * 420); }; pop(); });
+    // cicadas in the pines on a summer afternoon: a dry buzz, chopped fast, swelling and falling back as the chorus takes it up
+    make("cicadas", (d) => { const swell = ctx.createGain(); swell.gain.value = 0.55; swell.connect(d); lfo(swell.gain, 0.09, 0.4); const chop = ctx.createGain(); chop.gain.value = 0.5; chop.connect(swell); lfo(chop.gain, 43, 0.5, "square"); looped(chop, (n) => { n.type = "bandpass"; n.frequency.value = 5400; n.Q.value = 5; }); const hi = ctx.createGain(); hi.gain.value = 0.25; hi.connect(swell); lfo(hi.gain, 0.13, 0.2); looped(hi, (n) => { n.type = "bandpass"; n.frequency.value = 7600; n.Q.value = 9; }); });
     // dry leaves in the wind, autumn only
     make("leaves", (d) => { const f = looped(d, (n) => { n.type = "bandpass"; n.frequency.value = 3600; n.Q.value = 0.8; }); const g = ctx.createGain(); g.gain.value = 0.5; lfo(g.gain, 0.23, 0.45); lfo(f.frequency, 0.31, 900); });
     make("work", (d) => { const g = ctx.createGain(); g.gain.value = 0; g.connect(d); looped(g, (n) => { n.type = "lowpass"; n.frequency.value = 240; }); const tick = () => { if (!this.ctx) return; const t = ctx.currentTime; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.02, t + 0.18); setTimeout(tick, 900 + Math.random() * 500); }; tick(); });
@@ -147,21 +149,25 @@ export class Ambience {
     if (!this.ctx || this.muted) return;
     const night = s.hour < 6 || s.hour >= 21;
     const rain = s.weather === "rain" ? 0.5 : s.weather === "storm" ? 0.85 : 0; // snow falls without a sound
-    const coast = s.district === "harbor" || s.district === "north shore";
+    const coast = s.shore !== undefined ? s.shore > 0.45 : s.district === "harbor" || s.district === "north shore";
+    // far out over the island the near sounds (a crowd, a forge, the market) fall away under the sea and the weather
+    const near = s.far ? 0.35 : 1;
     const L = (n: LayerName) => this.layers.get(n)!;
-    L("sea").set((coast ? 0.4 : s.district === "pinewood" ? 0.1 : 0.18) * (s.weather === "storm" ? 1.6 : 1));
+    L("sea").set((s.shore !== undefined ? (s.far ? 0.26 : 0.1 + 0.34 * s.shore) : coast ? 0.4 : s.district === "pinewood" ? 0.1 : 0.18) * (s.weather === "storm" ? 1.6 : 1));
+    const hot = s.season === "summer" && s.hour >= 9 && s.hour < 19 && !rain && s.weather !== "fog" && s.weather !== "wind";
+    L("cicadas").set(hot ? (s.hour >= 12 && s.hour < 17 ? 0.13 : 0.07) * (1 - 0.6 * (s.shore ?? (coast ? 1 : 0))) * (s.district === "pinewood" || s.district === "hill" ? 1.5 : 1) : 0);
     L("rain").set(rain);
     L("wind").set(s.weather === "storm" ? 0.5 : s.weather === "wind" ? 0.4 : s.weather === "snow" ? 0.2 : s.weather === "fog" ? 0.06 : s.district === "pinewood" || s.district === "hill" ? 0.16 : 0.06);
     L("forest").set(s.district === "pinewood" && !night ? 0.3 : 0);
     L("night").set(night && !rain && s.season !== "winter" ? 0.25 : 0);
     const social = s.place === "tavern" || s.place === "inn";
-    L("murmur").set(social && s.crowd > 1 && !night ? Math.min(0.4, 0.1 + s.crowd * 0.05) : 0);
-    L("market").set(s.place === "market" && s.crowd > 2 && s.hour >= 7 && s.hour < 19 ? Math.min(0.4, 0.1 + s.crowd * 0.04) : 0);
-    L("work").set((s.place === "smithy" || s.place === "mill" || s.place === "sawpit" || s.place === "quarry") && s.hour >= 7 && s.hour < 17 ? 0.3 : 0);
+    L("murmur").set(social && s.crowd > 1 && !night ? Math.min(0.4, 0.1 + s.crowd * 0.05) * near : 0);
+    L("market").set(s.place === "market" && s.crowd > 2 && s.hour >= 7 && s.hour < 19 ? Math.min(0.4, 0.1 + s.crowd * 0.04) * near : 0);
+    L("work").set((s.place === "smithy" || s.place === "mill" || s.place === "sawpit" || s.place === "quarry") && s.hour >= 7 && s.hour < 17 ? 0.3 * near : 0);
     L("hearth").set(s.hearth ? 0.22 : 0);
     L("leaves").set(s.season === "autumn" && (s.district === "pinewood" || s.district === "hill" || s.district === "north shore") ? 0.08 + (s.wind ?? 0.2) * 0.3 : 0);
     // the one the camera follows: their steps, on cobbles in the old town and on earth everywhere else
-    this.walking = !!s.walking; if (this.walking && !this.stepAt) { this.stepAt = 1; const cob = s.district === "old town" || s.district === "harbor"; const walk = () => { if (!this.walking || this.muted || !this.ctx) { this.stepAt = 0; return; } this.step(this.master!, cob); setTimeout(walk, 400 + Math.random() * 60); }; walk(); }
+    this.walking = !!s.walking && !s.fast; if (this.walking && !this.stepAt) { this.stepAt = 1; const cob = s.district === "old town" || s.district === "harbor"; const walk = () => { if (!this.walking || this.muted || !this.ctx) { this.stepAt = 0; return; } this.step(this.master!, cob); setTimeout(walk, 400 + Math.random() * 60); }; walk(); }
     // the bed for this scene, crossfaded over a few seconds; a missing bed means silence under the effects, never a substitute
     const scene: MusicScene = s.mood ? s.mood : s.weather === "storm" ? "storm" : s.weather === "fog" ? "fog" : (s.place === "tavern" || s.place === "inn") && s.hour >= 17 && s.crowd > 1 ? "tavern" : night ? "night" : rain > 0 ? "rain" : s.season === "winter" ? "winter" : "day";
     if (scene !== this.bed) { this.bed = scene; this.bedFor(scene); for (const [m, L] of this.beds) L.set(m === scene ? 0.32 : 0, 4); }
@@ -172,6 +178,6 @@ export class Ambience {
     if (s.weather === "storm" && now - this.lastThunder > 12000 + Math.random() * 20000) { this.lastThunder = now; this.thunder(); }
     // the lighthouse sounds its horn in fog, far off unless you are on the point
     if (s.weather === "fog" && now - this.lastHorn > 24000 + Math.random() * 18000) { this.lastHorn = now; this.horn(s.district === "pinewood" ? 0.5 : 0.18); }
-    if (s.hour !== this.lastBellHour) { this.lastBellHour = s.hour; if (s.hour >= 7 && s.hour <= 20 && (s.district === "old town" || s.district === "hill")) this.bell(s.hour > 12 ? s.hour - 12 : s.hour); }
+    if (s.hour !== this.lastBellHour) { this.lastBellHour = s.hour; if (!s.fast && s.hour >= 7 && s.hour <= 20 && (s.district === "old town" || s.district === "hill")) this.bell(s.hour > 12 ? s.hour - 12 : s.hour); }
   }
 }
