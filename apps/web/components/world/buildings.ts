@@ -3,6 +3,7 @@ import { BENCH_SCALE_Y } from "./seating";
 import { Container, Graphics, Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import { HARBOR_ATLAS, HARBOR_SHEETS, LIGHT_SHEETS } from "./harbor-atlas";
 import { DALMATIAN_FOR, HOUSES, atlasName, bellAt, sailsAt, stockAt, type Kind } from "./dalmatian";
+import { CROWNS } from "./dalmatian-props";
 import { KELP, CREAM, SAGE_DARK, CORAL, WOOD, WOOD_DARK, STONE } from "./palette";
 
 /** Canonical Harbor Street atlas; only movable parts and live inventory are drawn separately. */
@@ -41,6 +42,8 @@ export const worldLight = {
   shade: { front: 0, side: 0, roof: 0 } as Record<Face, number>,
   glow: { front: 0, side: 0, roof: 0 } as Record<Face, number>,
   shadeTint: 0x5d6b8c, glowTint: 0x6a4a26,
+  /** snow settled on the roofs, or the sheen of rain on them, laid over each roof by its own mask */
+  roofCoat: 0,
 };
 /** The light masks of a drawing, for studies that shade or hatch a building by the way its surfaces face; null for anything without them. */
 export function faceTexturesFor(name: string): Record<Face, Texture> | null { return faceTextures.get(name) ?? null; }
@@ -50,6 +53,12 @@ export function setClassicHouses(on: boolean): void { classicHouses = on; }
 /** The drawing that stands where the town has a `sprite`, or null to keep the town's own. `h` is a stable 0..1 for the place, choosing its colourway. */
 export function streetHouse(sprite: string, h: number): string | null { if (classicHouses) return null; const m = DALMATIAN_FOR[sprite]; return m ? atlasName(m.kind, m.variant ?? Math.floor(h * HOUSES[m.kind].ways)) : null; }
 const kindOf = (drawing: string): Kind | null => { const m = /^dal-([a-z]+)\d*$/.exec(drawing); return m && m[1]! in HOUSES ? (m[1] as Kind) : null; };
+/** The crowns of a tree as drawn now, in its own frame: the Dalmatian trees' own, or where the classic drawings carry theirs. */
+const CLASSIC_CROWNS: Record<string, { x: number; y: number; rx: number; ry: number }[]> = {
+  "tree-large": [{ x: 0, y: -95, rx: 60, ry: 38 }], "tree-small": [{ x: 0, y: -58, rx: 37, ry: 23 }], olive: [{ x: 0, y: -62, rx: 40, ry: 25 }],
+  cypress: [{ x: 0, y: -100, rx: 9, ry: 12 }, { x: 0, y: -60, rx: 12, ry: 12 }], bush: [{ x: 0, y: -14, rx: 20, ry: 13 }],
+};
+export function treeCrowns(name: string): { x: number; y: number; rx: number; ry: number }[] { return (propDrawing(name) === name ? CLASSIC_CROWNS[name] : CROWNS[name]) ?? []; }
 /** How fast lit windows come up and go down, in seconds. */
 const WINDOW_FADE = 1.6;
 const litTarget = new WeakMap<Sprite, { to: number; at: number }>();
@@ -68,6 +77,7 @@ function harborDrawing(name: string): Drawn | null {
   if(faces)for(const face of FACES){
     const shade=over(faces[face],"light-shade:"+face);shade.blendMode="multiply";shade.onRender=()=>{shade.tint=worldLight.shadeTint;shade.alpha=worldLight.shade[face];shade.visible=shade.alpha>.004;};
     const glow=over(faces[face],"light-glow:"+face);glow.blendMode="add";glow.onRender=()=>{glow.tint=worldLight.glowTint;glow.alpha=worldLight.glow[face];glow.visible=glow.alpha>.004;};
+    if(face==="roof"){const coat=over(faces.roof,"light-coat");coat.onRender=()=>{coat.alpha=worldLight.roofCoat;coat.visible=coat.alpha>.004;};}
   }
   if(drawn === "bench") { sprite.scale.y *= BENCH_SCALE_Y; sprite.y *= BENCH_SCALE_Y; } // the old bench is drawn tall and squashed to its seat; the stone one is drawn at it
   if(/tree|olive/.test(name)) sprite.tint=season==="autumn"?0xe8c397:season==="winter"?0xbdc9c4:season==="spring"?0xe5f0cd:0xffffff;

@@ -21,7 +21,7 @@ import { Figurine } from "./world/figurine";
 type Rig = Citizen | Figurine;
 import { Ambience } from "./world/ambience";
 import { ProjectDetails, type CommunityView } from "./CommunityProjects";
-import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, setClassicHouses, streetHouse } from "./world/buildings";
+import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, setClassicHouses, streetHouse, treeCrowns } from "./world/buildings";
 import { DALMATIAN_FOR, chimneyTop, forgeAt, lanternAt } from "./world/dalmatian";
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
@@ -350,10 +350,16 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const tavern = places.get("tavern"); const konoba = !classic && !!tavern && DALMATIAN_FOR[tavern.sprite]?.kind === "konoba";
       const decor = keepOffRoads(decorFor([...places.values()]), segs).filter((d) => !(konoba && tavern && /^(terrace|parasol)$/.test(d.sprite) && Math.hypot(d.x - tavern.x, d.y - tavern.y) < 160));
       let trees: Container[] = [];
+      /** which drawing each tree is, for where its crown sits */
+      const treeKind = new WeakMap<Container, string>(); let snowCaps: Graphics[] = [];
+      /** a tree's crowns in the world: its drawing's crowns through the tree's place, size and flip */
+      const crownsOf = (t: Container) => treeCrowns(treeKind.get(t) ?? "").map((c) => ({ x: t.position.x + c.x * t.scale.x, y: t.position.y + c.y * t.scale.y, rx: c.rx * Math.abs(t.scale.x), ry: c.ry * t.scale.y }));
       const plantTrees = () => {
         treeSpecs.length = 0; // rebuilt from scratch each replant, so season changes never pile shadows up
-        for (const t of trees) t.destroy({ children: true }); trees = [];
-        for (const d of decor) { if (!/tree|bush|olive|cypress/.test(d.sprite)) continue; const sp = put(d.sprite, d.x, d.y, d.w, d.flip); if (!sp) continue; const sw = sp.width; if (sw >= 30) treeSpecs.push({ x: sp.x, y: sp.y, w: sw }); const sh = new Graphics(); sh.ellipse(d.w ? d.w * 0.12 : 8, 3, d.sprite === "tree-large" ? 40 : d.sprite === "bush" ? 12 : 26, d.sprite === "tree-large" ? 12 : d.sprite === "bush" ? 4 : 8).fill({ color: C.kelp, alpha: 0.09 }); sp.addChildAt(sh, 0); trees.push(sp); }
+        for (const t of trees) t.destroy({ children: true }); trees = []; snowCaps = [];
+        for (const d of decor) { if (!/tree|bush|olive|cypress/.test(d.sprite)) continue; const sp = put(d.sprite, d.x, d.y, d.w, d.flip); if (!sp) continue; treeKind.set(sp, d.sprite);
+          // snow settles on the top of each crown; it is part of the tree, so it sways with it and stays behind what stands in front
+          const crowns = treeCrowns(d.sprite); if (crowns.length) { const cap = new Graphics(); for (const c of crowns) { cap.ellipse(c.x, c.y - c.ry * 0.45, c.rx * 0.85, c.ry * 0.55).fill(0xffffff); cap.ellipse(c.x - c.rx * 0.25, c.y - c.ry * 0.72, c.rx * 0.45, c.ry * 0.32).fill({ color: 0xffffff, alpha: 0.9 }); } cap.alpha = 0; cap.label = "snowcap"; /* the weather step sets how much has settled */ sp.addChild(cap); snowCaps.push(cap); } const sw = sp.width; if (sw >= 30) treeSpecs.push({ x: sp.x, y: sp.y, w: sw }); const sh = new Graphics(); sh.ellipse(d.w ? d.w * 0.12 : 8, 3, d.sprite === "tree-large" ? 40 : d.sprite === "bush" ? 12 : 26, d.sprite === "tree-large" ? 12 : d.sprite === "bush" ? 4 : 8).fill({ color: C.kelp, alpha: 0.09 }); sp.addChildAt(sh, 0); trees.push(sp); }
       };
       setSeason(forcedSeason ?? clockRef.current?.season ?? townView.season ?? "summer");
       for (const d of decor) { if (/tree|bush|olive|cypress/.test(d.sprite)) continue; put(d.sprite, d.x, d.y, d.w, d.flip); }
@@ -443,7 +449,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         let spot = { x: moor.x - 300, y: moor.y - 160 }; for (let i = 0; i < 80 && inside(spot.x, spot.y) < 1.18; i++) spot = { x: spot.x - 8, y: spot.y - 3 };
         return new Life({
           perches, catSpots, dogHome: { x: harbor.x + 80, y: harbor.y + 70 }, yard: { x: f.x + 150, y: f.y + 200, r: 70 },
-          trees: () => trees.map((t) => ({ x: t.position.x, y: t.position.y, h: t.scale.x > 1.3 ? 70 : 44, orchard: Math.hypot(t.position.x - o.x, t.position.y - o.y) < 260 })),
+          trees: () => trees.map((t) => ({ x: t.position.x, y: t.position.y, h: Math.max(20, ...crownsOf(t).map((c) => t.position.y - c.y), 20), orchard: Math.hypot(t.position.x - o.x, t.position.y - o.y) < 260 })),
           flag: { x: (pier?.x ?? harbor.x - 250) - 118, y: (pier?.y ?? harbor.y + 40) - 12 }, moor, spot, lantern: !classic && DALMATIAN_FOR[(lh as PlaceView).sprite ?? ""] ? { x: lh.x + lanternAt()[0], y: lh.y + lanternAt()[1] } : { x: lh.x, y: lh.y - 233 },
           meadows: [{ x: f.x - 40, y: f.y + 140, r: 220 }, { x: o.x, y: o.y + 40, r: 200 }, { x: pw.x - 60, y: pw.y + 120, r: 180 }], roosts: [{ x: lh.x, y: lh.y - 100 }, { x: ch.x, y: ch.y - 70 }],
         }, scene);
@@ -727,11 +733,14 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         snowiness += ((snowing ? 1 : 0) - snowiness) * ease(snowing ? 0.0015 : winter ? 0.0002 : 0.001);
         harborSurface.update(wetness,detailSeconds);
         wetGround.alpha = 0.12 * wetness; snowGround.alpha = 0.6 * snowiness;
+        worldLight.roofCoat = classic ? 0 : Math.max(0.82 * snowiness, 0.14 * wetness); // snow on every roof, or the sheen of rain, cut to the roof's own shape
         // snow settles on every roof and crown; rain leaves the roofs shining; footprints cross the snow and fill in
         if (every(15)) {
           caps.clear();
-          if (snowiness > 0.05) { for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild" || p.kind === "public") continue; caps.ellipse(p.x + 8, p.y - 64, 54, 15).fill({ color: 0xffffff, alpha: 0.8 * snowiness }); caps.ellipse(p.x - 30, p.y - 50, 26, 9).fill({ color: 0xffffff, alpha: 0.6 * snowiness }); } for (const t of trees) caps.ellipse(t.position.x, t.position.y - (t.scale.x > 1.3 ? 70 : 44), 22, 9).fill({ color: 0xffffff, alpha: 0.7 * snowiness }); }
-          if (wetness > 0.05) for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild" || p.kind === "public") continue; caps.ellipse(p.x + 12, p.y - 66, 40, 9).fill({ color: 0xffffff, alpha: 0.16 * wetness }); }
+          // the classic drawings carry no roof masks: their snow and sheen are ellipses where their roofs roughly are
+          if (classic && snowiness > 0.05) for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild" || p.kind === "public") continue; caps.ellipse(p.x + 8, p.y - 64, 54, 15).fill({ color: 0xffffff, alpha: 0.8 * snowiness }); caps.ellipse(p.x - 30, p.y - 50, 26, 9).fill({ color: 0xffffff, alpha: 0.6 * snowiness }); }
+          if (classic && wetness > 0.05) for (const p of places.values()) { if (p.kind === "plot" || p.kind === "wild" || p.kind === "public") continue; caps.ellipse(p.x + 12, p.y - 66, 40, 9).fill({ color: 0xffffff, alpha: 0.16 * wetness }); }
+          for (const cap of snowCaps) cap.alpha = 0.8 * snowiness;
           prints_.clear(); for (const pr of prints) { const ageT = (tick - pr.at) / 900; if (ageT > 1) continue; prints_.ellipse(pr.x, pr.y, 3, 1.6).fill({ color: C.kelp, alpha: 0.18 * (1 - ageT) * snowiness }); }
         }
         if (every(60) && c && setSeason(forcedSeason ?? c.season)) { plantTrees(); }

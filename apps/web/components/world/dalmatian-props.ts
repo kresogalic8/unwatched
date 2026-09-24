@@ -369,5 +369,11 @@ export const PROPS: Record<string, { w: number; draw: (d: Draw) => void; lit?: (
   rock: { w: 48, draw: rock }, wall: { w: 130, draw: wall }, fence: { w: 140, draw: fence }, washing: { w: 140, draw: washing }, cloth: { w: 140, draw: cloth },
   sawpit: { w: 150, draw: sawpit }, quarry: { w: 190, draw: quarry }, field: { w: 180, draw: field }, orchard: { w: 180, draw: orchard },
 };
+/** Where each tree's crowns sit in its own frame, as ellipses: snow settles on their tops and leaves fall from them. */
+export const CROWNS: Record<string, { x: number; y: number; rx: number; ry: number }[]> = {
+  "tree-large": [{ x: -34, y: -108, rx: 32, ry: 11 }, { x: 34, y: -114, rx: 34, ry: 12 }, { x: 4, y: -130, rx: 38, ry: 13 }],
+  "tree-small": [{ x: 0, y: -62, rx: 38, ry: 30 }], olive: [{ x: 0, y: -60, rx: 46, ry: 26 }],
+  cypress: [{ x: 0, y: -108, rx: 7, ry: 10 }, { x: 0, y: -78, rx: 11, ry: 9 }, { x: 0, y: -46, rx: 13, ry: 8 }], bush: [{ x: 0, y: -14, rx: 26, ry: 15 }],
+};
 /** One prop as SVG, in its own frame with the origin at its foot. */
 export function propSvg(name: string, lit = false): string | null { const p = PROPS[name]; if (!p) return null; const d = new Draw(); (lit && p.lit ? p.lit : p.draw)(d); return d.svg(); }
