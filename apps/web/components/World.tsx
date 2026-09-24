@@ -21,7 +21,7 @@ import { Figurine } from "./world/figurine";
 type Rig = Citizen | Figurine;
 import { Ambience } from "./world/ambience";
 import { ProjectDetails, type CommunityView } from "./CommunityProjects";
-import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, setClassicHouses, streetHouse, treeCrowns } from "./world/buildings";
+import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, nightGlow, clearNightGlow, setClassicHouses, streetHouse, treeCrowns } from "./world/buildings";
 import { DALMATIAN_FOR, chimneyTop, forgeAt, kindOfDrawing, lanternAt, signPlacement } from "./world/dalmatian";
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
@@ -404,9 +404,15 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const smoke = new Graphics(); smoke.zIndex = 190000; scene.addChild(smoke);
       const fog = new Graphics(); fog.zIndex = 210000; scene.addChild(fog);
       const flash = new Graphics(); flash.rect(-3000, -3000, W + 6000, H + 6000).fill(0xffffff); flash.alpha = 0; world.addChild(flash); let nextBolt = 0;
-      const night = new Graphics(); night.rect(-3000, -3000, W + 6000, H + 6000).fill(LIGHT.night); night.alpha = 0; world.addChild(night);
+      // night is its own look, not the day under a veil: the dark multiplies the colours down into a moonlit blue, so the stone stays stone and the
+      // lamps and windows stay warm, where a flat navy laid over the top greyed everything into haze. ?nofx=nightlook shows the old veil.
+      const nightLook = !nofx.has("nightlook");
+      const night = new Graphics(); night.rect(-3000, -3000, W + 6000, H + 6000).fill(LIGHT.night); night.alpha = 0; world.addChild(night); // its alpha is how dark the island reckons it, 0 to .42
+      const moonlit = new Graphics(); moonlit.rect(-3000, -3000, W + 6000, H + 6000).fill(LIGHT.moon); moonlit.blendMode = "multiply"; moonlit.alpha = 0; world.addChild(moonlit);
+      if (nightLook) night.renderable = false; else moonlit.visible = false;
+      world.addChild(nightGlow); // lit windows, added back over the moonlit dark
       // the GPU's share, behind a switch so the old street and the new can be compared: night the lights cut through, and water that moves
-      const lighting = new Lighting(world, W, H); const water = new WaterFilter(); let effectsOn = false;
+      const lighting = new Lighting(world, W, H, nightLook); const water = new WaterFilter(); let effectsOn = false;
       water.island(cx, cy, Rx, Ry);
       const lightArea = new Rectangle(); lighting.dark.filterArea = lightArea; lighting.glow.filterArea = lightArea;
       // the ground shadows soften at their edges the way a real sun's do; blurred over the screen only, like the light layers
@@ -769,7 +775,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         const rise = hm(c?.sunrise) ?? 6.5, set = hm(c?.sunset) ?? 19.5;
         const nightAmt = (hour < rise - 1 ? 0.42 : hour < rise + 0.5 ? 0.42 * (rise + 0.5 - hour) / 1.5 : hour < set - 0.5 ? 0 : hour < set + 1 ? 0.42 * (hour - (set - 0.5)) / 1.5 : 0.42) + (weather === "storm" ? 0.12 : weather === "rain" ? 0.05 : 0);
         const duskAmt = Math.abs(hour - rise) < 1 ? 0.16 * (1 - Math.abs(hour - rise)) : Math.abs(hour - set) < 1 ? 0.2 * (1 - Math.abs(hour - set)) : 0;
-        night.alpha += (nightAmt - night.alpha) * ease(0.05); dusk.alpha += (duskAmt - dusk.alpha) * ease(0.05);
+        night.alpha += (nightAmt - night.alpha) * ease(0.05); dusk.alpha += (duskAmt - dusk.alpha) * ease(0.05); moonlit.alpha = 0.85 * Math.min(1, night.alpha / 0.42) * Math.max(0, 1 - flash.alpha * 1.4); worldLight.windowGlow = nightLook ? Math.min(1, night.alpha / 0.3) : 0;
         perfMark("life");
         for (let s = 0; s < steps; s++) cartTick();
         post.update(viewRef.current, night.alpha / 0.42, effectsOn && !nofx.has("post"), tick, nofx.has("grade") ? NEUTRAL : gradeNow);
@@ -823,7 +829,10 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
             const lit = { front: Math.max(0, L[1]), side: Math.max(0, L[0]), roof: Math.max(0, 0.6 * L[1] + 0.8 * L[2]) };
             const day = up && !nofx.has("facelight") ? Math.max(0, 1 - night.alpha / 0.42) : 0; const contrast = 0.38 * day * (1 - cover * 0.8); const rake = 0.55 * golden * (1 - cover) * day;
             for (const face of ["front", "side", "roof"] as const) { worldLight.shade[face] = contrast * Math.max(0, 0.55 - lit[face]) / 0.55; worldLight.glow[face] = rake * lit[face]; }
-            worldLight.shadeTint = mix(0x5d6b8c, 0x6a5f86, golden); worldLight.glowTint = mix(0x66502a, phase === "rise" ? 0x63501f : 0x6a4620, 0.5); }
+            worldLight.shadeTint = mix(0x5d6b8c, 0x6a5f86, golden); worldLight.glowTint = mix(0x66502a, phase === "rise" ? 0x63501f : 0x6a4620, 0.5);
+            // by night the moon does the sun's work, coldly: the roofs catch it, the walls turned from it fall into shade
+            const moon = nightLook && !nofx.has("facelight") ? Math.min(1, night.alpha / 0.42) * (1 - cover * 0.85) * (0.45 + 0.55 * (1 - Math.cos(moonPhase() * Math.PI * 2)) / 2) : 0;
+            if (moon > 0.01) { worldLight.glow.roof = 0.42 * moon; worldLight.glow.front = 0.06 * moon; worldLight.glow.side = 0; worldLight.shade.side = 0.42 * moon; worldLight.shade.front = 0.12 * moon; worldLight.shade.roof = 0; worldLight.glowTint = 0x34466a; worldLight.shadeTint = 0x3b4775; } }
           gradeNow = gradeFor({ golden: golden * (1 - cover * 0.7), blue: blue * (1 - cover * 0.4), night: Math.min(1, night.alpha / 0.42), cover, weather });
           const shadeTint = mix(LIGHT.night, 0x1b2140, blue * (1 - cover));
           water.update({ time: (still ? ft * 0.3 : ft) / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
@@ -833,7 +842,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
               sources.push({ x: d.x + 14, y: d.y - 58, r: 90, color: LIGHT.lamp, strength: .72, flicker: .025 });
               sources.push({ x: d.x + 18, y: d.y + 2, r: 62, aspect: .38, color: LIGHT.lamp, strength: .42 });
             }
-            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && p.kind !== "harbor" && p.kind !== "market") { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
+            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && (p.kind !== "harbor" || drawn.has(p.id)) && p.kind !== "market") { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
           sources.push(...life.lights);
@@ -858,7 +867,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           sky.circle(mx, my, 70).fill({ color: LIGHT.lamp, alpha: 0.05 * full }); sky.circle(mx, my, 44).fill({ color: LIGHT.lamp, alpha: 0.07 * full });
           if (every(4200) && !still) falling.set(tick, { x: 200 + ((tick * 7919) % (W - 400)), y: -500 + ((tick * 104729) % 300) });
           for (const [t0, st] of falling) { const age = (tick - t0) / 28; if (age > 1) { falling.delete(t0); continue; } const x = st.x + age * 260, y = st.y + age * 90; sky.moveTo(x - 60 * (1 - age), y - 20 * (1 - age)).lineTo(x, y).stroke({ width: 2, color: LIGHT.star, alpha: 0.9 * (1 - age), cap: "round" }); }
-          sky.circle(mx, my, 28).fill(LIGHT.lamp); if (full < 0.98) sky.circle(mx + (ph < 0.5 ? -1 : 1) * 58 * full, my, 29).fill({ color: 0x1b2a30, alpha: 0.94 }); // the earth's shadow slides off as the moon fills
+          sky.circle(mx, my, 28).fill({ color: 0x2e3a52, alpha: 0.5 }); // the dark of the moon, faintly there
+          sky.circle(mx, my, 28).fill(LIGHT.lamp); if (full < 0.98) sky.circle(mx + (ph < 0.5 ? -1 : 1) * 58 * full, my, 29).cut(); // the earth's shadow slides off as the moon fills
           for (let i = 0; i < 9; i++) { const yy = my + 60 + i * 34; if (inside(mx, yy) < 1.1) break; sky.moveTo(mx - 14 - (i % 3) * 8 + Math.sin(tick / 30 + i) * 6, yy).lineTo(mx + 14 + (i % 2) * 10 + Math.sin(tick / 30 + i) * 6, yy).stroke({ width: 2.5, color: LIGHT.lamp, alpha: 0.35 - i * 0.03, cap: "round" }); }
           // the quay's lamps on the water
           for (const d of decor) if (d.sprite === "lamp" && inside(d.x, d.y + 120) > 0.96) for (let i = 0; i < 4; i++) { const yy = d.y + 70 + i * 22; sky.moveTo(d.x - 8 + Math.sin(tick / 25 + i) * 4, yy).lineTo(d.x + 8 + Math.sin(tick / 25 + i) * 4, yy).stroke({ width: 2, color: LIGHT.lamp, alpha: 0.35 - i * 0.07, cap: "round" }); }
@@ -967,7 +977,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         perfMark("end");
       });
     })().catch(() => { if(alive) setLoadError(true); });
-    return () => { alive = false; stopWatching?.(); cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
+    return () => { alive = false; stopWatching?.(); cameraControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); clearNightGlow(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineId, apiUrl]);
 

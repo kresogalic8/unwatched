@@ -1,7 +1,7 @@
 import { gardenArt } from "./garden-art";
 import { BENCH_SCALE_Y } from "./seating";
-import { Container, Graphics, Assets, Rectangle, Sprite, Texture } from "pixi.js";
-import { HARBOR_ATLAS, HARBOR_SHEETS, LIGHT_SHEETS } from "./harbor-atlas";
+import { Container, Graphics, Assets, Matrix, Rectangle, Sprite, Texture } from "pixi.js";
+import { HARBOR_ATLAS, HARBOR_SHEETS, LIGHT_SHEETS, GLOW_SHEETS } from "./harbor-atlas";
 import { DALMATIAN_FOR, HOUSES, atlasName, bellAt, kindOfDrawing, sailsAt, stockAt } from "./dalmatian";
 import { CROWNS } from "./dalmatian-props";
 import { KELP, CREAM, SAGE_DARK, CORAL, WOOD, WOOD_DARK, STONE } from "./palette";
@@ -21,14 +21,17 @@ const atlasTextures = new Map<string, Texture>();
 type Face = "front" | "side" | "roof";
 const FACES: Face[] = ["front", "side", "roof"];
 const faceTextures = new Map<string, Record<Face, Texture>>();
+/** Each lit drawing's window glow and the box it covers in the drawing's own units. */
+const glowTextures = new Map<string, { texture: Texture; box: readonly number[] }>();
 let atlasReady: Promise<void> | null = null;
 /** Full SVG rasterization at 3x keeps the study's transforms intact; the drawings arrive packed on a few WebP sheets, so the street is a handful of requests and batches as one. */
 export function loadWorldArt(): Promise<void> {
-  if (!atlasReady) atlasReady = Promise.all([Promise.all(HARBOR_SHEETS.map((src)=>Assets.load<Texture>(src))), Promise.all(LIGHT_SHEETS.map((src)=>Assets.load<Texture>(src)))]).then(([sheets,lightSheets])=>{
+  if (!atlasReady) atlasReady = Promise.all([Promise.all(HARBOR_SHEETS.map((src)=>Assets.load<Texture>(src))), Promise.all(LIGHT_SHEETS.map((src)=>Assets.load<Texture>(src))), Promise.all(GLOW_SHEETS.map((src)=>Assets.load<Texture>(src)))]).then(([sheets,lightSheets,glowSheets])=>{
     const cut=(from:Texture[],[s,x,y,w,h]:readonly number[])=>{const sheet=from[s!];return sheet?new Texture({source:sheet.source,frame:new Rectangle(x!,y!,w!,h!)}):null;};
     for (const [name,asset] of Object.entries(HARBOR_ATLAS)) {
       const t=cut(sheets,[asset.sheet,...asset.frame]); if(t)atlasTextures.set(name,t);
       if("faces" in asset){const f={front:cut(lightSheets,asset.faces.front),side:cut(lightSheets,asset.faces.side),roof:cut(lightSheets,asset.faces.roof)};if(f.front&&f.side&&f.roof)faceTextures.set(name,f as Record<Face,Texture>);}
+      if("glow" in asset){const t=cut(glowSheets,asset.glow);if(t)glowTextures.set(name,{texture:t,box:asset.glowBox});}
     }
   }).catch(error=>{atlasReady=null;throw error;});
   return atlasReady;
@@ -44,6 +47,29 @@ export const worldLight = {
   shadeTint: 0x5d6b8c, glowTint: 0x6a4a26,
   /** snow settled on the roofs, or the sheen of rain on them, laid over each roof by its own mask */
   roofCoat: 0,
+  /** how strongly lit windows glow above the night: 0 by day and under the old veil, up to 1 in the moonlit dark */
+  windowGlow: 0,
+};
+/**
+ * The warm light of lit windows, drawn above the night so the moonlit multiply cannot dim it. Each glow is the lamps' share of a lit
+ * drawing (the atlas's <name>-glow: what the lit twin adds over the dark one) and follows its lit twin: where it stands, how far it has faded in.
+ * The town puts this layer over the night; the glows are added, not laid over, so they warm what is under them.
+ */
+export const nightGlow = new Container();
+const glows: { lit: Sprite; glow: Sprite; local: Matrix }[] = [];
+/** Let go of every glow, when the town that drew them goes. */
+export function clearNightGlow(): void { for (const g of glows) g.glow.destroy(); glows.length = 0; nightGlow.removeFromParent(); }
+const onStage = (c: Container) => { let p: Container | null = c.parent; while (p) { if (!p.visible) return false; if (p === nightGlow.parent) return true; p = p.parent; } return false; };
+nightGlow.onRender = () => {
+  const k = worldLight.windowGlow; if (k <= 0.004) { for (const g of glows) g.glow.visible = false; return; }
+  const inv = nightGlow.worldTransform.clone().invert();
+  for (let i = glows.length - 1; i >= 0; i--) {
+    const { lit, glow, local } = glows[i]!;
+    if (lit.destroyed) { glow.destroy(); glows.splice(i, 1); continue; }
+    glow.visible = lit.alpha > 0.004 && onStage(lit);
+    if (!glow.visible) continue;
+    glow.setFromMatrix(inv.clone().append(lit.parent!.worldTransform).append(local)); glow.alpha = lit.alpha * k;
+  }
 };
 /** The light masks of a drawing, for studies that shade or hatch a building by the way its surfaces face; null for anything without them. */
 export function faceTexturesFor(name: string): Record<Face, Texture> | null { return faceTextures.get(name) ?? null; }
@@ -71,7 +97,8 @@ function harborDrawing(name: string): Drawn | null {
   const over=(t:Texture,label:string)=>{const s=new Sprite(t);s.label=label;s.position.set(asset.x,asset.y);s.width=asset.width;s.height=asset.height;c.addChild(s);return s;};
   // the lit drawing lies over the dark one and fades in when someone is home, rather than switching
   const litTexture=atlasTextures.get(drawn+"-lit");
-  if(litTexture){const lit=over(litTexture,"harbor-lit:"+drawn);lit.alpha=0;lit.onRender=()=>{const tg=litTarget.get(lit);if(!tg)return;const now=performance.now()/1000;const step=Math.min(1,(now-tg.at)/WINDOW_FADE);tg.at=now;lit.alpha+=(tg.to-lit.alpha)*Math.min(1,step*3);lit.visible=lit.alpha>.004;};}
+  if(litTexture){const lit=over(litTexture,"harbor-lit:"+drawn);lit.alpha=0;
+    const g=glowTextures.get(drawn);if(g){const [bx,by,bw,bh]=g.box as [number,number,number,number];const glow=new Sprite(g.texture);glow.blendMode="add";glow.visible=false;nightGlow.addChild(glow);glows.push({lit,glow,local:new Matrix(bw/g.texture.width,0,0,bh/g.texture.height,bx,by)});}lit.onRender=()=>{const tg=litTarget.get(lit);if(!tg)return;const now=performance.now()/1000;const step=Math.min(1,(now-tg.at)/WINDOW_FADE);tg.at=now;lit.alpha+=(tg.to-lit.alpha)*Math.min(1,step*3);lit.visible=lit.alpha>.004;};}
   // the sun on each face: shade where a wall turns from it, a warm rake where a low sun catches it
   const faces=faceTextures.get(drawn);
   if(faces)for(const face of FACES){
