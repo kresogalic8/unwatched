@@ -23,3 +23,26 @@ jobs:
       # ten days of the island with the mock brain, no keys: the town must run and people must build
       - run: pnpm --filter @unwatched/headless soak -- --days 10 --agents 20 --brain mock --seed 7 --tick 1
       - run: grep -q "finished" apps/headless/out/gazette-day*.md
+  # the island photographed at fixed hours, weathers and looks, compared with the pictures kept in apps/web/e2e/__screenshots__.
+  # Linux draws antialiasing its own way, so it keeps its own pictures (*-linux.png); one not yet kept is taken, the run passes,
+  # and the new pictures come back in the artifact to be committed.
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @unwatched/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @unwatched/web test:visual --update-snapshots=missing
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual
+          retention-days: 7
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            apps/web/e2e/__screenshots__/*-linux.png

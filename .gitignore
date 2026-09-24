@@ -21,3 +21,7 @@ apps/headless/out-mock
 
 # the atlas generator's cache of drawn rasters and sheets, by content (apps/web/scripts/gen-harbor.tsx)
 apps/web/.cache/
+
+# visual regression runs (the kept pictures are in apps/web/e2e/__screenshots__)
+apps/web/playwright-report/
+apps/web/test-results/

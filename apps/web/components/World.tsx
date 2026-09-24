@@ -1029,7 +1029,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
   const showLabels = view === "street" || z > 0.6;
 
   return (
-    <div className={`absolute inset-0 overflow-hidden rounded-[28px] bg-glass ${observer ? townStyle.world : ""}`}>
+    <div data-world-ready={ready ? "1" : undefined} className={`absolute inset-0 overflow-hidden rounded-[28px] bg-glass ${observer ? townStyle.world : ""}`}>
       <div ref={host} className="absolute inset-0" />
       {!ready && <div className="absolute inset-0 flex flex-col gap-3 items-center justify-center text-teal font-bold">{loadError ? <>The island could not be loaded.<button className="underline" onClick={()=>window.location.reload()}>Try again</button></> : "Crossing to the island…"}</div>}
       <div className="absolute inset-0 pointer-events-none crossfade" style={{ background: "radial-gradient(ellipse at center, rgba(30,42,43,0) 55%, rgba(30,42,43,0.22) 100%)", opacity: view === "map" ? 0.5 : view === "cinema" ? 1 : 0.7 }} />
