@@ -18,3 +18,6 @@ apps/headless/out-mock
 
 # Generated local email previews
 /artifacts/email-preview/
+
+# the atlas generator's cache of drawn rasters and sheets, by content (apps/web/scripts/gen-harbor.tsx)
+apps/web/.cache/

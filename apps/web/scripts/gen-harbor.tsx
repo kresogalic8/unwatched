@@ -2,7 +2,7 @@
 import React from 'react';
 import { createHash } from 'node:crypto';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import { House, HouseFaces, HOUSE_SPECS, Tree, Barrel, Lamp, Table, Boat, Pot, P } from '../components/world/harbor-art';
@@ -17,6 +17,18 @@ const drawings:{name:string;png:Buffer;pw:number;ph:number}[]=[];
 /** Light masks: where each building faces the lane, faces along it, or faces the sky, as white on clear, at half the art's resolution. */
 const masks:{name:string;png:Buffer;pw:number;ph:number}[]=[];const faceSource:Record<string,string>={};
 const directory=new URL('../public/harbor/',import.meta.url);mkdirSync(directory,{recursive:true});
+/**
+ * Every costly step is kept by what went into it: a drawing's box and raster by its SVG, the light masks by theirs, a glow by the two
+ * rasters it compares, a sheet by what is on it and where. A drawing that has not changed is read back instead of drawn again, so a
+ * run after a small change takes seconds. Change SALT to throw the lot away.
+ */
+const SALT='harbor-cache-1',CACHE=new URL('../.cache/harbor/',import.meta.url);mkdirSync(CACHE,{recursive:true});
+const keyOf=(...parts:(string|Buffer)[])=>{const h=createHash('sha256').update(SALT);for(const p of parts)h.update(p);return h.digest('hex').slice(0,32);};
+const stats={hit:0,miss:0},started=performance.now();
+function kept(key:string,make:()=>Buffer):Buffer{const f=new URL(key,CACHE);if(existsSync(f)){stats.hit++;return readFileSync(f);}stats.miss++;const b=make();writeFileSync(f,b);return b;}
+async function keptAsync(key:string,make:()=>Promise<Buffer>):Promise<Buffer>{const f=new URL(key,CACHE);if(existsSync(f)){stats.hit++;return readFileSync(f);}stats.miss++;const b=await make();writeFileSync(f,b);return b;}
+/** a PNG's size, from its header */
+const pngSize=(b:Buffer)=>({width:b.readUInt32BE(16),height:b.readUInt32BE(20)});
 const pending:Promise<void>[]=[];
 /** Every drawing's raster by name, so a lit twin can be compared with the dark one it lies over. */
 const rasters=new Map<string,Buffer>();
@@ -31,16 +43,23 @@ function addLit(name:string,dark:React.ReactNode,lit:React.ReactNode,w:number,an
  const crop=union(sourceOf(name,dark,anchor,scale).crop,sourceOf(name+'-lit',lit,anchor,scale).crop),ZOOM=3;
  add(name,dark,w,anchor,scale,faces,crop);add(name+'-lit',lit,w,anchor,scale,undefined,crop);
  const a=rasters.get(name)!,b=rasters.get(name+'-lit')!;
- pending.push(Promise.all([sharp(a).ensureAlpha().raw().toBuffer({resolveWithObject:true}),sharp(b).ensureAlpha().raw().toBuffer({resolveWithObject:true})]).then(async([da,db])=>{
-  const n=da.info.width*da.info.height,out=Buffer.alloc(n*4);const lum=(d:Buffer,i:number)=>(0.2126*d[i]!+0.7152*d[i+1]!+0.0722*d[i+2]!)*d[i+3]!/65025;
-  const W=da.info.width;let x0=W,y0=da.info.height,x1=-1,y1=-1;
-  for(let i=0;i<n*4;i+=4){const gain=lum(db.data,i)-lum(da.data,i);if(gain<=0.02)continue;out[i]=db.data[i]!;out[i+1]=db.data[i+1]!;out[i+2]=db.data[i+2]!;out[i+3]=Math.min(255,Math.round(gain*2.4*255));const px=(i/4)%W,py=Math.floor(i/4/W);x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);}
-  if(x1<0)return; // nothing the lamps change
-  x0=Math.max(0,x0-4);y0=Math.max(0,y0-4);x1=Math.min(W-1,x1+4);y1=Math.min(da.info.height-1,y1+4);const bw=x1-x0+1,bh=y1-y0+1;
-  const pw=Math.max(1,Math.round(bw/2)),ph=Math.max(1,Math.round(bh/2));
-  const png=await sharp(out,{raw:{width:W,height:da.info.height,channels:4}}).extract({left:x0,top:y0,width:bw,height:bh}).resize(pw,ph).png().toBuffer();
-  glowItems.push({name,png,pw,ph});glowBoxes.set(name,[crop.x+x0/ZOOM,crop.y+y0/ZOOM,bw/ZOOM,bh/ZOOM]);
- }));
+ pending.push((async()=>{
+  // the glow and where it sits in the crop, kept by the two rasters it was taken from
+  const key=keyOf('glow',a,b);const meta=new URL(key+'.json',CACHE);
+  if(!existsSync(meta)){stats.miss++;
+   const [da,db]=await Promise.all([sharp(a).ensureAlpha().raw().toBuffer({resolveWithObject:true}),sharp(b).ensureAlpha().raw().toBuffer({resolveWithObject:true})]);
+   const n=da.info.width*da.info.height,out=Buffer.alloc(n*4);const lum=(d:Buffer,i:number)=>(0.2126*d[i]!+0.7152*d[i+1]!+0.0722*d[i+2]!)*d[i+3]!/65025;
+   const W=da.info.width;let x0=W,y0=da.info.height,x1=-1,y1=-1;
+   for(let i=0;i<n*4;i+=4){const gain=lum(db.data,i)-lum(da.data,i);if(gain<=0.02)continue;out[i]=db.data[i]!;out[i+1]=db.data[i+1]!;out[i+2]=db.data[i+2]!;out[i+3]=Math.min(255,Math.round(gain*2.4*255));const px=(i/4)%W,py=Math.floor(i/4/W);x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);}
+   if(x1<0){writeFileSync(meta,'null');return;} // nothing the lamps change
+   x0=Math.max(0,x0-4);y0=Math.max(0,y0-4);x1=Math.min(W-1,x1+4);y1=Math.min(da.info.height-1,y1+4);const bw=x1-x0+1,bh=y1-y0+1;
+   const png=await sharp(out,{raw:{width:W,height:da.info.height,channels:4}}).extract({left:x0,top:y0,width:bw,height:bh}).resize(Math.max(1,Math.round(bw/2)),Math.max(1,Math.round(bh/2))).png().toBuffer();
+   writeFileSync(new URL(key+'.png',CACHE),png);writeFileSync(meta,JSON.stringify({x0,y0,bw,bh}));
+  } else stats.hit++;
+  const m=JSON.parse(readFileSync(meta,'utf8')) as {x0:number;y0:number;bw:number;bh:number}|null;if(!m)return;
+  const png=readFileSync(new URL(key+'.png',CACHE)),sz=pngSize(png);
+  glowItems.push({name,png,pw:sz.width,ph:sz.height});glowBoxes.set(name,[crop.x+m.x0/ZOOM,crop.y+m.y0/ZOOM,m.bw/ZOOM,m.bh/ZOOM]);
+ })());
 }
 type Crop={x:number;y:number;width:number;height:number};
 /** A drawing as SVG on a large canvas, and the box it covers there. */
@@ -48,7 +67,8 @@ function sourceOf(name:string,node:React.ReactNode,anchor:[number,number],scale:
  const svg=renderToStaticMarkup(<svg xmlns="http://www.w3.org/2000/svg"><g transform={`scale(${scale}) translate(${-anchor[0]} ${-anchor[1]})`}>{node}</g></svg>)
  .replace(/<text\b[^>]*>[\s\S]*?<\/text>/g,'').replace(/\sfilter="[^"]*"/g,'').replace(/<polygon\b[^>]*fill="url\([^>]*\/>/g,'');
  const source=svg.replace('<svg ', '<svg width="1000" height="1000" viewBox="-500 -500 1000 1000" ');
- const bounds=new Resvg(source).getBBox();if(!bounds)throw new Error(`Empty artwork: ${name}`);
+ const box=kept(keyOf('bbox',source)+'.json',()=>{const b=new Resvg(source).getBBox();return Buffer.from(JSON.stringify(b?{x:b.x,y:b.y,width:b.width,height:b.height}:null));});
+ const bounds=JSON.parse(box.toString()) as {x:number;y:number;width:number;height:number}|null;if(!bounds)throw new Error(`Empty artwork: ${name}`);
  return {source,crop:{x:Math.floor(bounds.x)-2,y:Math.floor(bounds.y)-2,width:Math.ceil(bounds.width)+4,height:Math.ceil(bounds.height)+4} as Crop};
 }
 const union=(a:Crop,b:Crop):Crop=>{const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return {x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
@@ -56,21 +76,26 @@ function add(name:string,node:React.ReactNode,w:number,anchor:[number,number],sc
  const {source,crop:own}=sourceOf(name,node,anchor,scale);
  const {x,y,width,height}=crop??own;
  const cropped=source.replace('viewBox="-500 -500 1000 1000"',`viewBox="${x} ${y} ${width} ${height}"`).replace('width="1000" height="1000"',`width="${width}" height="${height}"`);
- const rendered=new Resvg(cropped,{fitTo:{mode:'zoom',value:3}}).render(),png=rendered.asPng();
+ const png=kept(keyOf('art',cropped)+'.png',()=>new Resvg(cropped,{fitTo:{mode:'zoom',value:3}}).render().asPng());const rendered=pngSize(png);
  writeFileSync(new URL(name+'.png',directory),png);drawings.push({name,png,pw:rendered.width,ph:rendered.height});rasters.set(name,png);
  const version=createHash('sha256').update(png).digest('hex').slice(0,10);
  assets[name]={src:'/harbor/'+name+'.png?v='+version,w:w*scale,x,y,width,height};
  if(faces){
   // the face map in the same crop as the art, split by colour into three coverage masks
   const fsvg=renderToStaticMarkup(<svg xmlns="http://www.w3.org/2000/svg" width={width} height={height} viewBox={`${x} ${y} ${width} ${height}`}><g transform={`scale(${scale}) translate(${-anchor[0]} ${-anchor[1]})`}>{faces}</g></svg>);
-  const fpng=new Resvg(fsvg,{fitTo:{mode:'zoom',value:1.5}}).render().asPng();
-  pending.push(sharp(fpng).ensureAlpha().raw().toBuffer({resolveWithObject:true}).then(async({data,info})=>{
+  const fkey=keyOf('faces',fsvg);let raw:Promise<{data:Buffer;info:{width:number;height:number}}>|null=null;
+  const rawFaces=()=>raw??=sharp(new Resvg(fsvg,{fitTo:{mode:'zoom',value:1.5}}).render().asPng()).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  pending.push((async()=>{
    for(const [c,face] of (['front','side','roof'] as const).entries()){
-    const out=Buffer.alloc(info.width*info.height*4);
-    for(let i=0;i<info.width*info.height;i++){out[i*4]=out[i*4+1]=out[i*4+2]=255;out[i*4+3]=Math.round(data[i*4+c]!*data[i*4+3]!/255);}
-    masks.push({name:name+':'+face,png:await sharp(out,{raw:{width:info.width,height:info.height,channels:4}}).png().toBuffer(),pw:info.width,ph:info.height});
+    const png=await keptAsync(fkey+'-'+face+'.png',async()=>{
+     const {data,info}=await rawFaces();
+     const out=Buffer.alloc(info.width*info.height*4);
+     for(let i=0;i<info.width*info.height;i++){out[i*4]=out[i*4+1]=out[i*4+2]=255;out[i*4+3]=Math.round(data[i*4+c]!*data[i*4+3]!/255);}
+     return sharp(out,{raw:{width:info.width,height:info.height,channels:4}}).png().toBuffer();
+    });
+    const sz=pngSize(png);masks.push({name:name+':'+face,png,pw:sz.width,ph:sz.height});
    }
-  }));
+  })());
  }
 }
 for(const [name,w,d,h,cafe,color,side] of HOUSE_SPECS) { addLit(name,<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={color} side={side}/>,<House u={0} v={0} w={w} d={d} h={h} name="" cafe={cafe} color={color} side={side} lit/>,(w+d)*.95,P(w,d),.72,<HouseFaces u={0} v={0} w={w} d={d} h={h} cafe={cafe}/>);faceSource[name]=name;
@@ -118,7 +143,7 @@ const WEBP={quality:90,alphaQuality:100,effort:6,smartSubsample:true} as const;
 async function writeSheets(prefix:string,sheets:ReturnType<typeof pack>['sheets'],dir:URL,webp:object=WEBP){
  const out:string[]=[];
  for(const [i,s] of sheets.entries()){
-  const buf=await sharp({create:{width:s.w,height:s.h,channels:4,background:{r:0,g:0,b:0,alpha:0}}}).composite(s.items.map(it=>({input:it.png,left:it.left,top:it.top}))).webp(webp).toBuffer();
+  const buf=await keptAsync(keyOf('sheet',JSON.stringify(webp),`${s.w}x${s.h}`,...s.items.map(it=>`${keyOf(it.png)}@${it.left},${it.top}`))+'.webp',()=>sharp({create:{width:s.w,height:s.h,channels:4,background:{r:0,g:0,b:0,alpha:0}}}).composite(s.items.map(it=>({input:it.png,left:it.left,top:it.top}))).webp(webp).toBuffer());
   writeFileSync(new URL(`${prefix}-${i}.webp`,dir),buf);out.push(`/harbor/sheets/${prefix}-${i}.webp?v=`+createHash('sha256').update(buf).digest('hex').slice(0,10));
  }
  return out;
@@ -135,7 +160,8 @@ const faceSrc=await writeSheets('light',light.sheets,sheetDir,{quality:80,alphaQ
 const glow=pack(glowItems);for(const [name,frame] of glow.at){assets[name]!.glow=frame;assets[name]!.glowBox=glowBoxes.get(name)!;}
 const glowSrc=await writeSheets('glow',glow.sheets,sheetDir,{quality:85,alphaQuality:90,effort:6});
 // Single drawings for the landing's three.js island, which places each one on its own card.
-for(const d of drawings)writeFileSync(new URL(d.name+'.webp',directory),await sharp(d.png).webp(WEBP).toBuffer());
+await Promise.all(drawings.map(async d=>writeFileSync(new URL(d.name+'.webp',directory),await keptAsync(keyOf('card',d.png)+'.webp',()=>sharp(d.png).webp(WEBP).toBuffer()))));
 writeFileSync(new URL('../components/world/harbor-atlas.ts',import.meta.url),'// Generated by scripts/gen-harbor.tsx from harbor-art.tsx. Do not edit by hand.\nexport const HARBOR_SHEETS = '+JSON.stringify(sheetSrc)+' as const;\nexport const LIGHT_SHEETS = '+JSON.stringify(faceSrc)+' as const;\nexport const GLOW_SHEETS = '+JSON.stringify(glowSrc)+' as const;\nexport const HARBOR_ATLAS = '+JSON.stringify(assets)+' as const;\n');
 console.log(`Generated ${Object.keys(assets).length} Harbor Street drawings on ${art.sheets.length} sheets, ${masks.length} light masks on ${light.sheets.length}, and ${glowItems.length} window glows on ${glow.sheets.length}.`);
+console.log(`Cache: ${stats.hit} kept, ${stats.miss} made, in ${((performance.now()-started)/1000).toFixed(1)}s.`);
 })().catch(error=>{console.error(error);process.exit(1);});
