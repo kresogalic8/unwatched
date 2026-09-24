@@ -41,7 +41,8 @@ export class Lighting {
   private warms: Sprite[] = [];
   private cores: Sprite[] = [];
   private disc = softDisc();
-  constructor(world: Container, W: number, H: number) {
+  /** `multiply`: the moonlit look, where the world is already multiplied down to blue and the lights only add. */
+  constructor(world: Container, W: number, H: number, private readonly multiply = false) {
     this.shade.rect(-3000, -3000, W + 6000, H + 6000).fill(0xffffff); this.dark.addChild(this.shade);
     this.dark.filters = [new AlphaFilter({ alpha: 1 })]; // renders the layer on its own, so 'erase' only ever cuts the shade
     this.glow.filters = [new BlurFilter({ strength: 5, quality: 3 })]; // the bloom: the warm layer smeared a little past its edge
@@ -53,7 +54,8 @@ export class Lighting {
     const k = Math.min(1, amount / 0.42);
     this.dark.visible = this.glow.visible = k > 0.02;
     if (!this.dark.visible) return;
-    this.shade.tint = tint; this.shade.alpha = 0.64 * k * Math.max(0, 1 - flash * 1.4); // a bolt lights every facade for a frame
+    this.shade.tint = tint; this.shade.alpha = this.multiply ? 0 : 0.64 * k * Math.max(0, 1 - flash * 1.4); // a bolt lights every facade for a frame
+    this.dark.visible = !this.multiply; // under the moonlit look the world is already multiplied down to blue; the lights add their warmth back over it // a bolt lights every facade for a frame
     while (this.holes.length < sources.length) { const h = new Sprite(this.disc); h.anchor.set(0.5); h.blendMode = "erase"; this.dark.addChild(h); this.holes.push(h); const w = new Sprite(this.disc); w.anchor.set(0.5); w.blendMode = "add"; this.glow.addChild(w); this.warms.push(w); const c = new Sprite(this.disc); c.anchor.set(0.5); c.blendMode = "add"; this.glow.addChild(c); this.cores.push(c); }
     for (let i = 0; i < this.holes.length; i++) {
       const s = sources[i]; const h = this.holes[i]!, w = this.warms[i]!, c = this.cores[i]!;
@@ -62,8 +64,8 @@ export class Lighting {
       const r = s.r * fl; const aspect = s.aspect ?? 1;
       h.visible = !s.noHole; w.visible = c.visible = true;
       h.position.set(s.x, s.y); h.width = r * 2.2; h.height = r * 2.2 * aspect; h.alpha = Math.min(1, s.strength) * k;
-      w.position.set(s.x, s.y); w.width = r * 1.8; w.height = r * 1.8 * aspect; w.tint = s.color; w.alpha = 0.15 * s.strength * k;
-      c.position.set(s.x, s.y); c.width = r * .3; c.height = r * .3 * aspect; c.tint = s.color; c.alpha = 0.3 * s.strength * k; // the bright heart of the bloom
+      w.position.set(s.x, s.y); w.width = r * 1.8; w.height = r * 1.8 * aspect; w.tint = s.color; w.alpha = (this.multiply ? 0.42 : 0.15) * s.strength * k;
+      c.position.set(s.x, s.y); c.width = r * .3; c.height = r * .3 * aspect; c.tint = s.color; c.alpha = (this.multiply ? 0.5 : 0.3) * s.strength * k; // the bright heart of the bloom
     }
   }
 }
