@@ -1038,7 +1038,7 @@ export class Town {
         this.removeAgent(a.id, "left", action.why ?? "");
         return true;
       }
-      case "wait": case "build": break;
+      case "wait": break;
     }
     return true;
   }
@@ -1076,7 +1076,7 @@ export class Town {
         if (!refund) continue;
         const place = this.places.get(placeId)!;
         this.rememberPlace(b);
-        let d;
+        let d: Awaited<ReturnType<Brain["converse"]>>;
         try {
           d = await this.brain.converse({
             a: payer, b: listener, place, time: this.clock(), weather: this.weather, observedPlace: this.rememberPlace(payer),
@@ -1525,7 +1525,7 @@ export class Town {
     await Promise.all(batch.map(async ({ a, what, with: b, place }) => {
       if (!this.agents.has(a.id)) return;
       const ctx: JudgeContext = { agent: a, what, withName: b?.persona.name ?? null, place: place.name, placeKind: place.kind, hour: this.hour, weather: this.weather, nearby: this.nearby(a).map((x) => x.persona.name), inventory: [...a.inventory], coins: a.coins, stock: Object.entries(place.stock).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k}`) };
-      let j; try { j = await this.brain.judge(ctx); } catch (err) { this.log(`judge failed for ${a.persona.name}: ${(err as Error).message}`); return; }
+      let j: Awaited<ReturnType<Brain["judge"]>>; try { j = await this.brain.judge(ctx); } catch (err) { this.log(`judge failed for ${a.persona.name}: ${(err as Error).message}`); return; }
       const name = a.persona.name;
       if (!j.plausible) { this.remember(a, `I tried to ${what}. ${j.happened}`, 0.4); this.emit("agent.do", [a.id], place.id, `${name} tried to ${what}: ${j.happened}`, 0.3, { what, happened: j.happened, plausible: false }); return; }
       const spent = Math.min(a.coins, j.coins_spent); if (spent > 0) { a.coins -= spent; const owner = place.owner ? this.agents.get(place.owner) : null; if (owner && owner.id !== a.id) owner.coins += spent; else place.treasury += spent; }
@@ -1962,7 +1962,7 @@ export class Town {
     const t = text.toLowerCase(); let rule: Rule | null = null;
     const tax = /(\d{1,2})\s*(?:%|percent|per cent)/.exec(t); if (tax && /tax|levy|tithe|council|treasury/.test(t)) rule = { kind: "tax", percent: Math.min(50, Number(tax[1])), text };
     const cap = /(?:cap|no more than|at most|not (?:more|above)|max(?:imum)?)[^\d]{0,40}(\d{1,2})\s*coins?[^a-z]{0,20}(?:for|a|per|on)\s+(?:a\s+|the\s+)?([a-z]+)/.exec(t) ?? /([a-z]+)\s+(?:shall|must|may|to)\s+(?:cost|sell for|be sold at)\s+(?:no more than|at most)?\s*(\d{1,2})/.exec(t);
-    if (!rule && cap) { const item = isNaN(Number(cap[1])) ? cap[1]! : cap[2]!; const price = Number(isNaN(Number(cap[1])) ? cap[2] : cap[1]); if (price >= 1) rule = { kind: "cap", item, price, text }; }
+    if (!rule && cap) { const item = Number.isNaN(Number(cap[1])) ? cap[1]! : cap[2]!; const price = Number(Number.isNaN(Number(cap[1])) ? cap[2] : cap[1]); if (price >= 1) rule = { kind: "cap", item, price, text }; }
     const curfew = /curfew[^\d]{0,30}(\d{1,2})|(?:close|shut|no drink|no drinking)[^\d]{0,30}(?:at|after|from)\s*(\d{1,2})/.exec(t); if (!rule && curfew) rule = { kind: "curfew", hour: Number(curfew[1] ?? curfew[2]), text };
     if (!rule) return null;
     this.rules = this.rules.filter((r) => r.kind !== rule!.kind || (r.kind === "cap" && rule!.kind === "cap" && r.item !== rule!.item)); this.rules.push(rule);

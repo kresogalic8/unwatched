@@ -14,7 +14,10 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm lint
       - run: pnpm test
+      # the web must build as it deploys; it needs no keys to prerender
+      - run: pnpm --filter @unwatched/web build
       - run: python3 deploy/test-release-spec.py
       - run: bash -n deploy/release.sh
       # ten days of the island with the mock brain, no keys: the town must run and people must build

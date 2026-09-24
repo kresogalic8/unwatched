@@ -1,0 +1,35 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["**/*.ts", "**/*.tsx", "**/*.mjs", "**/*.js", "!**/dist", "!**/.next", "!**/out", "!**/public"] },
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": { "noNonNullAssertion": "off", "useTemplate": "off", "useExponentiationOperator": "off" },
+      "complexity": { "useLiteralKeys": "off" },
+      "suspicious": {
+        "noAssignInExpressions": "off",
+        "useIterableCallbackReturn": "off",
+        "noThenProperty": "off",
+        "noArrayIndexKey": "warn"
+      },
+      "correctness": { "useExhaustiveDependencies": "warn" },
+      "security": { "noDangerouslySetInnerHtml": "warn" },
+      "a11y": {
+        "useButtonType": "warn",
+        "useSemanticElements": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "useKeyWithClickEvents": "warn",
+        "noStaticElementInteractions": "warn",
+        "noSvgWithoutTitle": "off",
+        "noLabelWithoutControl": "warn",
+        "useValidAnchor": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        "noNoninteractiveTabindex": "warn"
+      }
+    }
+  }
+}

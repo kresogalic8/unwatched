@@ -98,7 +98,7 @@ export function backofficeRoutes(o: {
     const rate_key = createHash("sha256")
       .update(owner ?? "anonymous-feedback")
       .digest("hex");
-    let screenshot;
+    let screenshot: ReturnType<typeof safeScreenshot>;
     try {
       screenshot = safeScreenshot(v.screenshot);
     } catch (e) {

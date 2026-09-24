@@ -264,6 +264,6 @@ it('links only active desires and keeps the cached prefix the same for every cit
  // the citizen's desires reach the model through the perception...
  expect(JSON.stringify(bodies[1]?.messages)).toContain('active-one');
  // ...and not through the schema: the shared first block is byte for byte the same with desires or without, so it caches across citizens
- const prefix=(i:number)=>(bodies[i]?.messages as {content:{text:string}[]}[])[0]!.content[0]!.text;
+ const prefix=(i:number)=>(bodies[i]!.messages as {content:{text:string}[]}[])[0]!.content[0]!.text;
  expect(prefix(1)).toBe(prefix(0));
 });
