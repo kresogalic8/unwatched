@@ -1692,7 +1692,7 @@ export class Town {
     if (this.brain.name === "none" || this.paused) return;
     const dayStart = (this.day - 1) * MINUTES_PER_DAY;
     // the paper prints what was done or said where others could see it: never a private thought, a plan, a letter home, or what one person privately thinks of another
-    const PRIVATE = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self"]);
+    const PRIVATE = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self", "agent.became"]);
     const raw = this.events.filter((e) => e.t >= dayStart && e.importance >= 0.3 && !PRIVATE.has(e.kind))
       .sort((x, y) => y.importance - x.importance).slice(0, 16);
     const evs = raw.map((e) => ({ text: e.text, importance: e.importance, actors: e.actors.map((id) => this.agents.get(id)?.persona.name ?? id) }));

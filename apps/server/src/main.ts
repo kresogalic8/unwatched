@@ -123,7 +123,7 @@ if (subscriberBrain) {
 }
 if(telegramDb) metrics.onAttempt=(a,kind,outcome,duration,t)=>{void telegramDb.from('cognition_attempts').insert({agent_id:a?.id??null,kind,outcome,duration_ms:duration,island_minute:t,funding:a?.brainKind==='own_key'?'user_key':a?.brainKind==='own_brain'?'external_brain':a?.owner&&billing.wallet(a.owner).plan!=='none'?'subscriber':'world'}).then(({error})=>{if(error)log('Could not persist cognition diagnostic.');});};
 const hasPerks = (a: AgentState) => !a.owner || billing.wallet(a.owner).plan === "resident" || billing.planFor(a) === "patron"; setPerks(hasPerks); // the portrait and the voice come with a plan
-const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { if(e.kind==="town.of_age"){const grown=town.agents.get(e.actors[0]!);if(grown)billing.applyPlan(grown);} store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: publicEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
+const town = new Town({ seed: SEED, brain: metrics, log, creditBank: billing.bank, idPrefix: TOWN_ID === "island" ? "" : TOWN_ID, name: TOWN_NAME, harbors: HARBORS.map((h) => ({ id: h.id, name: h.name })), onDepart: boatTo, onEvent: (e) => { if(e.kind==="town.of_age"){const grown=town.agents.get(e.actors[0]!);if(grown)billing.applyPlan(grown);} store?.sink(e); void telegram.deliver(e, () => { const a = town.agents.get(e.actors[0]!); return a ? { id: a.id, owner: a.owner, name: a.persona.name } : undefined; }); broadcast({ type: "event", event: streamEvent(e) }); if (e.kind === "town.built" && e.payload && (e.payload as { hash?: string }).hash) { const p = e.payload as { hash: string; look: string; what: "house" | "shop" }; void looks.ensure(p.hash, p.look, p.what); } if (e.kind === "town.book" && store && e.actors[0] && e.payload) { const p = e.payload as { title: string; text: string; epitaph: string; how: "left" | "died" | "exiled"; arrivedDay: number; leftDay: number; name: string }; void store.saveLife({ agentId: e.actors[0], name: p.name, title: p.title, text: p.text, epitaph: p.epitaph, how: p.how, arrivedDay: p.arrivedDay, leftDay: p.leftDay }).catch((err: Error) => log(`could not shelve the book: ${err.message}`)); } if (e.kind === "agent.leave" && store && e.actors[0]) { void store.markLeft(e.actors[0], e.t).then(() => store!.snapshot(town)).catch((err: Error) => log(`could not record the leaving: ${err.message}`)); } if (e.kind === "agent.letter" && e.actors[0]) { const a = town.agents.get(e.actors[0]); if (a?.owner) { void store?.saveLetter(a.id, a.owner, "to_owner", String(e.payload?.text ?? e.text), e.t, e.t); void noticeLetter(e).catch((err: Error) => log(`letter notice failed: ${err.message}`)); } } } });
 // the island in words, once, for the cached prefix every citizen shares: where things are, what is sold where, who hires, and the calendar
 town.npcThoughtInterval = 15;
 const waitingTown=new Town({seed:SEED,brain:new MockBrain(SEED)});
@@ -393,6 +393,9 @@ async function writtenDigest(a: AgentState, since: number, explicitRange=false):
 }
 /** An intent is the owner's to read, not the town's. Public streams carry the deed, never the why. */
 function publicEvent(e: TownEvent): TownEvent { if (!e.payload || !("because" in e.payload)) return e; const { because: _b, ...rest } = e.payload; const { payload: _p, ...base } = e; return { ...base, ...(Object.keys(rest).length ? { payload: rest } : {}) } as TownEvent; }
+/** An event for the public stream, which anyone can open: a private one (a letter, a reflection, a plan, going to bed) keeps only that it
+ * happened, who and where, so the street can see someone sit down to write or go in to sleep; what they wrote or thought stays theirs. */
+function streamEvent(e: TownEvent): TownEvent { return PRIVATE_KINDS.has(e.kind) ? { id: e.id, t: e.t, day: e.day, kind: e.kind, actors: e.actors, ...(e.place ? { place: e.place } : {}), text: "", importance: 0 } as TownEvent : publicEvent(e); }
 app.get("/api/agents/:id/digest", async (c) => {
   const a = town.agents.get(c.req.param("id"))??waitingTown.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
   const owner = await ownerOf(c.req.raw);
@@ -411,7 +414,9 @@ app.get("/api/agents/:id/digest", async (c) => {
 app.get("/api/agents/:id/events", async(c) => {
   const waiting=waitingTown.agents.get(c.req.param("id"));if(waiting&&!owns(waiting,await ownerOf(c.req.raw)))return c.json({error:"No such person on the island"},404);
   const id = c.req.param("id"); const since = Number(c.req.query("since") ?? 0);
-  return c.json(town.events.filter((e) => e.actors.includes(id) && e.t >= since).slice(-300));
+  // the owner reads everything about their citizen (letters, reflections, plans); anyone else only what the street could see
+  const a = town.agents.get(id); const mine = !!a && owns(a, await ownerOf(c.req.raw));
+  return c.json(town.events.filter((e) => e.actors.includes(id) && e.t >= since && (mine || !PRIVATE_KINDS.has(e.kind))).slice(-300).map((e) => mine ? e : publicEvent(e)));
 });
 app.post("/api/agents/:id/letters", async (c) => {
   const a = town.agents.get(c.req.param("id")); if (!a) return c.json({ error: "no such person" }, 404);
@@ -484,7 +489,7 @@ app.get("/api/events/:id/voice", async (c) => {
   catch (err) { log(`voice for letter ${id}: ${(err as Error).message}`); return c.json({ error: (err as Error).message }, 502); }
 });
 /** What never leaves a person's head, so it is never a moment to share: the same set the paper keeps out. */
-const PRIVATE_KINDS = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self"]);
+const PRIVATE_KINDS = new Set(["agent.reflect", "agent.letter", "town.book", "relation.change", "agent.plan", "agent.wake", "agent.sleep", "action.rejected", "agent.self", "agent.became"]);
 app.get("/api/moments/:id", (c) => {
   const id = Number(c.req.param("id")); const e = town.events.find((x) => x.id === id);
   if (!e || PRIVATE_KINDS.has(e.kind)) return c.json({ error: "that moment is not in the street's memory anymore" }, 404);
@@ -626,7 +631,7 @@ app.post("/api/ops/park-unfunded",async(c)=>{
   waitingTown.restore({...snapshot,agents:[...waitingTown.snapshot().agents,...records]});
   for(const a of selected)detachCitizen(a);
   await store.snapshot(town);
-  broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(publicEvent)});
+  broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(streamEvent)});
   return c.json({moved:ids.size,remaining:town.agents.size});
  }finally{worldTransition=false;}
 });
@@ -651,7 +656,7 @@ app.post("/api/ops/npc-population",async c=>{
    town.removeAgent(selected.id,"left","Returned to the mainland as part of the island population adjustment.");
   }
   await store.snapshot(town,true);
-  broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(publicEvent)});
+  broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(a=>publicAgent(town,a)),recent:town.events.slice(-80).map(streamEvent)});
   return c.json({moved:plan.selected.length,remaining:plan.remaining});
  }finally{worldTransition=false;}
 });
@@ -752,7 +757,7 @@ app.post("/api/agents/:id/activate",async(c)=>{
    waitingTown.agents.delete(a.id);town.agents.set(a.id,ready);
    town.emit("agent.arrive",[a.id],"harbor",`${a.persona.name} returned to the island with their brain activated.`,0.5);
    if(store)await store.snapshot(town);
-   broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(x=>publicAgent(town,x)),recent:town.events.slice(-80).map(publicEvent)});
+   broadcast({type:"hello",clock:clockOf(town),agents:[...town.agents.values()].map(x=>publicAgent(town,x)),recent:town.events.slice(-80).map(streamEvent)});
    return c.json({id:a.id,activated:true});
   }finally{worldTransition=false;}
  }finally{boardingLocks.delete(owner!);}
@@ -828,7 +833,7 @@ const agentWss = new WebSocketServer({ noServer: true });
 });
 wss.on("connection", (ws) => {
   clients.add(ws);
-  ws.send(JSON.stringify({ type: "hello", clock: clockOf(town), agents: [...town.agents.values()].map((a) => publicAgent(town, a)), recent: town.events.slice(-80).map(publicEvent) }));
+  ws.send(JSON.stringify({ type: "hello", clock: clockOf(town), agents: [...town.agents.values()].map((a) => publicAgent(town, a)), recent: town.events.slice(-80).map(streamEvent) }));
   ws.on("close", () => clients.delete(ws));
 });
 
