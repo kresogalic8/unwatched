@@ -184,13 +184,21 @@ export function Interior({ kind, sprite, hour, people, stock }: { kind: string; 
       // at night the room is dark but for the lumin, the oil lamp hung from a beam
       if (night) { const lx = kindOfRoom === "konoba" ? W / 2 - 20 : W / 2 + 120; const dark = new Graphics(); dark.rect(0, 0, W, H).fill({ color: LIGHT.night, alpha: .32 }); for (let i = 7; i > 0; i--) dark.ellipse(lx, 60, 26 + i * 16, 22 + i * 14).fill({ color: LIGHT.lamp, alpha: .03 }); stage.addChild(dark); }
       // people, each at a spot that fits their pose
-      const rigs: Figurine[] = []; let si = 0, bi = 0, wi = 0, xi = 0;
+      const rigs: Figurine[] = []; let si = 0, bi = 0, wi = 0, xi = 0, pi = 0;
       for (const p of people.slice(0, 8)) {
         const pose: Pose = p.asleep || p.pose === "sleep" ? "sleep" : p.pose === "work" ? "work" : p.pose === "sit" ? "sit" : "idle";
         const c = new Figurine(aged(lookFor(p.name, p.appearance as Partial<Look> | null), p.age ?? 30)); c.age(p.age ?? 30); c.trade(p.job); c.hold(p.carrying ?? null); c.scale.set(1.15 * FIGURE_SCALE); c.setPose(pose);
         let at: [number, number] | undefined;
         if (pose === "sleep") at = spots.beds[bi++]; else if (pose === "work") at = spots.benches[wi++]; else if (pose === "sit") at = spots.seats[si++];
         if (pose === "sit" && at) c.seatAt(0); // the spot is the seat itself
+        if (!at && pose === "sleep") {
+          // no bed in this room: a straw pallet on the floor, a blanket over it, and the sleeper on that, not on the bare boards
+          const px = 60 + (pi++ % 5) * 84, py = floorY + 34, pal = new Graphics();
+          pal.roundRect(px - 34, py - 10, 68, 16, 6).fill(0xc9a86a).stroke({ width: 0.7, color: INK });
+          for (let k = -26; k <= 26; k += 6) pal.moveTo(px + k, py - 8).lineTo(px + k + 2, py + 4).stroke({ width: 0.6, color: 0x9b7a44, alpha: 0.7 });
+          pal.roundRect(px - 16, py - 14, 46, 14, 5).fill(0x9c4a3c).stroke({ width: 0.6, color: INK });
+          stage.addChild(pal); at = [px + 32, py - 4]; // lying, the figure reaches back from its feet, so it is set at the pallet's foot
+        }
         if (!at) { if(pose === "sit") c.setPose("idle"); at = [45 + (xi++ % 8) * 54, floorY + 28]; }
         c.position.set(at[0], at[1]); c.face(at[0] < W / 2 ? 1 : -1); stage.addChild(c); rigs.push(c);
       }

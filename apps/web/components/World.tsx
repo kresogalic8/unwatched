@@ -144,6 +144,9 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       const townView = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView;
       const W = townView.size?.w ?? 3000, H = townView.size?.h ?? 1800;
       const places = new Map<string, PlaceView>(townView.places.map((p) => [p.id, p]));
+      // a place people are inside, whose windows light when someone is awake there: not the quay, the market or the open ground,
+      // even where a building stands on them (the harbour office on the quay), since the people there are outdoors
+      const indoors = (p: PlaceView) => !["plot", "wild", "public", "harbor", "market"].includes(p.kind);
       const hourParam = typeof location !== "undefined" ? new URLSearchParams(location.search).get("hour") : null; const forcedHour = hourParam === null ? NaN : Number(hourParam); // ?hour=23 previews the light without waiting for it
       const forcedWeather = typeof location !== "undefined" ? new URLSearchParams(location.search).get("weather") : null; // ?weather=storm previews the weather
       const forcedSeason = typeof location !== "undefined" ? new URLSearchParams(location.search).get("season") : null; // ?season=autumn previews the leaves
@@ -879,7 +882,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
               sources.push({ x: d.x + 14, y: d.y - 58, r: 90, color: LIGHT.lamp, strength: .72, flicker: .025 });
               sources.push({ x: d.x + 18, y: d.y + 2, r: 62, aspect: .38, color: LIGHT.lamp, strength: .42 });
             }
-            for (const p of places.values()) if (p.crowd > 0 && p.kind !== "plot" && p.kind !== "wild" && p.kind !== "public" && (p.kind !== "harbor" || drawn.has(p.id)) && p.kind !== "market") { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
+            for (const p of places.values()) if (p.crowd > 0 && indoors(p)) { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
           sources.push(...life.lights);
@@ -912,7 +915,7 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
         } else if (sky.alpha <= 0.02 && every(60)) sky.clear();
         if (every(10)) {
           lamps.clear(); windows.clear();
-          for(const [id,node] of drawn) lightWorldArt(node,night.alpha>.05 && (places.get(id)?.crowd??0)>0);
+          for(const [id,node] of drawn) { const pl = places.get(id); lightWorldArt(node, night.alpha > .05 && !!pl && indoors(pl) && pl.crowd > 0); }
           if (night.alpha > 0.05) {
             const k = night.alpha / 0.42;
             for (const d of decor) if (d.sprite === "lamp") { lamps.circle(d.x, d.y - 58, 40).fill({ color: LIGHT.lamp, alpha: 0.16 * k }); lamps.circle(d.x, d.y - 58, 22).fill({ color: LIGHT.lamp, alpha: 0.28 * k }); lamps.ellipse(d.x, d.y + 2, 34, 12).fill({ color: LIGHT.lamp, alpha: 0.22 * k }); }
