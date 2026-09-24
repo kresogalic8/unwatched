@@ -37,7 +37,7 @@ describe("the boat between islands", () => {
     expect(north.events.some((e) => e.kind === "agent.arrive" && /from The island/.test(e.text))).toBe(true);
     expect(b.memory.some((m) => m.text.startsWith("News from The island"))).toBe(true);
     // and back the other way, to a harbor that does not answer: she stays
-    arrived.location = "harbor";
+    arrived.location = "harbor"; north.setWeather("clear"); // a calm sea, so only the far harbor can keep her
     expect(north.apply(arrived, { kind: "leave", to: "south" }, "test")).toBe(true);
     await north.tick();
     expect(north.agents.has(arrived.id)).toBe(true);

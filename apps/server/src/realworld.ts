@@ -34,12 +34,16 @@ export const TIMETABLE: Record<string, number[]> = {
   summer: [6, 8, 10, 12, 14, 16, 18, 20, 22],
 };
 
-/** WMO weather codes into the island's words. */
-export function weatherWord(code: number, windKmh: number): string {
+/** WMO weather codes into the island's words. A dry gale is named by where it blows from, as the coast names it: the bura from the
+ * north-east, down off the hills in gusts, and the jugo from the south-east, warm and steady; any other strong wind is just wind. */
+export function weatherWord(code: number, windKmh: number, fromDeg: number | null = null, gustKmh: number | null = null): string {
   if (code >= 95) return "storm";
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
   if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return windKmh > 45 ? "storm" : "rain";
   if (code === 45 || code === 48) return "fog";
+  const gust = gustKmh ?? windKmh;
+  if (fromDeg !== null && fromDeg >= 15 && fromDeg <= 100 && (windKmh >= 25 || gust >= 50)) return "bura";
+  if (fromDeg !== null && fromDeg > 100 && fromDeg <= 190 && (windKmh >= 22 || gust >= 45)) return "jugo";
   if (windKmh > 35) return "wind";
   return "clear";
 }
@@ -88,12 +92,12 @@ export class RealWorld {
   /** How far behind the real clock the island is, in minutes, when the ticks have been slow. */
   lag(): number { const d = (minuteOfDayIn(this.place.tz) - this.town.minuteOfDay + 1440) % 1440; return d > 720 ? 0 : d; }
   async fetchOnce(): Promise<void> {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${this.place.lat}&longitude=${this.place.lon}&current=temperature_2m,precipitation,weather_code,wind_speed_10m&daily=sunrise,sunset&timezone=${encodeURIComponent(this.place.tz)}&forecast_days=1`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${this.place.lat}&longitude=${this.place.lon}&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m&daily=sunrise,sunset&timezone=${encodeURIComponent(this.place.tz)}&forecast_days=1`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) }); if (!res.ok) throw new Error(`open-meteo ${res.status}`);
-      const d = (await res.json()) as { current?: { temperature_2m?: number; weather_code?: number; wind_speed_10m?: number }; daily?: { sunrise?: string[]; sunset?: string[] } };
+      const d = (await res.json()) as { current?: { temperature_2m?: number; weather_code?: number; wind_speed_10m?: number; wind_direction_10m?: number; wind_gusts_10m?: number }; daily?: { sunrise?: string[]; sunset?: string[] } };
       const code = d.current?.weather_code ?? 0, wind = d.current?.wind_speed_10m ?? 0;
-      const word = weatherWord(code, wind);
+      const word = weatherWord(code, wind, d.current?.wind_direction_10m ?? null, d.current?.wind_gusts_10m ?? null);
       this.state.temperatureC = d.current?.temperature_2m ?? null; this.state.code = code; this.state.wind = wind; this.state.fetchedAt = Date.now(); this.state.ok = true;
       this.state.sunrise = d.daily?.sunrise?.[0]?.slice(11, 16) ?? null; this.state.sunset = d.daily?.sunset?.[0]?.slice(11, 16) ?? null;
       this.town.temperatureC = this.state.temperatureC;

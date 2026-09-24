@@ -19,11 +19,13 @@ const gradeDistance = (g: Grade) => Math.abs(g.sat - 1) + Math.abs(g.contrast - 
  */
 export function gradeFor(o: { golden: number; blue: number; night: number; cover: number; weather: string }): Grade {
   const { golden: g, blue: b, night: n, cover: c } = o; const fog = o.weather === "fog" ? 1 : 0, storm = o.weather === "storm" ? 1 : 0;
+  // the bura's air is scoured clear and cold, every edge sharp; the jugo's is warm, thick and a little yellow
+  const bura = o.weather === "bura" ? 1 - n * 0.6 : 0, jugo = o.weather === "jugo" ? 1 - n * 0.6 : 0;
   return {
-    sat: 1 + 0.1 * g - 0.08 * b - 0.22 * n - 0.2 * c - 0.08 * storm,
-    contrast: 1 + 0.07 * g + 0.04 * n - 0.08 * c - 0.1 * fog + 0.05 * storm,
-    lift: [0.004 * g + 0.02 * fog, 0.012 * g + 0.012 * b + 0.018 * n + 0.02 * fog, 0.035 * g + 0.04 * b + 0.045 * n + 0.012 * c + 0.022 * fog],
-    gain: [1 + 0.05 * g - 0.03 * b - 0.02 * c, 1 + 0.012 * g - 0.01 * b - 0.01 * c, 1 - 0.05 * g + 0.03 * b + 0.015 * c],
+    sat: 1 + 0.1 * g - 0.08 * b - 0.22 * n - 0.2 * c - 0.08 * storm + 0.1 * bura - 0.06 * jugo,
+    contrast: 1 + 0.07 * g + 0.04 * n - 0.08 * c - 0.1 * fog + 0.05 * storm + 0.07 * bura - 0.05 * jugo,
+    lift: [0.004 * g + 0.02 * fog + 0.02 * jugo, 0.012 * g + 0.012 * b + 0.018 * n + 0.02 * fog + 0.015 * jugo, 0.035 * g + 0.04 * b + 0.045 * n + 0.012 * c + 0.022 * fog],
+    gain: [1 + 0.05 * g - 0.03 * b - 0.02 * c - 0.02 * bura + 0.02 * jugo, 1 + 0.012 * g - 0.01 * b - 0.01 * c + 0.005 * jugo, 1 - 0.05 * g + 0.03 * b + 0.015 * c + 0.04 * bura - 0.04 * jugo],
   };
 }
 

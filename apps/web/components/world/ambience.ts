@@ -153,11 +153,11 @@ export class Ambience {
     // far out over the island the near sounds (a crowd, a forge, the market) fall away under the sea and the weather
     const near = s.far ? 0.35 : 1;
     const L = (n: LayerName) => this.layers.get(n)!;
-    L("sea").set((s.shore !== undefined ? (s.far ? 0.26 : 0.1 + 0.34 * s.shore) : coast ? 0.4 : s.district === "pinewood" ? 0.1 : 0.18) * (s.weather === "storm" ? 1.6 : 1));
-    const hot = s.season === "summer" && s.hour >= 9 && s.hour < 19 && !rain && s.weather !== "fog" && s.weather !== "wind";
+    L("sea").set((s.shore !== undefined ? (s.far ? 0.26 : 0.1 + 0.34 * s.shore) : coast ? 0.4 : s.district === "pinewood" ? 0.1 : 0.18) * (s.weather === "storm" ? 1.6 : s.weather === "jugo" ? 1.5 : s.weather === "bura" ? 1.3 : 1)); // the jugo brings the swell in
+    const hot = s.season === "summer" && s.hour >= 9 && s.hour < 19 && !rain && !["fog", "wind", "bura"].includes(s.weather);
     L("cicadas").set(hot ? (s.hour >= 12 && s.hour < 17 ? 0.13 : 0.07) * (1 - 0.6 * (s.shore ?? (coast ? 1 : 0))) * (s.district === "pinewood" || s.district === "hill" ? 1.5 : 1) : 0);
     L("rain").set(rain);
-    L("wind").set(s.weather === "storm" ? 0.5 : s.weather === "wind" ? 0.4 : s.weather === "snow" ? 0.2 : s.weather === "fog" ? 0.06 : s.district === "pinewood" || s.district === "hill" ? 0.16 : 0.06);
+    L("wind").set(s.weather === "storm" || s.weather === "bura" ? 0.55 : s.weather === "wind" ? 0.4 : s.weather === "jugo" ? 0.22 : s.weather === "snow" ? 0.2 : s.weather === "fog" ? 0.06 : s.district === "pinewood" || s.district === "hill" ? 0.16 : 0.06);
     L("forest").set(s.district === "pinewood" && !night ? 0.3 : 0);
     L("night").set(night && !rain && s.season !== "winter" ? 0.25 : 0);
     const social = s.place === "tavern" || s.place === "inn";
@@ -173,7 +173,7 @@ export class Ambience {
     if (scene !== this.bed) { this.bed = scene; this.bedFor(scene); for (const [m, L] of this.beds) L.set(m === scene ? 0.32 : 0, 4); }
     this.releaseQuietBeds();
     const now = performance.now();
-    if (!night && rain < 0.7 && coast && now - this.lastGull > 4000 + Math.random() * 9000) { this.lastGull = now; this.gull(); if (Math.random() < 0.4) setTimeout(() => !this.muted && this.gull(), 300 + Math.random() * 400); }
+    if (!night && rain < 0.7 && s.weather !== "bura" && coast && now - this.lastGull > 4000 + Math.random() * 9000) { this.lastGull = now; this.gull(); if (Math.random() < 0.4) setTimeout(() => !this.muted && this.gull(), 300 + Math.random() * 400); }
     if (s.district === "harbor" && now - this.lastCreak > 6000 + Math.random() * 8000) { this.lastCreak = now; this.creak(); }
     if (s.weather === "storm" && now - this.lastThunder > 12000 + Math.random() * 20000) { this.lastThunder = now; this.thunder(); }
     // the lighthouse sounds its horn in fog, far off unless you are on the point

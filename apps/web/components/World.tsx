@@ -888,14 +888,18 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         perfMark("weather");
         const c = clockRef.current; const weather = forcedWeather ?? c?.weather ?? "clear"; const winter = (forcedSeason ?? c?.season) === "winter";
         const wet = weather === "rain" || weather === "storm" || weather === "snow"; const snowing = weather === "snow" || (wet && winter);
-        const wind = weather === "storm" ? 1 : weather === "wind" ? 0.8 : weather === "rain" ? 0.45 : weather === "fog" ? 0.1 : 0.2;
+        const wind = weather === "storm" || weather === "bura" ? 1 : weather === "wind" ? 0.8 : weather === "jugo" ? 0.6 : weather === "rain" ? 0.45 : weather === "fog" ? 0.1 : 0.2;
         // the sea itself: the foam breathes, the water darkens and breaks white in a blow, rain rings the surface
-        const rough = weather === "storm" ? 1 : weather === "wind" ? 0.5 : 0;
+        const rough = weather === "storm" ? 1 : weather === "bura" ? 0.85 : weather === "jugo" ? 0.6 : weather === "wind" ? 0.5 : 0;
         if (every(3)) { drawFoam(tick, rough); drawTide(tick); }
-        sea.tint = weather === "storm" ? 0x8fa9a6 : weather === "rain" || weather === "fog" ? 0xb9cfcb : 0xffffff;
+        sea.tint = weather === "storm" ? 0x8fa9a6 : weather === "bura" ? 0xa8c1ea : weather === "jugo" ? 0xb9c3ae : weather === "rain" || weather === "fog" ? 0xb9cfcb : 0xffffff; // the bura turns the sea a hard dark blue, the jugo a murky green
         if (every(3)) {
           seaLife.clear();
           if (rough > 0) for (let i = 0; i < 70 * rough; i++) { const xx = ((i * 811 + tick * 3) % (W + 1400)) - 700, yy = ((i * 1237) % (H + 1000)) - 500; if (inside(xx, yy) < 1.12) continue; const ph = Math.sin(tick / 12 + i); if (ph < 0.2) continue; seaLife.moveTo(xx, yy).lineTo(xx + 14 + ph * 10, yy - 2).stroke({ width: 2.2, color: C.foam, alpha: 0.5 + ph * 0.4, cap: "round" }); }
+          // the bura smokes the sea: spray torn off the crests and blown across the water in long white wisps, harder in the gusts
+          if (weather === "bura") { const gust = 0.55 + 0.45 * Math.max(0, Math.sin(ft / 47) * Math.sin(ft / 19 + 1)); for (let i = 0; i < 80; i++) { const sp = 7 + (i % 5) * 2.5; const xx = ((i * 677 + tick * sp) % (W + 1800)) - 900, yy = ((i * 1409) % (H + 1100)) - 550 + ((tick * sp * 0.15 + i * 37) % 70); if (inside(xx, yy) < 1.1) continue; const len = (70 + (i % 4) * 34) * gust; seaLife.moveTo(xx - len, yy - len * 0.14).quadraticCurveTo(xx - len * 0.45, yy - len * 0.03 - 5, xx, yy).stroke({ width: 12, color: C.foam, alpha: 0.16 * gust, cap: "round" }); seaLife.moveTo(xx - len * 0.55, yy - len * 0.07).lineTo(xx, yy).stroke({ width: 2.5, color: C.foam, alpha: 0.65 * gust, cap: "round" }); } }
+          // the jugo's long swell: slow crests rolling in from the open sea one behind another, broken where they meet the island
+          if (weather === "jugo") for (let row = 0; row < 14; row++) { const y0 = ((row * 150 + ft * 0.3) % (H + 1200)) - 600; let open = false; for (let xx = -900; xx <= W + 900; xx += 45) { const yy = y0 + Math.sin(xx * 0.004 + row * 1.9) * 22; if (inside(xx, yy) < 1.1) { open = false; continue; } if (!open) { seaLife.moveTo(xx, yy); open = true; } else seaLife.lineTo(xx, yy); } seaLife.stroke({ width: 3, color: C.foam, alpha: 0.2, cap: "round", join: "round" }); }
           if (weather === "rain" || weather === "storm") for (let i = 0; i < 60; i++) { const xx = ((i * 947 + Math.floor(tick / 9) * 131) % (W + 1400)) - 700, yy = ((i * 1543 + Math.floor(tick / 9) * 71) % (H + 1000)) - 500; if (inside(xx, yy) < 1.1) continue; const age = ((tick + i * 7) % 9) / 9; seaLife.ellipse(xx, yy, 3 + age * 14, 1.5 + age * 6).stroke({ width: 1, color: C.foam, alpha: 0.5 * (1 - age) }); }
         }
         // boat: it crosses at a boat's pace, bobs, and leaves a wake; the rowboats bob beside the quay
@@ -914,7 +918,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         const bellOn = c?.weekday === "Sunday" && c.hour === 10 && c.minute % 60 < 3; for (const bl of bells) bl.rotation = bellOn ? Math.sin(ft / 4) * 0.5 : bl.rotation * Math.pow(0.95, dtf);
         for (const cl of cloths) {const parent=cl.parent;const breeze=harborBreeze(detailSeconds,parent?.x??0,parent?.y??0,wind);cl.skew.x=quietMotion.matches?0:Math.sin(detailSeconds*2.1)*.075*breeze+Math.sin(detailSeconds*5)*.02*breeze;}
         // gulls over the quay by day, a few, wheeling
-        if (every(2)) { gulls.clear(); if (!still && !(c && (c.hour < 6 || c.hour >= 20)) && weather !== "storm") for (let i = 0; i < 5; i++) { const t = tick / 60 + i * 1.3; const gx = harbor.x - 120 + Math.cos(t * 0.7 + i) * (160 + i * 30), gy = harbor.y - 260 - i * 28 + Math.sin(t * 1.1) * 40; const flap = Math.sin(tick / 5 + i) * 4; gulls.moveTo(gx - 9, gy + flap).quadraticCurveTo(gx - 4, gy - 4, gx, gy).quadraticCurveTo(gx + 4, gy - 4, gx + 9, gy + flap).stroke({ width: 1.6, color: C.kelp, alpha: 0.7, cap: "round" }); } }
+        if (every(2)) { gulls.clear(); if (!still && !(c && (c.hour < 6 || c.hour >= 20)) && weather !== "storm" && weather !== "bura") for (let i = 0; i < 5; i++) { const t = tick / 60 + i * 1.3; const gx = harbor.x - 120 + Math.cos(t * 0.7 + i) * (160 + i * 30), gy = harbor.y - 260 - i * 28 + Math.sin(t * 1.1) * 40; const flap = Math.sin(tick / 5 + i) * 4; gulls.moveTo(gx - 9, gy + flap).quadraticCurveTo(gx - 4, gy - 4, gx, gy).quadraticCurveTo(gx + 4, gy - 4, gx + 9, gy + flap).stroke({ width: 1.6, color: C.kelp, alpha: 0.7, cap: "round" }); } }
         if (every(2)) {
           rain.clear();
           if (wet) {
@@ -956,7 +960,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         // dawn and dusk follow the real sunrise and sunset when the island keeps our time
         const hm = (t?: string | null) => t ? Number(t.slice(0, 2)) + Number(t.slice(3, 5)) / 60 : null;
         const rise = hm(c?.sunrise) ?? 6.5, set = hm(c?.sunset) ?? 19.5;
-        const nightAmt = (hour < rise - 1 ? 0.42 : hour < rise + 0.5 ? 0.42 * (rise + 0.5 - hour) / 1.5 : hour < set - 0.5 ? 0 : hour < set + 1 ? 0.42 * (hour - (set - 0.5)) / 1.5 : 0.42) + (weather === "storm" ? 0.12 : weather === "rain" ? 0.05 : 0);
+        const nightAmt = (hour < rise - 1 ? 0.42 : hour < rise + 0.5 ? 0.42 * (rise + 0.5 - hour) / 1.5 : hour < set - 0.5 ? 0 : hour < set + 1 ? 0.42 * (hour - (set - 0.5)) / 1.5 : 0.42) + (weather === "storm" ? 0.12 : weather === "rain" ? 0.05 : weather === "jugo" ? 0.04 : 0);
         const duskAmt = Math.abs(hour - rise) < 1 ? 0.16 * (1 - Math.abs(hour - rise)) : Math.abs(hour - set) < 1 ? 0.2 * (1 - Math.abs(hour - set)) : 0;
         night.alpha += (nightAmt - night.alpha) * ease(0.05); dusk.alpha += (duskAmt - dusk.alpha) * ease(0.05); moonlit.alpha = 0.85 * Math.min(1, night.alpha / 0.42) * Math.max(0, 1 - flash.alpha * 1.4); worldLight.windowGlow = nightLook ? Math.min(1, night.alpha / 0.3) : 0;
         perfMark("life");
@@ -989,7 +993,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           else { lx = W - 220; ly = 90; ls = 0.55 * Math.max(0, (night.alpha - 0.1) / 0.32); }
           { const [ex, ey] = par(0.7); lx += ex; ly += ey; }
           // the low sun: golden either side of sunrise and sunset, blue for the half hour beyond them; cloud and rain take most of it away
-          const cover = weather === "storm" ? 1 : weather === "rain" ? 0.85 : weather === "fog" ? 0.9 : weather === "snow" ? 0.8 : weather === "wind" ? 0.2 : 0;
+          const cover = weather === "storm" ? 1 : weather === "rain" ? 0.85 : weather === "fog" ? 0.9 : weather === "snow" ? 0.8 : weather === "jugo" ? 0.6 : weather === "wind" ? 0.2 : 0; // the bura sweeps the sky clear
           const nearRise = Math.abs(hour - rise), nearSet = Math.abs(hour - set); const phase: "rise" | "set" = nearRise < nearSet ? "rise" : "set";
           const golden = Math.max(0, 1 - Math.min(nearRise, nearSet) / 1.1);
           const blue = Math.max(0, 1 - Math.abs(hour - (phase === "rise" ? rise - 0.7 : set + 0.7)) / 0.7);
@@ -1024,7 +1028,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
             if (moon > 0.01) { worldLight.glow.roof = 0.42 * moon; worldLight.glow.front = 0.06 * moon; worldLight.glow.side = 0; worldLight.shade.side = 0.42 * moon; worldLight.shade.front = 0.12 * moon; worldLight.shade.roof = 0; worldLight.glowTint = 0x34466a; worldLight.shadeTint = 0x3b4775; } }
           gradeNow = gradeFor({ golden: golden * (1 - cover * 0.7), blue: blue * (1 - cover * 0.4), night: Math.min(1, night.alpha / 0.42), cover, weather });
           const shadeTint = mix(LIGHT.night, 0x1b2140, blue * (1 - cover));
-          water.update({ time: (still ? ft * 0.3 : ft) / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : 1) * (1 + golden * 0.5) }, color: GROUND.water, deep: GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
+          water.update({ time: (still ? ft * 0.3 : ft) / 60, cam: { x: cam.x, y: cam.y, zoom: cam.zoom }, sun: { x: lx, y: ly, strength: ls * (weather === "storm" ? 0.15 : weather === "rain" || weather === "fog" ? 0.35 : weather === "jugo" ? 0.45 : 1) * (1 + golden * 0.5) }, color: weather === "bura" ? mix(GROUND.water, 0x3d6c9e, 0.5) : weather === "jugo" ? mix(GROUND.water, 0x8b9776, 0.4) : GROUND.water, deep: weather === "bura" ? mix(GROUND.waterDeep, 0x1b4476, 0.6) : weather === "jugo" ? mix(GROUND.waterDeep, 0x56654c, 0.45) : GROUND.waterDeep, glint: up ? mix(0xffe9a8, phase === "rise" ? 0xffb27a : 0xff8f57, golden) : 0xd9e3ff, rough, night: Math.min(1, night.alpha / 0.42) });
           const sources: LightSource[] = [];
           if (night.alpha > 0.03) {
             for (const d of decor) if (d.sprite === "lamp") {
@@ -1036,7 +1040,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
           sources.push(...life.lights);
           lighting.update(night.alpha * (1 - golden * (1 - cover) * 0.55), sources, ft, flash.alpha, shadeTint); // the low sun holds the dark off a while
-          weatherFx.update({ weather, wind, snowing, wet, tick: ft, dt: dtf, density: still ? 0.35 : 1, night: Math.min(1, night.alpha / 0.42), fogColor: 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
+          weatherFx.update({ weather, wind, snowing, wet, tick: ft, dt: dtf, density: still ? 0.35 : 1, night: Math.min(1, night.alpha / 0.42), fogColor: weather === "jugo" ? 0xe4d9c2 : 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
           clouds.update({ tick: ft, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) }); if (miniRef.current) clouds.puffs.visible = clouds.shadows.visible = false; // no weather in the sky over a model on a table
         }
         // long shadows near sunrise and sunset
@@ -1072,7 +1076,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           }
         }
         if (quay && every(2)) { lap.clear(); if (!still || every(30)) {
-          const qx = quay.x, qy = quay.y + 35, calm = weather === "storm" ? 2.2 : weather === "rain" ? 1.4 : 1;
+          const qx = quay.x, qy = quay.y + 35, calm = weather === "storm" ? 2.2 : weather === "jugo" ? 2 : weather === "bura" ? 1.7 : weather === "rain" ? 1.4 : 1;
           const breathe = 0.5 + 0.5 * Math.sin(tick / 55); lap.moveTo(qx - 112, qy + 1 + breathe * 1.5).lineTo(qx + 140, qy + 1 + breathe * 1.5).stroke({ width: 1.4, color: 0xf6f3ea, alpha: 0.35 + 0.3 * breathe });
           for (let k = 0; k < 16; k++) { const x = qx - 108 + k * 16 + Math.sin(k * 2.3) * 4, ph = tick / 38 + k * 0.9; const sw = (Math.sin(ph) + 1) / 2; if (sw < 0.25) continue;
             lap.moveTo(x - 6 * calm, qy + 2).quadraticCurveTo(x, qy + 2 + (2 + sw * 3) * calm, x + 6 * calm, qy + 2).stroke({ width: 1.2, color: 0xffffff, alpha: (sw - 0.25) * 0.8, cap: "round" }); }
@@ -1146,7 +1150,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           if (partner) { f.rig.lookAt((partner.x - f.x) * f.facing); } else if (b || f.rig["pose" as keyof typeof f.rig] === "talk") { let best: Fig | null = null, bd = 90; for (const o of figs.current.values()) { if (o === f || o.asleep || o.place !== f.place) continue; const d = Math.hypot(o.x - f.x, o.y - f.y); if (d < bd) { bd = d; best = o; } } f.rig.lookAt(best ? (best.x - f.x) * (f.facing) : 0); } else if (petting && f.react) f.rig.lookAt((f.react.ax - f.x) * f.facing); else if (animal && (animal.kind === "hen" ? animalD < 90 : animalD < 70) && !(animal.kind === "dog" && animal.state === "follow" && tick % 400 > 120)) f.rig.lookAt((animal.x - f.x) * f.facing); else f.rig.lookAt(0);
           if (!moving && petting) f.rig.face(f.facing, true);
           if (posed) f.rig.update(poseSecs);
-          f.rig.weather({ rain: wet && !snowing && !f.asleep, cold: (winter || snowing) && !f.asleep });
+          f.rig.weather({ rain: wet && !snowing && !f.asleep, cold: (winter || snowing || weather === "bura") && !f.asleep });
           if (moving && snowiness > 0.3 && every(6)) { prints.push({ x: f.x + (tick % 12 < 6 ? -4 : 4), y: f.y + 2, at: tick }); if (prints.length > 400) prints.shift(); }
           f.g.zIndex = f.y;
           const subjectX = viewRef.current === "cinema" ? (cinema.current?.x ?? fx) : fx, subjectY = viewRef.current === "cinema" ? (cinema.current?.y ?? fy) : fy;
