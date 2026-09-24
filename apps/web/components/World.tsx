@@ -23,7 +23,7 @@ type Rig = Citizen | Figurine;
 import { Ambience } from "./world/ambience";
 import { ProjectDetails, type CommunityView } from "./CommunityProjects";
 import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, nightGlow, clearNightGlow, setClassicHouses, streetHouse, treeCrowns } from "./world/buildings";
-import { DALMATIAN_FOR, chimneyTop, forgeAt, kindOfDrawing, lanternAt, signPlacement } from "./world/dalmatian";
+import { DALMATIAN_FOR, HOUSES, isoOf, type Kind, chimneyTop, forgeAt, kindOfDrawing, lanternAt, signPlacement } from "./world/dalmatian";
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
 import { Life, type Critter } from "./world/life";
@@ -394,6 +394,8 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       const smallStyle = new TextStyle({ fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x1e5a63, stroke: { color: 0xf7f6f3, width: 3, join: "round" } });
       // each place owns its drawn things so it can be redrawn when someone builds on it
       const drawn = new Map<string, Container>();
+      /** the drawing that stands for each building, and its colour, for dressing a home as lived in or left */
+      const houseOf = new Map<string, { kind: Kind; body: Container; tint: number }>();
       const drawnMarks = new Map<string, Container>();
       const drawPlace = (p: PlaceView) => {
         drawn.get(p.id)?.destroy({ children: true }); nameOf.get(p.id)?.destroy(); nameOf.delete(p.id);
@@ -438,8 +440,8 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
           const standIn = p.kind === "shop" ? "shop" : "house"; const stand = local(streetHouse(standIn, vhash(p.x, p.y, 13)) ?? bldVariant(standIn, p.x, p.y));
           void lookSvg(p.sprite.slice(5)).then((svg) => { if (!svg || g.destroyed) return; const d = new Graphics(); try { d.svg(svg); } catch { return; } const b = d.getLocalBounds(); if (b.width < 1) return; const target = p.kind === "shop" ? 120 : 104; const sc = target / b.width; d.scale.set(sc); d.position.set(-(b.x + b.width / 2) * sc, -(b.y + b.height) * sc); d.zIndex = 0; stand?.destroy(); g.addChild(d); });
         } else {
-          const drawing = streetHouse(p.sprite, vhash(p.x, p.y, 13)) ?? bldVariant(p.sprite, p.x, p.y); local(drawing);
-          const kind = kindOfDrawing(drawing); const board = kind ? signPlacement(kind) : null;
+          const drawing = streetHouse(p.sprite, vhash(p.x, p.y, 13)) ?? bldVariant(p.sprite, p.x, p.y); const body = local(drawing);
+          const kind = kindOfDrawing(drawing); if (body && kind) houseOf.set(p.id, { kind, body, tint: body.tint }); else houseOf.delete(p.id); const board = kind ? signPlacement(kind) : null;
           if (board) {
             const sign = new Text({ text: p.name.replace(/^the /i, "").toUpperCase(), style: signStyle }); sign.anchor.set(0.5);
             // as tall as the board allows, narrowed to fit a long name
@@ -470,6 +472,37 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         g.on("pointertap", () => { if (performance.now() < suppressSelectUntil) return; const here = [...agents.current.values()].filter((a) => a.location === p.id); onSelect(null); placePast.current=null; setPlaceInfo({ decorations:p.decorations, community: p.community, stock: p.stock, hasHistory: p.hasHistory, id: p.id, name: p.name, district: p.district, kind: p.kind, sprite: p.sprite, owner: p.owner, site: p.site, people: here.map((a) => ({ id: a.id, name: a.name, asleep: a.asleep, job: a.job, appearance: a.appearance, age: a.age, carrying:a.carrying, ...(a.pose ? { pose: a.pose } : {}) })) }); });
       };
       for (const p of places.values()) drawPlace(p);
+      // #6 a home that is lived in shows it: washing on a line beside it and a pot of geraniums at the door. One whose people are all
+      // gone goes grey and quiet: weeds up the walls, a slipped tile or two at its foot, and no smoke (the hearth is out)
+      const homeState = new Map<string, string>(), homeDress = new Map<string, Container>();
+      const dressHome = (p: PlaceView) => {
+        const h = houseOf.get(p.id); const homey = !!h && (p.kind === "home" || ["stone", "fisher", "townhouse"].includes(h.kind));
+        const living = homey ? [...agents.current.values()].filter((a) => a.home === p.id).length : 0;
+        const forced = q?.get("homes"); // ?homes=lived|empty previews every house one way
+        const state = !homey || p.site ? "" : forced === "lived" || forced === "empty" ? forced : living ? "lived" : p.kind === "home" ? "empty" : "";
+        if (homeState.get(p.id) === state && (!state || homeDress.get(p.id)?.destroyed === false)) return; homeState.set(p.id, state);
+        const old = homeDress.get(p.id); if (old) { for (const c of old.children) { const i = cloths.indexOf(c as never); if (i >= 0) cloths.splice(i, 1); } old.destroy({ children: true }); homeDress.delete(p.id); }
+        if (h) h.body.tint = state === "empty" ? mix(h.tint as number, 0xb9b4aa, 0.45) : h.tint;
+        if (!state || !h) return;
+        const { w, d } = HOUSES[h.kind].spec; const iso = isoOf(h.kind); const hs = vhash(p.x, p.y, 21);
+        const dress = new Container(); dress.position.set(p.x, p.y); dress.zIndex = p.y + 2; scene.addChild(dress); homeDress.set(p.id, dress);
+        const g = new Graphics(); dress.addChild(g);
+        if (state === "lived") {
+          // the line runs beside the side wall on two posts, with the week's washing pegged along it
+          const [ax, ay] = iso(w + 26, d - 6, 0), [bx, by] = iso(w + 26, Math.max(10, d - 70), 0);
+          for (const [x, y] of [[ax, ay], [bx, by]] as const) g.moveTo(x, y).lineTo(x, y - 38).stroke({ width: 2.2, color: 0x8a6a48, cap: "round" });
+          g.moveTo(ax, ay - 36).quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 - 30, bx, by - 36).stroke({ width: 0.9, color: 0x5d5a52 });
+          const colours = [0xf4efe2, 0x3f6a8c, 0xc4503f, 0xefe4c8, 0x8fa56a];
+          for (let i = 0; i < 4; i++) { const t = 0.18 + i * 0.21, x = ax + (bx - ax) * t, y = ay + (by - ay) * t - 36 + 4 * 4 * t * (1 - t) * 1.5; const c = new Graphics(); c.position.set(x, y); const tall = 9 + ((hs * 10 + i * 3) % 5); c.rect(-4, 0, 8, tall).fill(colours[(i + Math.floor(hs * 5)) % colours.length]!).stroke({ width: 0.6, color: 0x4a4a42, alpha: 0.6 }); dress.addChild(c); cloths.push(c as never); }
+          // geraniums in a pot by the door
+          const [px, py] = iso(w * 0.5 + 24, d + 7, 0); g.roundRect(px - 5, py - 9, 10, 9, 2).fill(0xb8703f).stroke({ width: 0.7, color: 0x5d3b26 }); for (let i = 0; i < 5; i++) g.circle(px - 5 + i * 2.5, py - 12 - (i % 2) * 3, 2.2).fill(i % 2 ? 0xc4503f : 0xd9574a); g.ellipse(px, py - 10, 6, 2.5).fill({ color: 0x4f7a5a, alpha: 0.9 });
+        } else {
+          // weeds up the front and side walls, and a couple of tiles slipped off the roof lying at its foot
+          for (let i = 0; i < 16; i++) { const along = vhash(p.x + i, p.y, 22), side = i % 3 === 0; const [x, y] = side ? iso(w + 2, d * along, 0) : iso(w * along, d + 2, 0); const hgt = 6 + vhash(p.x, p.y + i, 23) * 12; g.moveTo(x, y).lineTo(x - 3, y - hgt).moveTo(x, y).lineTo(x + 2, y - hgt * 0.8).moveTo(x, y).lineTo(x + 4, y - hgt * 0.55).stroke({ width: 1.2, color: i % 2 ? 0x7d8a52 : 0x98a36a, cap: "round" }); }
+          for (let i = 0; i < 3; i++) { const [x, y] = iso(w * (0.2 + i * 0.25), d + 12 + i * 3, 0); g.poly([x - 5, y, x + 4, y - 2, x + 6, y + 1, x - 3, y + 3]).fill(0xc2653f).stroke({ width: 0.6, color: 0x6e3a24 }); }
+        }
+      };
+      const dressHomes = () => { for (const p of places.values()) dressHome(p); };
       // the konoba brings its own tables under its vine, so the tavern's terrace and parasol stay away
       const tavern = places.get("tavern"); const konoba = !classic && !!tavern && DALMATIAN_FOR[tavern.sprite]?.kind === "konoba";
       const decor = keepOffRoads([...decorFor([...places.values()]), ...wildlands()], segs).filter((d) => !(konoba && tavern && /^(terrace|parasol)$/.test(d.sprite) && Math.hypot(d.x - tavern.x, d.y - tavern.y) < 160));
@@ -499,6 +532,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       // the moving parts of the drawn things, found by their labels
       const findParts = (label: string): Container[] => { const out: Container[] = []; const walk = (n: Container) => { if (n.label === label) out.push(n); for (const ch of n.children) if (ch instanceof Container) walk(ch); }; walk(scene); return out; };
       const sails = findParts("sails"), bells = findParts("bell"), cloths = findParts("cloth"); let millSpeed = 0;
+      dressHomes(); // now the washing lines have somewhere to sway
       const boats = [...scene.children].filter((ch) => decor.some((d) => d.sprite === "rowboat" && Math.abs(ch.position.x - d.x) < 1 && Math.abs(ch.position.y - d.y) < 1)) as (Container & { userData: number })[]; for (const bt of boats) bt.userData = bt.position.y;
       const updateMoorings=harborMoorings(scene,boats,decor.filter(d=>d.sprite==="pier"));
       let detailSeconds=0;const quietMotion=window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -649,7 +683,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       };
       // a walk wears the path it takes, but the day played back again wears none twice
       const moveTo = (id: string, place: string) => { const f = figs.current.get(id); if (!f) return; releaseSeat(f); const seat = seatOf.current.get(place) ?? 0; seatOf.current.set(place, (seat + 1) % 10); const sp = spot(place, seat); if (f.place && f.place !== place && !rw) { wear.step(f.place, place); trailStep(f.place, place); } f.tx = sp.x; f.ty = sp.y; f.place = place; const a = agents.current.get(id); if (a) { a.location = place; a.place = places.get(place)?.name ?? place; } };
-      const refreshPlaces = async () => { try { const t = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock) || old.storedCount !== p.storedCount || old.looseCount !== p.looseCount) drawPlace(p); } setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
+      const refreshPlaces = async () => { try { const t = (await (await fetch(`${apiUrl}/api/town`, { cache: "no-store" })).json()) as TownView; for (const p of t.places) { const old = places.get(p.id); places.set(p.id, p); if (!old || old.kind !== p.kind || old.name !== p.name || JSON.stringify(old.decorations) !== JSON.stringify(p.decorations) || JSON.stringify(old.community) !== JSON.stringify(p.community) || JSON.stringify(old.site) !== JSON.stringify(p.site) || JSON.stringify(old.stock) !== JSON.stringify(p.stock) || old.storedCount !== p.storedCount || old.looseCount !== p.looseCount) { drawPlace(p); homeState.delete(p.id); } } dressHomes(); setPlaceInfo(info => { const p = info ? places.get(info.id) : null; return info && p ? { ...info, decorations:p.decorations, community: p.community, stock: p.stock, site: p.site, kind: p.kind, sprite: p.sprite, name: p.name, hasHistory: p.hasHistory } : info; }); } catch {} };
 
       // Full population snapshots are authoritative, including citizens who were moved off island.
       const syncPopulation = (list: PublicAgent[]) => {
@@ -666,6 +700,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         for (const a of list) ensure(a);
         setPlaceInfo(info=>info?{...info,people:list.filter(a=>a.location===info.id).map(a=>({id:a.id,name:a.name,asleep:a.asleep,job:a.job,appearance:a.appearance,age:a.age,carrying:a.carrying,pose:a.pose}))}:info);
         if (removed) setFeed(feed => [...feed]);
+        dressHomes();
       };
       poll = setInterval(() => { void fetch(`${apiUrl}/api/agents`, { cache: "no-store" }).then((r) => r.json()).then((list: PublicAgent[]) => syncPopulation(list)).catch(() => {}); void refreshPlaces(); }, 30000);
       /** One moment of the record played onto the island: live as it happens, or `past` while the last day plays back, when nothing is
