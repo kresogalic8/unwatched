@@ -192,6 +192,7 @@ function townHouse(s: Sheet, way: (typeof WAYS)[number], lit: boolean) {
   for (const z of [60, 120]) { s.poly(onPlane(s.front, rect(-1, z, w + 1, z + 5), 1.5), "#e7dfcd", MORTAR, 0.5); s.poly(onPlane(s.side, rect(-1, z, d + 1, z + 5), 1.5), "#d8d0bd", MORTAR, 0.5); }
   for (const [a, z] of [[16, 130], [60, 130], [100, 130], [16, 72], [100, 72]] as const) window_(s, s.front, a, z, 18, 28, way, lit);
   for (const [a, z] of [[22, 130], [58, 130], [22, 72], [58, 72]] as const) window_(s, s.side, a, z, 16, 26, way, lit);
+  signboard(s, SIGNS.townhouse!);
   // ground floor: a keystoned arch, barred windows either side
   door(s, s.front, 52, 78, 50, way, true); s.poly(onPlane(s.front, [[62, 51], [68, 51], [69, 57], [61, 57]], 0.6), "#ece5d4", MORTAR, 0.5);
   for (const a of [16, 100]) { s.poly(onPlane(s.front, rect(a - 2, 18, a + 18, 42)), "#e8e0cd", MORTAR, 0.5); s.poly(onPlane(s.front, rect(a, 20, a + 16, 40)), GLASS); for (let k = 3; k < 16; k += 4) s.line(s.front(a + k, 20, 1), s.front(a + k, 40, 1), "#2a2e2b", 0.9); }
@@ -220,7 +221,7 @@ function konoba(s: Sheet, way: (typeof WAYS)[number], lit: boolean) {
     s.poly(onPlane(s.front, arch(a0 - 4, a1 + 4, 0, 26)), "#e0d7c3", MORTAR, 0.6); s.poly(onPlane(s.front, arch(a0, a1, 0, 24), 0.2), lit ? "#5a3f26" : "#2f2b25");
     for (const a of [a0 + 12, a0 + 30]) { const c = s.front(a, 9, -6); s.ellipse(c, 8, 9, "#7a5436"); for (const dy of [-5, 0, 5]) s.line([c[0] - 7.5, c[1] + dy], [c[0] + 7.5, c[1] + dy], "#3b2a1c", 0.6, 0.7); s.circle(c, 3.2, "#5d3f28"); }
   }
-  s.text(68, 40, 1, "KONOBA", 7, "#5b4636");
+  signboard(s, SIGNS.konoba!);
   // barrels by the door and the pergola with its vine over the tables
   for (const a of [66, 132]) { const c = s.front(a, 0, 8); s.poly([[c[0] - 6, c[1]], [c[0] + 6, c[1]], [c[0] + 7, c[1] - 9], [c[0] + 6, c[1] - 17], [c[0] - 6, c[1] - 17], [c[0] - 7, c[1] - 9]], "#8a5f3d", "#4b3322", 0.5); for (const dy of [-3, -14]) s.line([c[0] - 6.5, c[1] + dy], [c[0] + 6.5, c[1] + dy], "#3b2a1c", 0.8); s.ellipse([c[0], c[1] - 17], 6, 2.2, "#6d4a30"); }
   const po = 46, pz = 60;
@@ -246,6 +247,19 @@ function awning(s: Sheet, a0: number, a1: number, z: number, out: number, c1: st
   for (let k = 0; k < n; k++) s.poly([s.front(at(k), z - 12, out), s.front(at(k + 1), z - 12, out), s.front((at(k) + at(k + 1)) / 2, z - 17, out)], k % 2 ? c1 : c2, "#6b5a45", 0.4);
   s.poly([s.front(a1, z, 0), s.front(a1, z - 12, out), s.front(a1, z - 12, 0)], c2, "#6b5a45", 0.4); // the cheek at the open end
 }
+/** Where a building's signboard hangs: which wall, the board's centre along it and up it, its size, how far it stands proud. The town letters the place's name on it. */
+type Sign = { wall: "front" | "side"; a: number; z: number; w: number; h: number; out: number };
+export const SIGNS: Partial<Record<Kind, Sign>> = {
+  shop: { wall: "front", a: 53, z: 70.5, w: 56, h: 9, out: 1 }, bakery: { wall: "front", a: 79, z: 60, w: 50, h: 9, out: 1 },
+  fishhouse: { wall: "front", a: 63, z: 46.5, w: 70, h: 8, out: 1 }, konoba: { wall: "side", a: 66, z: 44, w: 50, h: 10, out: 1 },
+  townhouse: { wall: "side", a: 32, z: 34, w: 52, h: 10, out: 1 },
+};
+/** A painted signboard: a dark frame, a lighter inset where the letters go. */
+function signboard(s: Sheet, sign: Sign) {
+  const p = sign.wall === "front" ? s.front : s.side; const { a, z, w, h, out } = sign;
+  s.poly(onPlane(p, rect(a - w / 2 - 2, z - h / 2 - 1.5, a + w / 2 + 2, z + h / 2 + 1.5), out - 0.2), "#6a4c32", "#3e2c1c", 0.5);
+  s.poly(onPlane(p, rect(a - w / 2, z - h / 2, a + w / 2, z + h / 2), out), "#7d5b3c");
+}
 /** A string course: a band of dressed stone standing proud of the wall, across the front and the side. */
 function course(s: Sheet, z: number) { const { w, d } = s.spec; s.poly(onPlane(s.front, rect(-1, z, w + 1, z + 5), 1.5), "#e7dfcd", MORTAR, 0.5); s.poly(onPlane(s.side, rect(-1, z, d + 1, z + 5), 1.5), "#d8d0bd", MORTAR, 0.5); }
 
@@ -261,7 +275,7 @@ function shop(s: Sheet, way: (typeof WAYS)[number], lit: boolean) {
   s.poly(onPlane(s.front, rect(66, 4, 90, 50), 0.2), way.door, "#3d3226", 0.6); s.poly(onPlane(s.front, rect(69, 28, 87, 46), 0.3), lit ? LIT : GLASS); s.circle(s.front(86, 24, 0.5), 0.9, "#d2b27a");
   window_(s, s.front, 104, 18, 14, 26, way, lit);
   awning(s, 8, 98, 62, 16, "#efe6cf", way.shutter);
-  s.poly(onPlane(s.front, rect(28, 66, 78, 75), 0.8), "#7a5a3c", "#4b3524", 0.5); s.poly(onPlane(s.front, rect(30, 67.5, 76, 73.5), 1), "#8f6a47");
+  signboard(s, SIGNS.shop!);
   for (const a of [16, 57, 98]) window_(s, s.front, a, 84, 16, 22, way, lit);
   roof(s, h, 111, CHIMNEYS.shop);
 }
@@ -280,7 +294,7 @@ function bakery(s: Sheet, way: (typeof WAYS)[number], lit: boolean) {
   door(s, s.front, 16, 38, 44, way, true);
   s.poly(onPlane(s.front, rect(52, 8, 106, 44)), "#e8e0cd", MORTAR, 0.5); s.poly(onPlane(s.front, rect(55, 11, 103, 41), 0.2), lit ? LIT : GLASS);
   for (const z of [18, 30]) { s.line(s.front(56, z, 0.3), s.front(102, z, 0.3), "#8a6f4e", 1.1); for (let a = 58; a < 100; a += 6) s.ellipse(s.front(a + 2, z + 2.5, 0.4), 2.6, 1.6, "#c98b4a"); }
-  awning(s, 50, 108, 52, 13, "#efe6cf", "#c4503f");
+  awning(s, 50, 108, 52, 13, "#efe6cf", "#c4503f"); signboard(s, SIGNS.bakery!);
   // the bench where the morning's loaves are set out
   s.poly([s.front(58, 12, 13), s.front(100, 12, 13), s.front(100, 12, 19), s.front(58, 12, 19)], "#b49a73", "#7c6647", 0.5);
   s.poly(onPlane(s.front, rect(58, 10, 100, 12), 19), "#9a8060", "#7c6647", 0.4);
@@ -334,6 +348,7 @@ function fishhouse(s: Sheet, _: (typeof WAYS)[number], lit: boolean) {
   s.poly(onPlane(s.front, rect(6, 0, 120, 15), 1), "#ddd4c0", MORTAR, 0.6); s.poly([s.front(6, 15, 1), s.front(120, 15, 1), s.front(120, 15, -8), s.front(6, 15, -8)], "#ebe4d4", MORTAR, 0.5);
   const r = rnd(183); for (let k = 0; k < 9; k++) { const c = s.front(14 + k * 11 + r() * 4, 15.5, -3); s.ellipse(c, 4.2, 1.5, k % 3 ? "#9fb0b3" : "#b9c6c7"); s.poly([[c[0] + 3.8, c[1]], [c[0] + 6.4, c[1] - 1.6], [c[0] + 6.4, c[1] + 1.6]], "#8a9b9f"); }
   for (const a of [16, 58, 100]) window_(s, s.front, a, 54, 14, 20, way, lit);
+  signboard(s, SIGNS.fishhouse!);
   roof(s, h, 191, CHIMNEYS.fishhouse);
   // a fish turning on the ridge
   const top = s.q(w / 2, d / 2, h + 40); s.line(top, [top[0], top[1] - 16], "#3c3f40", 1.2);
@@ -457,6 +472,17 @@ export function stockAt(kind: Kind): [number, number] | null {
   if (kind === "fishhouse") return q(62, d + 18, 0);
   if (kind === "mill") return q(w + 26, d - 10, 0);
   return null;
+}
+/** Which kind a Dalmatian drawing is: dal-stone2 is a stone house. */
+export function kindOfDrawing(drawing: string): Kind | null { const m = /^dal-([a-z]+)\d*$/.exec(drawing); return m && m[1]! in HOUSES ? (m[1] as Kind) : null; }
+/**
+ * Where to letter a building's sign: the board's centre and size in the drawing's units, and the two directions of its wall on
+ * screen, one per unit along the board and one per unit down it, so text can be laid flat on the board.
+ */
+export function signPlacement(kind: Kind): { x: number; y: number; w: number; h: number; along: [number, number]; down: [number, number] } | null {
+  const sign = SIGNS[kind]; if (!sign) return null; const { w, d } = HOUSES[kind].spec; const q = isoOf(kind);
+  const at = sign.wall === "front" ? q(sign.a, d + sign.out + 0.3, sign.z) : q(w + sign.out + 0.3, d - sign.a, sign.z);
+  return { x: at[0], y: at[1], w: sign.w, h: sign.h, along: sign.wall === "front" ? [0.684, 0.317] : [0.684, -0.317], down: [0, 0.72] };
 }
 /** The forge's anvil, where sparks fly while the smith works. */
 export const forgeAt = (): [number, number] => isoOf("smithy")(76, HOUSES.smithy.spec.d + 26, 14);

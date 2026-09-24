@@ -13,7 +13,7 @@ import { previewZoom, coast } from "./world/camera-motion";
 import { constructionStage } from "@unwatched/protocol";
 import { uiFont } from "@/lib/fonts";
 import { useEffect, useRef, useState } from "react";
-import { Application, BlurFilter, Container, Graphics, Rectangle, Text, TextStyle } from "pixi.js";
+import { Application, BlurFilter, Container, Graphics, Matrix, Rectangle, Text, TextStyle } from "pixi.js";
 import { API, type PublicAgent, type TownEvent, type Clock } from "@/lib/api";
 import { Citizen, lookFor, aged, type Look, type Pose } from "./world/citizen";
 import { Figurine } from "./world/figurine";
@@ -22,7 +22,7 @@ type Rig = Citizen | Figurine;
 import { Ambience } from "./world/ambience";
 import { ProjectDetails, type CommunityView } from "./CommunityProjects";
 import { loadWorldArt, lightWorldArt, drawConstruction, drawThing, drawStock, drawCart, drawSign, setSeason, worldLight, setClassicHouses, streetHouse, treeCrowns } from "./world/buildings";
-import { DALMATIAN_FOR, chimneyTop, forgeAt, lanternAt } from "./world/dalmatian";
+import { DALMATIAN_FOR, chimneyTop, forgeAt, kindOfDrawing, lanternAt, signPlacement } from "./world/dalmatian";
 import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/palette";
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
 import { Life, type Critter } from "./world/life";
@@ -281,6 +281,8 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
       };
       // a place's name on the ground: ink with a paper edge, so it reads on sand, grass, stone and in the dark alike
       const nameStyle = new TextStyle({ fontFamily: uiFont(), fontSize: 10, fontWeight: "500", fill: 0x536451, letterSpacing: 1.2, stroke: { color: 0xeee5cd, width: 2, join: "round" } });
+      // a place's name painted on its signboard, cream on the dark board, laid flat on the wall it hangs from
+      const signStyle = new TextStyle({ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 40, fontWeight: "700", fill: 0xf2e6c8, letterSpacing: 3 });
       const smallStyle = new TextStyle({ fontFamily: uiFont(), fontSize: 11, fontWeight: "700", fill: 0x1e5a63, stroke: { color: 0xf7f6f3, width: 3, join: "round" } });
       // each place owns its drawn things so it can be redrawn when someone builds on it
       const drawn = new Map<string, Container>();
@@ -322,6 +324,13 @@ export function World({ mineId, onSelect, view, effects = true, observer = false
           void lookSvg(p.sprite.slice(5)).then((svg) => { if (!svg || g.destroyed) return; const d = new Graphics(); try { d.svg(svg); } catch { return; } const b = d.getLocalBounds(); if (b.width < 1) return; const target = p.kind === "shop" ? 120 : 104; const sc = target / b.width; d.scale.set(sc); d.position.set(-(b.x + b.width / 2) * sc, -(b.y + b.height) * sc); d.zIndex = 0; stand?.destroy(); g.addChild(d); });
         } else {
           const drawing = streetHouse(p.sprite, vhash(p.x, p.y, 13)) ?? bldVariant(p.sprite, p.x, p.y); local(drawing);
+          const kind = kindOfDrawing(drawing); const board = kind ? signPlacement(kind) : null;
+          if (board) {
+            const sign = new Text({ text: p.name.replace(/^the /i, "").toUpperCase(), style: signStyle }); sign.anchor.set(0.5);
+            // as tall as the board allows, narrowed to fit a long name
+            let k = (board.h * 0.62) / 40; if (sign.width * k > board.w * 0.9) k = (board.w * 0.9) / sign.width;
+            sign.setFromMatrix(new Matrix(board.along[0] * k, board.along[1] * k, board.down[0] * k, board.down[1] * k, board.x, board.y)); sign.zIndex = 1.5; g.addChild(sign);
+          }
           // #3: moss and lichen creep up the foot of a building, a little on every one and more on some, so the stone reads as lived-in and aged
           if (ROOF_Y[p.sprite] !== undefined) { const moss = new Graphics(); const n = 8 + Math.floor(vhash(p.x, p.y, 7) * 11); for (let i = 0; i < n; i++) { const mx = -54 + vhash(p.x + i, p.y, 8) * 108, mz = vhash(p.x, p.y + i, 9) * 30; moss.ellipse(mx, -mz, 3.5 + vhash(i, p.y, 10) * 5, 2.2 + vhash(i, p.x, 11) * 3).fill({ color: i % 3 ? 0x6f8158 : 0x8a9470, alpha: 0.2 + vhash(i, i + 3, 12) * 0.16 }); } moss.zIndex = 0.3; g.addChild(moss); }
           if (p.stock) { const st = drawStock(p.sprite, p.stock, drawing); if (st) { st.zIndex = 1; g.addChild(st); } }
