@@ -23,6 +23,8 @@ export default defineConfig({
     baseURL: `http://localhost:${WEB_PORT}`,
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
     launchOptions: { executablePath: process.env.PW_CHROME || undefined, args: ["--use-gl=angle", "--ignore-gpu-blocklist"] },
   },
   webServer: [
