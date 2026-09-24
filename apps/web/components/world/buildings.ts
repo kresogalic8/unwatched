@@ -53,21 +53,23 @@ const kindOf = (drawing: string): Kind | null => { const m = /^dal-([a-z]+)\d*$/
 /** How fast lit windows come up and go down, in seconds. */
 const WINDOW_FADE = 1.6;
 const litTarget = new WeakMap<Sprite, { to: number; at: number }>();
+/** A prop's drawing: the Dalmatian one where the atlas has it, unless the classic street was asked for. */
+const propDrawing = (name: string) => !classicHouses && ("dal-" + name) in HARBOR_ATLAS ? "dal-" + name : name;
 function harborDrawing(name: string): Drawn | null {
-  const asset=HARBOR_ATLAS[name as keyof typeof HARBOR_ATLAS], texture=atlasTextures.get(name);
+  const drawn=propDrawing(name); const asset=HARBOR_ATLAS[drawn as keyof typeof HARBOR_ATLAS], texture=atlasTextures.get(drawn);
   if(!asset||!texture)return null;
-  const c=new Container(), sprite=new Sprite(texture);sprite.label="harbor:"+name;sprite.position.set(asset.x,asset.y);sprite.width=asset.width;sprite.height=asset.height;c.addChild(sprite);
+  const c=new Container(), sprite=new Sprite(texture);sprite.label="harbor:"+drawn;sprite.position.set(asset.x,asset.y);sprite.width=asset.width;sprite.height=asset.height;c.addChild(sprite);
   const over=(t:Texture,label:string)=>{const s=new Sprite(t);s.label=label;s.position.set(asset.x,asset.y);s.width=asset.width;s.height=asset.height;c.addChild(s);return s;};
   // the lit drawing lies over the dark one and fades in when someone is home, rather than switching
-  const litTexture=atlasTextures.get(name+"-lit");
-  if(litTexture){const lit=over(litTexture,"harbor-lit:"+name);lit.alpha=0;lit.onRender=()=>{const tg=litTarget.get(lit);if(!tg)return;const now=performance.now()/1000;const step=Math.min(1,(now-tg.at)/WINDOW_FADE);tg.at=now;lit.alpha+=(tg.to-lit.alpha)*Math.min(1,step*3);lit.visible=lit.alpha>.004;};}
+  const litTexture=atlasTextures.get(drawn+"-lit");
+  if(litTexture){const lit=over(litTexture,"harbor-lit:"+drawn);lit.alpha=0;lit.onRender=()=>{const tg=litTarget.get(lit);if(!tg)return;const now=performance.now()/1000;const step=Math.min(1,(now-tg.at)/WINDOW_FADE);tg.at=now;lit.alpha+=(tg.to-lit.alpha)*Math.min(1,step*3);lit.visible=lit.alpha>.004;};}
   // the sun on each face: shade where a wall turns from it, a warm rake where a low sun catches it
-  const faces=faceTextures.get(name);
+  const faces=faceTextures.get(drawn);
   if(faces)for(const face of FACES){
     const shade=over(faces[face],"light-shade:"+face);shade.blendMode="multiply";shade.onRender=()=>{shade.tint=worldLight.shadeTint;shade.alpha=worldLight.shade[face];shade.visible=shade.alpha>.004;};
     const glow=over(faces[face],"light-glow:"+face);glow.blendMode="add";glow.onRender=()=>{glow.tint=worldLight.glowTint;glow.alpha=worldLight.glow[face];glow.visible=glow.alpha>.004;};
   }
-  if(name === "bench") { sprite.scale.y *= BENCH_SCALE_Y; sprite.y *= BENCH_SCALE_Y; }
+  if(drawn === "bench") { sprite.scale.y *= BENCH_SCALE_Y; sprite.y *= BENCH_SCALE_Y; } // the old bench is drawn tall and squashed to its seat; the stone one is drawn at it
   if(/tree|olive/.test(name)) sprite.tint=season==="autumn"?0xe8c397:season==="winter"?0xbdc9c4:season==="spring"?0xe5f0cd:0xffffff;
   if(name==="washing"){const cloth=harborDrawing("cloth");if(cloth){cloth.c.label="cloth";c.addChild(cloth.c);}}
   if(name==="mill"||name==="dal-mill") {

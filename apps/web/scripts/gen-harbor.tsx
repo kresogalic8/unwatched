@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { House, HouseFaces, HOUSE_SPECS, Tree, Barrel, Lamp, Table, Boat, Pot, P } from '../components/world/harbor-art';
 import { HarborProp, HarborTower } from '../components/world/harbor-props';
 import { HOUSES, atlasName, houseFacesSvg, houseSvg, type Kind } from '../components/world/dalmatian';
+import { PROPS, propSvg } from '../components/world/dalmatian-props';
 type Frame=[number,number,number,number,number]; // sheet, x, y, w, h
 type FaceName='front'|'side'|'roof';
 const assets:Record<string,{src:string;w:number;x:number;y:number;width:number;height:number;sheet?:number;frame?:[number,number,number,number];faces?:Record<FaceName,Frame>}>={};
@@ -57,6 +58,8 @@ for(const kind of Object.keys(HOUSES) as Kind[]){
   add(name+'-lit',<g dangerouslySetInnerHTML={{__html:houseSvg(kind,v,true).svg}}/>,(w+d)*.95*.72,[0,0],1);
   faceSource[name]=atlasName(kind,0);}
 }
+// The square's and the harbour's props in the same hand, drawn at the size the street places them.
+for(const [name,prop] of Object.entries(PROPS)){add('dal-'+name,<g dangerouslySetInnerHTML={{__html:propSvg(name)!}}/>,prop.w,[0,0],1);if(prop.lit)add('dal-'+name+'-lit',<g dangerouslySetInnerHTML={{__html:propSvg(name,true)!}}/>,prop.w,[0,0],1);}
 add('tree-large',<Tree u={0} v={0}/>,110,P(0,0),1.3);
 add('tree-small',<Tree u={0} v={0}/>,110,P(0,0),.8);
 add('olive',<Tree u={0} v={0}/>,110,P(0,0),.85);
