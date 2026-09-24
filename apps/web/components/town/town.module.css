@@ -161,6 +161,15 @@
 .liveShort { display: none; }
 .liveDot { width: 8px; height: 8px; border-radius: 999px; background: #8fbf7a; }
 
+/* the postcard: the card itself, large, over the island, with what to do with it underneath */
+.cardBack { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(15, 20, 18, 0.72); }
+.card { display: flex; flex-direction: column; gap: 16px; width: min(900px, 100%, calc((100dvh - 140px) * 1.5)); }
+.card:has(img[data-upright="true"]) { width: min(520px, 100%, calc((100dvh - 140px) / 1.5)); animation: panelIn 0.25s ease; }
+.card img { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); transform: rotate(-0.6deg); }
+.cardActions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.cardActions .ctaBig { flex: 0 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 22px; text-decoration: none; }
+.cardActions .secondary { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 1px solid var(--rule); border-radius: 999px; background: var(--glass); color: var(--ink); font-size: 16px; }
+
 /* the first-visit tip */
 .hint { position: absolute; z-index: 34; left: 20px; top: 76px; display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 16px; background: var(--glass); border: 1px solid var(--rule); border-radius: 999px; font-size: 14px; color: var(--muted); }
 .hint button { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--surface); color: var(--ink); }

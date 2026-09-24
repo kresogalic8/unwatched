@@ -96,9 +96,11 @@ type Fig = { /** off the boat with a suitcase, until they have set it down somew
 export type RewindMark = { t: number; text: string; importance: number; actors: string[] };
 /** The day played back, as the page shows it: its span in island minutes, the playhead, and the moments on it. */
 export type RewindState = { from: number; to: number; t: number; playing: boolean; marks: RewindMark[] } | null;
+/** The island as it looks this moment, for a postcard: the picture on screen, and the place at its middle. */
+export type Photo = { canvas: HTMLCanvasElement; place: string };
 export type RewindControl = { start(hours?: number): Promise<void>; play(): void; pause(): void; seek(t: number): void; stop(): void };
 export type WorldSnapshot = { clock: Clock | null; feed: TownEvent[]; citizens: PublicAgent[]; ready: boolean; error: boolean };
-export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API, selectedId = null, spotlight = null, miniature: miniatureProp, onMiniatureChange, compact = false }: { /** the miniature look, when the page holds it (the town page's view switcher); left out, the world keeps its own */ miniature?: boolean; onMiniatureChange?: (on: boolean) => void; /** the town page's own chrome: no minimap, and only zoom and sound at the island's edge */ compact?: boolean; /** filled with the controls of the day played back, for the page's scrubber */ rewindControl?: { current: RewindControl | null }; onRewind?: (state: RewindState) => void; apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void; selectedId?: string | null; spotlight?: { id: number; actors: string[]; place: string | null; at: number } | null }) {
+export function World({ photoControl, rewindControl: rewindHandle, onRewind, mineId, onSelect, view, effects = true, observer = false, onSnapshot, focusId, onViewChange, apiUrl = API, selectedId = null, spotlight = null, miniature: miniatureProp, onMiniatureChange, compact = false }: { /** the miniature look, when the page holds it (the town page's view switcher); left out, the world keeps its own */ miniature?: boolean; onMiniatureChange?: (on: boolean) => void; /** the town page's own chrome: no minimap, and only zoom and sound at the island's edge */ compact?: boolean; /** filled with a way to take the island's picture as it is on screen */ photoControl?: { current: (() => Photo | null) | null }; /** filled with the controls of the day played back, for the page's scrubber */ rewindControl?: { current: RewindControl | null }; onRewind?: (state: RewindState) => void; apiUrl?: string; mineId: string | null; onSelect: (a: PublicAgent | null) => void; view: "street" | "map" | "cinema"; effects?: boolean; observer?: boolean; focusId?: string | null; onViewChange?: (view: "street" | "map" | "cinema") => void; onSnapshot?: (snapshot: WorldSnapshot) => void; selectedId?: string | null; spotlight?: { id: number; actors: string[]; place: string | null; at: number } | null }) {
   const viewChange = useRef(onViewChange); viewChange.current = onViewChange;
   const rewindChange = useRef(onRewind); rewindChange.current = onRewind;
   const ownRewind = useRef<RewindControl | null>(null); const rewindControl = rewindHandle ?? ownRewind;
@@ -819,6 +821,13 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
         if (liveClock) { clockRef.current = liveClock; setClock(liveClock); }
         try { setFeed(((await (await fetch(`${apiUrl}/api/events?since=${(liveClock?.t ?? 0) - 240}`, { cache: "no-store" })).json()) as TownEvent[]).filter((e) => e.importance >= 0.1 && e.kind !== "agent.move" && e.text).slice(-12).reverse()); } catch {}
       };
+      // a postcard: the frame drawn again and copied at once (the canvas keeps nothing between frames), and the place in the middle of it
+      if (photoControl) photoControl.current = () => {
+        if (!app) return null; app.render(); const src = app.canvas as HTMLCanvasElement; const out = document.createElement("canvas"); out.width = src.width; out.height = src.height; out.getContext("2d")!.drawImage(src, 0, 0);
+        const cam = camera.current, ex = (app.screen.width / 2 - cam.x) / cam.zoom, ey = (app.screen.height / 2 - cam.y) / cam.zoom; let best: PlaceView | null = null, bd = Infinity;
+        for (const p of places.values()) { if (p.kind === "wild" || p.kind === "plot") continue; const d = Math.hypot(p.x - ex, p.y - ey); if (d < bd) { bd = d; best = p; } }
+        return { canvas: out, place: best?.name ?? "the island" };
+      };
       rewindControl.current = {
         async start(hours = 24) {
           const r = (await (await fetch(`${apiUrl}/api/replay?hours=${hours}`, { cache: "no-store" })).json()) as { from: number; to: number; weather: string; start: Record<string, { location: string; asleep: boolean }>; events: TownEvent[] };
@@ -1234,7 +1243,7 @@ export function World({ rewindControl: rewindHandle, onRewind, mineId, onSelect,
       // after the application has drawn the frame: what the draw cost lands in "render"
       app.ticker.add(() => perfMark("idle"), undefined, UPDATE_PRIORITY.UTILITY);
     })().catch(() => { if(alive) setLoadError(true); });
-    return () => { alive = false; stopWatching?.(); cameraControl.current = null; rewindControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); clearNightGlow(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
+    return () => { alive = false; stopWatching?.(); cameraControl.current = null; rewindControl.current = null; if (photoControl) photoControl.current = null; navigateMini.current=null; for (const timer of speechTimers) clearTimeout(timer); speechTimers.clear(); dialogue.clear(); bubbles.current.clear(); ws?.close(); if (poll) clearInterval(poll); void ambienceRef.current?.disable(); clearNightGlow(); if (inited) { try { app?.destroy(true); } catch {} } figs.current.clear(); agents.current.clear(); seatOf.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineId, apiUrl]);
 

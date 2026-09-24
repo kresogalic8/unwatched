@@ -14,7 +14,8 @@ import { Bubble, Tide } from "@/components/ui";
 import { api, hhmm, dayOf as dayNumber, PRIVATE_KINDS, type PublicAgent, type OwnerAgent, type TownEvent } from "@/lib/api";
 import { Portrait } from "@/components/Portrait";
 import { useMyAgent } from "@/lib/useAgent";
-import type { WorldSnapshot, RewindControl, RewindState } from "@/components/World";
+import type { WorldSnapshot, RewindControl, RewindState, Photo } from "@/components/World";
+import { postcard } from "@/lib/postcard";
 import theme from "@/components/explore/explore.module.css";
 import s from "@/components/town/town.module.css";
 const World = dynamic(() => import("@/components/World").then((m) => m.World), {
@@ -47,6 +48,9 @@ export default function Town() {
   const rewindCtl = useRef<RewindControl | null>(null);
   const [rewind, setRewind] = useState<RewindState>(null);
   const [rewinding, setRewinding] = useState(false);
+  // a postcard of the island as it is on screen, to keep or send
+  const photoCtl = useRef<(() => Photo | null) | null>(null);
+  const [card, setCard] = useState<{ url: string; blob: Blob; name: string; upright: boolean } | null>(null);
   const [snapshot, setSnapshot] = useState<WorldSnapshot>({
     clock: null,
     feed: [],
@@ -147,6 +151,17 @@ export default function Town() {
     setRewinding(true); setSel(null); setTracking(null); setFollow(false); setPossessed(false); changeView("cinema");
     try { await rewindCtl.current?.start(24); } catch { setRewinding(false); }
   }
+  function takePostcard() {
+    const shot = photoCtl.current?.(); const c = snapshot.clock; if (!shot || !c) return;
+    const who = sel ?? (tracking ? snapshot.citizens.find((p) => p.id === tracking) : null);
+    const title = who ? `${first(who.name)}, ${who.asleep ? "asleep at" : "at"} ${who.place.replace(/^the /i, "the ")}` : `${shot.place.charAt(0).toUpperCase()}${shot.place.slice(1)}`;
+    const sub = `Day ${c.day} · ${String(c.hour).padStart(2, "0")}:${String(c.minute % 60).padStart(2, "0")}${c.weather ? ` · ${c.weather}` : ""}`;
+    const drawn = postcard(shot.canvas, { title, sub, day: c.day }); drawn.toBlob((blob) => { if (!blob) return; setCard((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(blob), blob, name: `unwatched-day-${c.day}.png`, upright: drawn.height > drawn.width }; }); }, "image/png");
+  }
+  async function shareCard() {
+    if (!card) return; const file = new File([card.blob], card.name, { type: "image/png" });
+    try { if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "A postcard from the island" }); } catch {}
+  }
   function stopRewind() { rewindCtl.current?.stop(); setRewinding(false); changeView("street"); }
   function toggleMiniature() { setMiniature((m) => { try { localStorage.setItem("uw.look", m ? "town" : "miniature"); } catch {} return !m; }); }
   function dismissHint() { setHint(false); try { localStorage.setItem("uw.townHint", "1"); } catch {} }
@@ -185,6 +200,7 @@ export default function Town() {
           onMiniatureChange={toggleMiniature}
           onSnapshot={setSnapshot}
           rewindControl={rewindCtl}
+          photoControl={photoCtl}
           onRewind={setRewind}
         />
       </section>
@@ -425,10 +441,27 @@ export default function Town() {
               <ArrowIcon name="model" size={20} /><span>Miniature</span>
             </button>
             <span className={s.navRule} aria-hidden="true" />
+            <button aria-label="Postcard" title="Make a postcard of what you see" onClick={takePostcard}>
+              <ArrowIcon name="postcard" size={20} /><span>Postcard</span>
+            </button>
             <button aria-label="The last day again" title="Play the last day back in a minute" onClick={() => void startRewind()}>
               <ArrowIcon name="rewind" size={20} /><span>The day again</span>
             </button>
           </nav>
+
+          {card && (
+            <div className={s.cardBack} role="dialog" aria-modal="true" aria-label="Your postcard" onClick={(e) => { if (e.target === e.currentTarget) setCard(null); }} onKeyDown={(e) => { if (e.key === "Escape") setCard(null); }}>
+              <div className={s.card}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={card.url} data-upright={card.upright} alt="A postcard of the island as it looked a moment ago" />
+                <div className={s.cardActions}>
+                  <a className={s.ctaBig} href={card.url} download={card.name} autoFocus><ArrowIcon name="download" size={20} />Save the postcard</a>
+                  {typeof navigator !== "undefined" && "canShare" in navigator && <button className={s.secondary} onClick={() => void shareCard()}><ArrowIcon name="share" size={20} />Send it</button>}
+                  <button className={s.secondary} onClick={() => setCard(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {hint && (
             <div className={s.hint} id="town-camera-help" data-panel={journalOpen}>
