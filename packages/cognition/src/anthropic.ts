@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ActionProposal, Dialogue, Paper, Reflection, type Perception, DayPlan, DigestText, Persona, LifeText, Judgement, PersonaDepth } from "@unwatched/protocol";
 import type { AgentState, Brain, ConverseContext, PaperContext, ReflectContext, Tier, PlanContext, DigestContext, ChildContext, LifeContext, JudgeContext } from "@unwatched/engine";
 import { MockBrain } from "./mock.ts";
+import type { CallKind, ProviderUsage } from "./openrouter.ts";
 import { WORLD, personaBlock, decidePrompt, conversePrompt, reflectPrompt, paperSystem, paperPrompt, lifeSystem, lifePrompt, judgeSystem, judgePrompt, planPrompt, digestSystem, digestPrompt, childSystem, childPrompt, depthSystem, depthPrompt } from "./prompts.ts";
 
 export interface AnthropicBrainOptions {
@@ -36,6 +37,13 @@ export class AnthropicBrain implements Brain {
     this.timeoutMs = o.timeoutMs ?? envMs("UW_TIMEOUT_MS", 45_000);
     this.reflectTimeoutMs = o.reflectTimeoutMs ?? envMs("UW_TIMEOUT_REFLECT_MS", 90_000);
   }
+  /** Every call's tokens, reported as the OpenRouter brain reports them, so the day's spend and its ceiling see this backend too. */
+  onUsage: ((usage: ProviderUsage) => void) | null = null;
+  private async metered<R extends { model: string; usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } }>(kind: CallKind, agentId: string | null, call: Promise<R>): Promise<R> {
+    const res = await call; const u = res.usage; const cached = u.cache_read_input_tokens ?? 0;
+    try { this.onUsage?.({ agentId, kind, model: res.model, promptTokens: u.input_tokens + cached + (u.cache_creation_input_tokens ?? 0), completionTokens: u.output_tokens, cachedTokens: cached, costUsd: null }); } catch { this.log("Provider usage reporting failed"); }
+    return res;
+  }
   /** The request options every call carries: a deadline by tier and one retry, so a stalled model cannot hold the morning. */
   private opts(model: string) { return { timeout: model === this.reflectModel ? this.reflectTimeoutMs : this.timeoutMs, maxRetries: 1 }; }
 
@@ -50,12 +58,12 @@ export class AnthropicBrain implements Brain {
   async decide(p: Perception, a: AgentState, tier: Tier): Promise<ActionProposal> {
     const model = tier >= 2 ? this.stakes : this.routine;
     try {
-      const res = await this.client.messages.parse({
+      const res = await this.metered("action_proposal", a.id, this.client.messages.parse({
         model, max_tokens: 1024,
         system: this.system(a),
         messages: [{ role: "user", content: decidePrompt(p) }],
         output_config: { format: zodOutputFormat(ActionProposal) },
-      }, this.opts(model));
+      }, this.opts(model)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.decide(p, a, tier);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.decide(p, a, tier)); }
@@ -64,12 +72,12 @@ export class AnthropicBrain implements Brain {
   async converse(ctx: ConverseContext): Promise<Dialogue> {
     const { a, b } = ctx;
     try {
-      const res = await this.client.messages.parse({
+      const res = await this.metered("dialogue", ctx.a.id, this.client.messages.parse({
         model: this.routine, max_tokens: 1500,
         system: [{ type: "text", text: WORLD }, { type: "text", text: conversePrompt.system(ctx) }],
         messages: [{ role: "user", content: conversePrompt.user(ctx) }],
         output_config: { format: zodOutputFormat(Dialogue) },
-      }, this.opts(this.routine));
+      }, this.opts(this.routine)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.converse(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.converse(ctx)); }
@@ -78,12 +86,12 @@ export class AnthropicBrain implements Brain {
   async reflect(ctx: ReflectContext): Promise<Reflection> {
     const a = ctx.agent;
     try {
-      const res = await this.client.messages.parse({
+      const res = await this.metered("reflection", ctx.agent.id, this.client.messages.parse({
         model: this.reflectModel, max_tokens: 2000,
         system: this.system(a),
         messages: [{ role: "user", content: reflectPrompt(ctx) }],
         output_config: { format: zodOutputFormat(Reflection) },
-      }, this.opts(this.reflectModel));
+      }, this.opts(this.reflectModel)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.reflect(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.reflect(ctx)); }
@@ -91,12 +99,12 @@ export class AnthropicBrain implements Brain {
 
   async plan(ctx: PlanContext, tier: Tier): Promise<DayPlan> {
     try {
-      const res = await this.client.messages.parse({
+      const res = await this.metered("day_plan", ctx.agent.id, this.client.messages.parse({
         model: tier >= 2 ? this.stakes : this.routine, max_tokens: 1200,
         system: this.system(ctx.agent),
         messages: [{ role: "user", content: planPrompt(ctx) }],
         output_config: { format: zodOutputFormat(DayPlan) },
-      }, this.opts(tier >= 2 ? this.stakes : this.routine));
+      }, this.opts(tier >= 2 ? this.stakes : this.routine)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.plan(ctx, tier);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.plan(ctx, tier)); }
@@ -104,45 +112,45 @@ export class AnthropicBrain implements Brain {
 
   async digest(ctx: DigestContext): Promise<DigestText> {
     try {
-      const res = await this.client.messages.parse({ model: this.routine, max_tokens: 600, system: digestSystem, messages: [{ role: "user", content: digestPrompt(ctx) }], output_config: { format: zodOutputFormat(DigestText) } }, this.opts(this.routine));
+      const res = await this.metered("digest", ctx.agent.id, this.client.messages.parse({ model: this.routine, max_tokens: 600, system: digestSystem, messages: [{ role: "user", content: digestPrompt(ctx) }], output_config: { format: zodOutputFormat(DigestText) } }, this.opts(this.routine)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.digest(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.digest(ctx)); }
   }
   async child(ctx: ChildContext): Promise<Persona> {
     try {
-      const res = await this.client.messages.parse({ model: this.stakes, max_tokens: 900, system: childSystem, messages: [{ role: "user", content: childPrompt(ctx) }], output_config: { format: zodOutputFormat(Persona) } }, this.opts(this.stakes));
+      const res = await this.metered("child", null, this.client.messages.parse({ model: this.stakes, max_tokens: 900, system: childSystem, messages: [{ role: "user", content: childPrompt(ctx) }], output_config: { format: zodOutputFormat(Persona) } }, this.opts(this.stakes)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.child(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.child(ctx)); }
   }
   async writePaper(ctx: PaperContext): Promise<Paper> {
     try {
-      const res = await this.client.messages.parse({
+      const res = await this.metered("paper", null, this.client.messages.parse({
         model: this.reflectModel, max_tokens: 3000,
         system: paperSystem,
         messages: [{ role: "user", content: paperPrompt(ctx) }],
         output_config: { format: zodOutputFormat(Paper) },
-      }, this.opts(this.reflectModel));
+      }, this.opts(this.reflectModel)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.writePaper(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.writePaper(ctx)); }
   }
   async judge(ctx: JudgeContext): Promise<Judgement> {
     try {
-      const res = await this.client.messages.parse({ model: this.routine, max_tokens: 400, system: judgeSystem, messages: [{ role: "user", content: judgePrompt(ctx) }], output_config: { format: zodOutputFormat(Judgement) } }, this.opts(this.routine));
+      const res = await this.metered("judgement", null, this.client.messages.parse({ model: this.routine, max_tokens: 400, system: judgeSystem, messages: [{ role: "user", content: judgePrompt(ctx) }], output_config: { format: zodOutputFormat(Judgement) } }, this.opts(this.routine)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.judge(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.judge(ctx)); }
   }
   async life(ctx: LifeContext): Promise<LifeText> {
     try {
-      const res = await this.client.messages.parse({
+      const res = await this.metered("life", null, this.client.messages.parse({
         model: this.reflectModel, max_tokens: 3200,
         system: lifeSystem,
         messages: [{ role: "user", content: lifePrompt(ctx) }],
         output_config: { format: zodOutputFormat(LifeText) },
-      }, this.opts(this.reflectModel));
+      }, this.opts(this.reflectModel)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return this.fallback.life(ctx);
       return res.parsed_output;
     } catch (err) { return this.handle(err, () => this.fallback.life(ctx)); }
@@ -151,7 +159,7 @@ export class AnthropicBrain implements Brain {
   /** The depth a person has beyond the sheet, written once by the strongest mind and kept with them; the same prompt and schema as the OpenRouter brain. */
   async enrich(p: Persona, island: string): Promise<PersonaDepth | null> {
     try {
-      const res = await this.client.messages.parse({ model: this.reflectModel, max_tokens: 900, system: depthSystem, messages: [{ role: "user", content: depthPrompt(p, island) }], output_config: { format: zodOutputFormat(PersonaDepth) } }, this.opts(this.reflectModel));
+      const res = await this.metered("persona_depth", null, this.client.messages.parse({ model: this.reflectModel, max_tokens: 900, system: depthSystem, messages: [{ role: "user", content: depthPrompt(p, island) }], output_config: { format: zodOutputFormat(PersonaDepth) } }, this.opts(this.reflectModel)));
       if (res.stop_reason === "refusal" || !res.parsed_output) return null;
       return res.parsed_output;
     } catch (err) { return this.handle(err, async () => null); }

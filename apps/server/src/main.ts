@@ -30,7 +30,7 @@ import { BrainRouter, newToken, OwnBrain, OwnKeyBrain } from "./brains.ts";
 import type { BrainRow, Plan, Store, OwnerPrefs, OwnerRead } from "@unwatched/store";
 import { digestMail, letterMail, sendMail, mailEnabled, mailDue } from "./mail.ts";
 import { Billing, PLANS, PACKS, COST } from "./billing.ts";
-import { Metrics } from "./ops.ts";
+import { Metrics, costOf, type Funding } from "./ops.ts";
 import { RealWorld, parsePlace, resolveZone } from "./realworld.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -58,7 +58,7 @@ const MODELS = { routine: process.env.UW_OR_MODEL_ROUTINE ?? "anthropic/claude-h
 let clockRef = () => ({ day: 1, hour: 6, t: 0 });
 const PATRON_MODELS = { stakes: process.env.UW_OR_MODEL_PATRON_STAKES ?? "anthropic/claude-opus-5", reflect: process.env.UW_OR_MODEL_REFLECT ?? "anthropic/claude-opus-5" }; // a Patron's careful thoughts go to the most capable mind
 let modelsFor: (a: AgentState) => Partial<{ routine: string; stakes: string; reflect: string }> | null = () => null;
-const metrics = new Metrics(router, townBrain, () => clockRef(), MODELS, (a) => modelsFor(a));
+const metrics = new Metrics(router, () => clockRef());
 if (townBrain instanceof OpenRouterBrain) townBrain.modelsFor = (a) => modelsFor(a);
 const DAILY_CEILING_USD = Number(process.env.UW_DAILY_CEILING_USD ?? 120); // past it, careful thoughts go to the routine mind and reflections to the middle one; the clock never slows
 const brain = router; // endpoints keep talking to the router; the engine talks to the metrics wrapper
@@ -96,9 +96,10 @@ const telegramDb = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE
 configureDeliveryLog(telegramDb);
 // Retry content is private and retained only for the provider's deduplication window.
 if(telegramDb) setInterval(()=>{void telegramDb.from('delivery_jobs').update({payload:{},status:'expired'}).in('status',['failed','sending','pending']).lt('created_at',new Date(Date.now()-24*3600000).toISOString()).then(()=>{});},3600000).unref();
-if(telegramDb) {
- const recordUsage=(funding:string)=>(u:import("@unwatched/cognition").ProviderUsage)=>{void telegramDb.from("provider_usage").insert({agent_id:u.agentId,funding,kind:u.kind,model:u.model,prompt_tokens:u.promptTokens,completion_tokens:u.completionTokens,cached_tokens:u.cachedTokens,cost_usd:u.costUsd}).then(({error})=>{if(error)log("Provider usage persistence failed");});};
- if(townBrain instanceof OpenRouterBrain)townBrain.onUsage=recordUsage("world");
+// Every provider call counts toward the day's spend as it is reported, and is kept in provider_usage when the store is Supabase.
+{
+ const recordUsage=(funding:Funding)=>(u:import("@unwatched/cognition").ProviderUsage)=>{metrics.record(u,funding);if(telegramDb)void telegramDb.from("provider_usage").insert({agent_id:u.agentId,funding,kind:u.kind,model:u.model,prompt_tokens:u.promptTokens,completion_tokens:u.completionTokens,cached_tokens:u.cachedTokens,cost_usd:u.costUsd}).then(({error})=>{if(error)log("Provider usage persistence failed");});};
+ if(townBrain instanceof OpenRouterBrain||townBrain instanceof AnthropicBrain)townBrain.onUsage=recordUsage("world");
  if(subscriberBrain)subscriberBrain.onUsage=recordUsage("subscriber");
  router.onUsage=recordUsage("user_key");
 }
@@ -153,6 +154,13 @@ if (saved && saved.agents.length > 0) {
 }
 billing.onPlan = (owner) => { for (const b of town.agents.values()) if (b.owner === owner) billing.applyPlan(b); };
 clockRef = () => ({ day: town.day, hour: town.hour, t: town.t });
+// A restart does not reset the ceiling: what the operator spent since the island day began is read back from provider_usage.
+if (telegramDb) {
+  const since = new Date(Date.now() - (town.t % 1440) * 60_000).toISOString();
+  const { data, error } = await telegramDb.rpc("provider_spend_since", { p_since: since });
+  if (error) log(`Could not read today's provider spend; the ceiling starts from zero (${error.message})`);
+  else metrics.carry(town.day, ((data ?? []) as { model: string; billed: number | string; unbilled_prompt: number; unbilled_cached: number; unbilled_completion: number }[]).reduce((sum, r) => sum + Number(r.billed) + costOf({ model: r.model, promptTokens: Number(r.unbilled_prompt), cachedTokens: Number(r.unbilled_cached), completionTokens: Number(r.unbilled_completion), costUsd: null }), 0));
+}
 // the island keeps our time: the sky, calendar, clock and timetable of a real point on the earth, by latitude and longitude
 const REAL = process.env.UW_REAL_WORLD ? await (async () => { const p = parsePlace(process.env.UW_REAL_WORLD!, process.env.UW_REAL_WORLD_NAME); if (!p) { log(`UW_REAL_WORLD should be "lat,lon" or "lat,lon,Area/City" (got ${JSON.stringify(process.env.UW_REAL_WORLD)}); the island keeps its own time`); return null; } return resolveZone(p); })() : null;
 const real = REAL ? new RealWorld(town, REAL, log) : null;
