@@ -32,18 +32,33 @@ const mix = (a: number, b: number, t: number) => { const ch = (sh: number) => Ma
 /** Where the roads meet: a little below each place, where the door is. */
 export const doorOf = (p: Pt) => ({ x: p.x, y: p.y + 40 });
 
-export type Seg = { key: string; a: Pt; b: Pt; cobbled: boolean };
-export function segmentsOf(places: Map<string, TerrainPlace>, oldTown: string[]): Seg[] {
+/** A road between two doors, and the line it actually takes: a gentle curve, never a ruler, kept on land where it would run into the sea. */
+export type Seg = { key: string; a: Pt; b: Pt; cobbled: boolean; pts: Pt[] };
+export function segmentsOf(places: Map<string, TerrainPlace>, oldTown: string[], onLand: (p: Pt) => Pt = (p) => p): Seg[] {
   const segs: Seg[] = []; const seen = new Set<string>();
-  for (const p of places.values()) for (const e of p.exits) { const q = places.get(e); if (!q) continue; const key = [p.id, q.id].sort().join("|"); if (seen.has(key)) continue; seen.add(key); segs.push({ key, a: doorOf(p), b: doorOf(q), cobbled: oldTown.includes(p.id) && oldTown.includes(q.id) }); }
+  for (const p of places.values()) for (const e of p.exits) {
+    const q = places.get(e); if (!q) continue; const key = [p.id, q.id].sort().join("|"); if (seen.has(key)) continue; seen.add(key);
+    const a = doorOf(p), b = doorOf(q), cobbled = oldTown.includes(p.id) && oldTown.includes(q.id);
+    segs.push({ key, a, b, cobbled, pts: roadLine(a, b, segs.length, cobbled ? 0.03 : 0.09, onLand) });
+  }
   return segs;
 }
+function roadLine(a: Pt, b: Pt, seed: number, bend: number, onLand: (p: Pt) => Pt): Pt[] {
+  const L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 1) return [a, b];
+  const nx = -(b.y - a.y) / L, ny = (b.x - a.x) / L, off = (hash2(seed, 91) - 0.5) * 2 * Math.min(90, L * bend);
+  const c = { x: (a.x + b.x) / 2 + nx * off, y: (a.y + b.y) / 2 + ny * off };
+  const n = Math.max(2, Math.round(L / 30)); const pts: Pt[] = [];
+  for (let k = 0; k <= n; k++) { const t = k / n, u = 1 - t; const p = { x: u * u * a.x + 2 * u * t * c.x + t * t * b.x, y: u * u * a.y + 2 * u * t * c.y + t * t * b.y }; pts.push(k === 0 || k === n ? p : onLand(p)); }
+  return pts;
+}
 
-/** A road drawn as a slightly wandering ribbon, not a ruler line. */
-function ribbon(g: Graphics, a: Pt, b: Pt, width: number, color: number, alpha = 1, wobble = 3, seed = 0): void {
-  const L = Math.hypot(b.x - a.x, b.y - a.y); const n = Math.max(2, Math.round(L / 40)); const nx = -(b.y - a.y) / L, ny = (b.x - a.x) / L;
-  g.moveTo(a.x, a.y);
-  for (let k = 1; k <= n; k++) { const t = k / n; const off = k === n ? 0 : (noise(seed + t * 6, seed * 0.37) - 0.5) * 2 * wobble; g.lineTo(a.x + (b.x - a.x) * t + nx * off, a.y + (b.y - a.y) * t + ny * off); }
+/** A road drawn as a slightly wandering ribbon along its line. */
+function ribbon(g: Graphics, pts: Pt[], width: number, color: number, alpha = 1, wobble = 3, seed = 0): void {
+  const n = pts.length - 1; g.moveTo(pts[0]!.x, pts[0]!.y);
+  for (let k = 1; k <= n; k++) {
+    const p = pts[k]!, q = pts[k - 1]!; const L = Math.hypot(p.x - q.x, p.y - q.y) || 1; const nx = -(p.y - q.y) / L, ny = (p.x - q.x) / L;
+    const off = k === n ? 0 : (noise(seed + (k / n) * 6, seed * 0.37) - 0.5) * 2 * wobble; g.lineTo(p.x + nx * off, p.y + ny * off);
+  }
   g.stroke({ width, color, alpha, cap: "round", join: "round" });
 }
 
@@ -112,13 +127,17 @@ export function drawGround(o: TerrainOptions, season: string): Graphics {
 export function drawRoads(segs: Seg[]): Graphics {
   const g=new Graphics();
   segs.forEach((s,i)=>{
-    const L=Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y);if(L<1)return;
-    ribbon(g,s.a,s.b,s.cobbled?20:27,0x9ba58a,.12,5,i);
-    if(!s.cobbled) {ribbon(g,s.a,s.b,22,0xcfc5a8,.34,4,i);ribbon(g,s.a,s.b,15,0xe2d7b9,.65,3,i);}
-    const ux=(s.b.x-s.a.x)/L,uy=(s.b.y-s.a.y)/L;
-    for(let t=7;t<L;t+=14){const h=hash2(Math.round(t),i),x=s.a.x+ux*t,y=s.a.y+uy*t;
-      if(s.cobbled && h>.4)g.moveTo(x-8,y).lineTo(x,y-4).lineTo(x+8,y).lineTo(x,y+4).closePath().fill({color:h>.5?0xe3ddc5:0xd4ceb5,alpha:.55});
-      else if(h>.65)g.ellipse(x+7,y+3,1.8,.8).fill({color:0xb0b394,alpha:.45});
+    if(Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y)<1)return;
+    // an untrodden road is a faint earth track; the wear (below) pales the ones people actually use
+    ribbon(g,s.pts,s.cobbled?20:26,0x9ba58a,.1,5,i);
+    if(!s.cobbled) {ribbon(g,s.pts,20,0xcfc5a8,.28,4,i);ribbon(g,s.pts,13,0xdcd2b4,.42,3,i);}
+    let walked=0;
+    for(let k=1;k<s.pts.length;k++){const a=s.pts[k-1]!,b=s.pts[k]!;const L=Math.hypot(b.x-a.x,b.y-a.y)||1,ux=(b.x-a.x)/L,uy=(b.y-a.y)/L;
+      for(let t=(7-walked%14+14)%14;t<L;t+=14){const h=hash2(Math.round(walked+t),i),x=a.x+ux*t,y=a.y+uy*t;
+        if(s.cobbled && h>.4)g.moveTo(x-8,y).lineTo(x,y-4).lineTo(x+8,y).lineTo(x,y+4).closePath().fill({color:h>.5?0xe3ddc5:0xd4ceb5,alpha:.55});
+        else if(h>.65)g.ellipse(x+7,y+3,1.8,.8).fill({color:0xb0b394,alpha:.45});
+      }
+      walked+=L;
     }
   });return g;
 }
@@ -130,7 +149,7 @@ export class Wear extends Container {
   step(from: string, to: string): void { const key = [from, to].sort().join("|"); if (!this.count.has(key)) return; this.count.set(key, (this.count.get(key) ?? 0) + 1); this.dirty = true; }
   redraw(): void {
     if (!this.dirty) return; this.dirty = false; const g = this.g; g.clear();
-    for (const s of this.segs) { const n = this.count.get(s.key) ?? 0; if (n <= 0) continue; const k = Math.min(1, Math.log2(1 + n) / 7); ribbon(g, s.a, s.b, 4 + 9 * k, s.cobbled ? 0xe2dbca : 0xe6dcc4, 0.06 + 0.08 * k, 2, 3); }
+    for (const s of this.segs) { const n = this.count.get(s.key) ?? 0; if (n <= 0) continue; const k = Math.min(1, Math.log2(1 + n) / 7); ribbon(g, s.pts, 4 + 9 * k, s.cobbled ? 0xe2dbca : 0xe6dcc4, 0.06 + 0.08 * k, 2, 3); }
   }
 }
 
@@ -140,9 +159,10 @@ export function keepOffRoads<T extends { sprite: string; x: number; y: number }>
   return items.map((it) => {
     if (skip.test(it.sprite)) return it;
     let best: { d: number; nx: number; ny: number } | null = null;
-    for (const s of segs) {
-      const dx = s.b.x - s.a.x, dy = s.b.y - s.a.y, L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((it.x - s.a.x) * dx + (it.y - s.a.y) * dy) / L2));
-      const px = s.a.x + dx * t, py = s.a.y + dy * t; const ox = it.x - px, oy = it.y - py; const d = Math.hypot(ox, oy);
+    for (const s of segs) for (let k = 1; k < s.pts.length; k++) {
+      const a = s.pts[k - 1]!, b = s.pts[k]!;
+      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((it.x - a.x) * dx + (it.y - a.y) * dy) / L2));
+      const px = a.x + dx * t, py = a.y + dy * t; const ox = it.x - px, oy = it.y - py; const d = Math.hypot(ox, oy);
       if (!best || d < best.d) { const L = Math.hypot(dx, dy) || 1; const side = ox * -dy + oy * dx >= 0 ? 1 : -1; best = { d, nx: (-dy / L) * side, ny: (dx / L) * side }; }
     }
     if (!best || best.d >= margin) return it;
