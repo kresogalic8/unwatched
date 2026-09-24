@@ -34,7 +34,8 @@ export class Figurine extends Container {
   private upper = new Container();
   private torso = new Graphics(); private apron = new Graphics(); private patch = new Graphics(); private scarf = new Graphics();
   private armL = new Container(); private armR = new Container();
-  private tool = new Graphics(); private held = new Graphics(); private book = new Graphics();
+  private tool = new Graphics(); private held = new Graphics(); private book = new Graphics(); private cane = new Graphics(); private toy = new Graphics(); private cap = new Graphics();
+  private tw = 16; private th = 17; private hipH = 15;
   private head = new Container(); private faceParts = new Container(); private eyes = new Graphics(); private mouth = new Graphics(); private brows = new Graphics();
   private backHair = new Graphics(); private umbrella = new Graphics(); private hood = new Graphics(); private breath = new Graphics();
   private facing: Facing = "right"; private tall = 1; private wide = 1;
@@ -63,7 +64,7 @@ export class Figurine extends Container {
     for (const [leg, x] of [[this.legL, -3.2 * wide], [this.legR, 3.2 * wide]] as const) { leg.roundRect(-2.4, 0, 4.8, 12 * tall, 2.2).fill(bottom).stroke(OUTLINE); leg.roundRect(-2.7, 10 * tall, 6, 3.2, 1.4).fill(BOOT); leg.position.set(x, -hip); }
     // everything above the hip turns together: it stoops, leans, crouches
     this.upper.position.set(0, -hip);
-    const t = this.torso; const tw = 16 * wide, th = 17 * tall;
+    const t = this.torso; const tw = 16 * wide, th = 17 * tall; this.tw = tw; this.th = th; this.hipH = hip;
     t.roundRect(-tw / 2, -th, tw, th, L.shape === "Round" ? 8 : 6).fill(top).stroke(OUTLINE);
     if (L.pattern === "Stripes") for (let y = -th + 3; y < -1; y += 3.4) t.moveTo(-tw / 2 + 1.5, y).lineTo(tw / 2 - 1.5, y).stroke({ width: 1.2, color: shade(top, -0.22), alpha: 0.8 });
     if (L.pattern === "Checks") for (let x = -tw / 2 + 3; x < tw / 2; x += 4) t.moveTo(x, -th + 1).lineTo(x, -1).stroke({ width: 1, color: shade(top, -0.2), alpha: 0.6 });
@@ -72,7 +73,7 @@ export class Figurine extends Container {
     if (L.coral === "Buttons") for (const y of [-th + 3, -th + 7, -th + 11]) t.circle(0, y, 0.9).fill(RED);
     if (L.carrying === "Satchel") { t.moveTo(-tw / 2 + 2, -th + 1).lineTo(tw / 2 - 2, -4).stroke({ width: 1.3, color: 0x6e4b33 }); t.roundRect(tw / 2 - 5, -6, 6, 5, 1.2).fill(0x8a5f3f).stroke(OUTLINE); }
     t.ellipse(-tw / 4, -th + 4, 2.2, 3.5).fill({ color: 0xffffff, alpha: 0.18 }); // varnish
-    this.apron.roundRect(-tw / 2 + 2, -th + 6, tw - 4, th - 4, 2).fill(0xf2ece0).stroke(OUTLINE); this.apron.visible = false;
+    this.apron.visible = false; // drawn for the trade, in its colour
     this.patch.rect(tw / 2 - 6, -th + 5, 4, 4).fill(shade(top, -0.3)); this.patch.rect(-tw / 2 + 2, -7, 3.5, 3).fill(shade(top, 0.2)); this.patch.visible = false;
     this.scarf.roundRect(-7 * wide, -th - 2, 14 * wide, 4.5, 2).fill(0xb8452f).stroke(OUTLINE); this.scarf.moveTo(-3, -th + 2).lineTo(-4, -th + 9).stroke({ width: 2.6, color: 0xb8452f, cap: "round" }); this.scarf.visible = false;
     // arms, pivoting at the shoulder; the working hand carries the tool or what is held, the other what was brought on the boat
@@ -85,6 +86,14 @@ export class Figurine extends Container {
     if (L.carrying === "Suitcase") carry.roundRect(-5, hy + 0.5, 10, 8, 1.5).fill(0x8e5b3c).stroke(OUTLINE);
     if (L.carrying === "Tool bag") carry.roundRect(-4.5, hy + 0.5, 9, 6, 2).fill(0x5d6b52).stroke(OUTLINE);
     this.armL.addChild(carry);
+    // the old lean on a stick, from the hand to the ground; a child carries a toy in the free hand
+    const ground = hip + th - 2;
+    this.cane.moveTo(0.5, hy + 1).lineTo(2.2, ground).stroke({ width: 2, color: 0x7a5a3c, cap: "round" }); this.cane.moveTo(-2.6, hy + 1.2).quadraticCurveTo(-1, hy - 2.4, 0.9, hy + 1.2).stroke({ width: 2, color: 0x7a5a3c, cap: "round" }); this.cane.visible = false;
+    const toy = this.toy, kind = Math.floor(this.phase * 7) % 3;
+    if (kind === 0) { toy.moveTo(-5, hy + 3).lineTo(5, hy + 3).lineTo(3.5, hy + 6).lineTo(-3.5, hy + 6).closePath().fill(0x3f7f78).stroke(OUTLINE); toy.moveTo(0, hy + 3).lineTo(0, hy - 5).stroke({ width: 0.8, color: INK }); toy.moveTo(0.5, hy - 5).lineTo(4.5, hy + 1.5).lineTo(0.5, hy + 1.5).closePath().fill(0xf6f1e4).stroke({ ...OUTLINE, width: 0.6 }); } // a wooden boat
+    else if (kind === 1) { toy.circle(0, hy + 4.5, 3.6).fill(RED).stroke(OUTLINE); toy.moveTo(-3.4, hy + 4).quadraticCurveTo(0, hy + 6, 3.4, hy + 4).stroke({ width: 1, color: 0xf6f1e4 }); } // a ball
+    else { toy.moveTo(0, hy + 2).lineTo(0, hy - 9).stroke({ width: 1, color: WOOD }); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; toy.moveTo(0, hy - 9).lineTo(Math.cos(a) * 4, hy - 9 + Math.sin(a) * 4).lineTo(Math.cos(a + 0.7) * 3, hy - 9 + Math.sin(a + 0.7) * 3).closePath().fill([RED, 0xefe4c8, 0x3f7f78, 0xd9b56a][k]!); } toy.circle(0, hy - 9, 0.8).fill(INK); } // a pinwheel
+    toy.visible = false; this.armL.addChild(this.cane, toy);
     this.tool.position.set(0, 12.5 * tall); this.held.position.set(0, 12.5 * tall); this.armR.addChild(this.tool, this.held); this.tool.visible = false;
     this.book.roundRect(-5, -3, 10, 7, 1).fill(0xf2ece0).stroke(OUTLINE); this.book.moveTo(0, -3).lineTo(0, 4).stroke({ width: 0.6, color: INK }); this.book.visible = false; this.upper.addChild(this.book); this.book.position.set(6, -th + 6);
     // the head: big, round, painted
@@ -111,6 +120,9 @@ export class Figurine extends Container {
     if (L.hat === "Baker's cap") { hr.roundRect(-7.5, -18, 15, 12, 5).fill(0xf6f1e4).stroke(OUTLINE); hr.roundRect(-8.5, -8, 17, 3.2, 1.4).fill(0xebe3d0).stroke(OUTLINE); }
     if (L.hat === "Headscarf") { hr.moveTo(-10, 3).quadraticCurveTo(-11, -12, 0, -12).quadraticCurveTo(11, -12, 10, 3).quadraticCurveTo(8, -5, 0, -5).quadraticCurveTo(-8, -5, -10, 3).fill(RED).stroke(OUTLINE); for (let k = -6; k <= 6; k += 4) hr.circle(k, -8, 0.8).fill(0xefe4c8); }
     h.addChild(hr);
+    // the fisherman's cap, worn by those who work the boats and chose no hat of their own
+    this.cap.moveTo(-9.4, -3).quadraticCurveTo(-9.6, -12.5, 0, -12.5).quadraticCurveTo(9.6, -12.5, 9.4, -3).closePath().fill(0x2f3e55).stroke(OUTLINE); this.cap.roundRect(-9.8, -4.6, 19.6, 3.2, 1.4).fill(0x24303f).stroke(OUTLINE); this.cap.moveTo(2, -3.5).quadraticCurveTo(10, -4, 13, -1.5).quadraticCurveTo(8, -1.2, 2, -2).fill(0x1d2633).stroke({ ...OUTLINE, width: 0.6 }); this.cap.circle(-3, -9, 1).fill({ color: 0xffffff, alpha: 0.3 });
+    this.cap.visible = false; h.addChild(this.cap);
     // rain gear: an umbrella for some, a hood for the rest; a breath of mist in the cold
     this.hood.moveTo(-10.5, 4).quadraticCurveTo(-12, -13, 0, -13).quadraticCurveTo(12, -13, 10.5, 4).quadraticCurveTo(8, -6, 0, -6).quadraticCurveTo(-8, -6, -10.5, 4).fill(0x5f7f86).stroke(OUTLINE); this.hood.visible = false; h.addChild(this.hood);
     this.umbrella.moveTo(-17, 0).quadraticCurveTo(0, -17, 17, 0).quadraticCurveTo(12, -3, 8.5, 0).quadraticCurveTo(4, -3, 0, 0).quadraticCurveTo(-4, -3, -8.5, 0).quadraticCurveTo(-12, -3, -17, 0).fill(this.phase % 2 < 1 ? RED : 0x3f7f78).stroke(OUTLINE);
@@ -148,7 +160,8 @@ export class Figurine extends Container {
   /** the tool of the trade in the working hand, and how the work moves */
   trade(title: string | null): void {
     const t = (title ?? "").toLowerCase(); if (t === this.tradeName) return; this.tradeName = t; const g = this.tool; g.clear();
-    this.apron.visible = /cook|bak|inn|help|smith|forge|keep|clerk/.test(t);
+    this.drawApron(t);
+    this.cap.visible = /fish|net|sail|boat|dock|harbo|ferry/.test(t) && this.look.hat === "None" && this.look.hair !== "Under a hat";
     const handle = (len: number) => g.roundRect(-1.4, -len + 3, 2.8, len, 1.4).fill(WOOD).stroke(OUTLINE);
     if (t === "angling") { this.workStyle = "angle"; g.moveTo(0, 2).quadraticCurveTo(14, -20, 30, -30).stroke({ width: 1.6, color: WOOD }); g.moveTo(30, -30).quadraticCurveTo(34, -8, 36, 22).stroke({ width: 0.6, color: 0xf2ece0, alpha: 0.8 }); g.ellipse(36, 23, 1.6, 2.2).fill(RED); }
     else if (/smith|forge|iron/.test(t)) { this.workStyle = "swing"; handle(16); g.roundRect(-5, -16, 10, 5, 1.5).fill(IRON).stroke(OUTLINE); }
@@ -162,6 +175,19 @@ export class Figurine extends Container {
     else if (/mill/.test(t)) { this.workStyle = "haul"; g.roundRect(-6, -1, 12, 13, 4).fill(0xf7f5ee).stroke(OUTLINE); }
     else if (/dock|harbo/.test(t)) { this.workStyle = "haul"; g.roundRect(-6, 0, 12, 10, 1.5).fill(WOOD).stroke(OUTLINE); }
     else { this.workStyle = "swing"; g.roundRect(-1.5, -4, 3, 13, 1.5).fill(0x8e6a4b).stroke(OUTLINE); g.roundRect(-5, -6, 10, 4.5, 1.5).fill(IRON); }
+  }
+  /** the apron the trade wears: the smith's leather, the baker's white, the fish-seller's stripes, the shop's green, the inn's cream with a red hem, sacking in the fields */
+  private drawApron(t: string): void {
+    const a = this.apron; a.clear(); const { tw, th } = this;
+    const kind = /smith|forge|iron/.test(t) ? "leather" : /cook|bak/.test(t) ? "white" : /fish|gutter|net/.test(t) ? "stripes" : /clerk|shop|trade|chand/.test(t) ? "shop" : /inn|help|keep/.test(t) ? "inn" : /field|orchard|farm|mill/.test(t) ? "sack" : null;
+    a.visible = kind !== null; if (!kind) return;
+    const fill = { leather: 0x7a5236, white: 0xf2ece0, stripes: 0xe4ebee, inn: 0xefe6d2, shop: 0x6f8a5c, sack: 0xc8b48a }[kind];
+    a.roundRect(-tw / 2 + 2, -th + 6, tw - 4, th - 4, 2).fill(fill).stroke(OUTLINE);
+    if (kind === "stripes") for (let x = -tw / 2 + 4; x < tw / 2 - 2; x += 3) a.rect(x, -th + 6.6, 1.2, th - 5.2).fill({ color: 0x3f6a8c, alpha: 0.8 });
+    if (kind === "inn") a.rect(-tw / 2 + 2.6, -3.4, tw - 5.2, 1.6).fill(RED);
+    if (kind === "leather") { a.moveTo(-tw / 2 + 3, -th + 6).lineTo(-tw / 2 + 5, -th + 1).moveTo(tw / 2 - 3, -th + 6).lineTo(tw / 2 - 5, -th + 1).stroke({ width: 1, color: 0x4f3524 }); a.roundRect(-3, -th + 10, 6, 4, 1).stroke({ width: 0.7, color: 0x4f3524 }); }
+    if (kind === "sack") for (let y = -th + 9; y < -2; y += 3) a.moveTo(-tw / 2 + 3, y).lineTo(tw / 2 - 3, y).stroke({ width: 0.5, color: 0x8e7a52, alpha: 0.6 });
+    if (kind === "shop") a.roundRect(-3.5, -th + 12, 7, 4, 1).stroke({ width: 0.7, color: 0x4a6040 });
   }
   /** a thing in the working hand when it is not working: a loaf, a fish, a cup, planks on the shoulder, a lantern, a letter */
   hold(item: string | null): void {
@@ -182,7 +208,7 @@ export class Figurine extends Container {
     else if (/oil|bottle|jar/.test(it)) { g.roundRect(-2.4, -1, 4.8, 8, 1.5).fill(0x9a8fc4).stroke(OUTLINE); g.roundRect(-1.2, -3.5, 2.4, 2.5, 1).fill(INK); }
   }
   /** years on the figure: children small, the old stooped */
-  age(years: number): void { if (years === this.years) return; this.years = years; const k = years < 16 ? 0.62 + (years / 16) * 0.3 : years >= 70 ? 0.95 : 1; this.body.scale.y = k; this.body.scale.x = Math.sign(this.body.scale.x || 1) * k; }
+  age(years: number): void { if (years === this.years) return; this.years = years; const k = years < 16 ? 0.62 + (years / 16) * 0.3 : years >= 70 ? 0.95 : 1; this.body.scale.y = k; this.body.scale.x = Math.sign(this.body.scale.x || 1) * k; this.head.scale.set(years < 14 ? 1.16 : 1); }
   mood(m: { hunger?: number; joy?: number; grief?: number; anger?: number; surprise?: number; tired?: number }): void {
     const next = { hunger: m.hunger ?? 0, joy: m.joy ?? 0, grief: m.grief ?? 0, anger: m.anger ?? 0, surprise: m.surprise ?? 0, tired: m.tired ?? 0 };
     const changed = (Object.keys(next) as (keyof typeof next)[]).some((k) => Math.abs(next[k] - this.moodNow[k]) > 0.05); if (!changed) return; this.moodNow = next; this.drawFace();
@@ -219,6 +245,9 @@ export class Figurine extends Container {
     this.upper.scale.y = p === "idle" || p === "talk" ? 1 + Math.sin(t * 1.6 + this.phase) * 0.015 : 1;
     const working = p === "work"; this.tool.visible = working; this.held.visible = !working && this.heldItem !== "";
     this.book.visible = p === "read" || p === "write";
+    // the stick and the toy are in the free hand, when it is free: not while working, asleep or carrying something of their own
+    const freeHand = !working && p !== "sleep" && p !== "read" && p !== "write" && (this.look.carrying === "Nothing" || this.look.carrying === "Satchel"); // a satchel hangs from the shoulder
+    this.cane.visible = freeHand && this.years >= 70 && p !== "sit" && this.seatHeight === null; this.toy.visible = freeHand && this.years < 12;
     if (this.breath.visible) { const b = this.breath; b.clear(); const c = (t * 0.6 + this.phase) % 1; b.circle(9 + c * 6, 3 - c * 4, 1.5 + c * 2.5).fill({ color: 0xffffff, alpha: 0.45 * (1 - c) }); }
   }
 
