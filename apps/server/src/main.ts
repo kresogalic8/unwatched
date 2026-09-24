@@ -5,7 +5,7 @@ import { adminResolver, backofficeRoutes } from "./backoffice.ts";
 import { configureDeliveryLog } from "./delivery-log.ts";
 import { telegramRoutes } from "./telegram-routes.ts";
 import { TelegramLetters } from "./telegram.ts";
-import { publicProject } from "./views.ts";
+import { publicProject, replayOf } from "./views.ts";
 import { constructionRoutes } from "./construction.ts";
 import type { AgentState } from "@unwatched/engine";
 import { existsSync } from "node:fs";
@@ -717,6 +717,8 @@ app.get("/api/events", (c) => {
   const since = Number(c.req.query("since") ?? town.t - 120); const place = c.req.query("place"); const min = Number(c.req.query("min") ?? 0);
   return c.json(town.events.filter((e) => e.t >= since && (!place || e.place === place) && e.importance >= min).slice(-500).map(publicEvent));
 });
+// the day again, for the town to play back fast (see replayOf)
+app.get("/api/replay", (c) => c.json(replayOf(town, Number(c.req.query("hours")) || 24, streamEvent)));
 app.post("/api/boarding/external", async(c)=>{
   const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);
   const body=z.object({persona:Persona}).safeParse(await c.req.json());if(!body.success)return c.json({error:"Complete your character first."},400);

@@ -43,6 +43,9 @@ export const ICONS = {
   plus: "M12 5v14 M5 12h14",
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M21 21l-5-5",
   settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.3 2.6a7 7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.3 2.6h5l.3-2.6a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5c.1-.3.1-.7.1-1z",
+  rewind: "M4 12a8 8 0 1 0 2.3-5.6 M4 3v4h4 M12 8v4l3 2",
+  play: "M7 5l12 7-12 7z",
+  pause: "M8 5v14 M16 5v14",
   leave: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
 } as const;
 export type IconName = keyof typeof ICONS;
