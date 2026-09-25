@@ -20,7 +20,13 @@ export default function Library() {
   const [open, setOpen] = useState<Life | null>(null);
   useEffect(() => {
     void api<Life[]>("/api/library")
-      .then(setLives)
+      .then((all) => {
+        setLives(all);
+        // ?book=<id> opens that life's book, as a gravestone on the island links to it
+        const want = new URLSearchParams(location.search).get("book");
+        const hit = want ? all.find((l) => l.agentId === want) : null;
+        if (hit) setOpen({ ...hit });
+      })
       .catch(() =>
         setError("The library could not be reached. Please try again shortly."),
       );

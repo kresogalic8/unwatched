@@ -28,6 +28,7 @@ import { GROUND, LIGHT, CREAM, SAGE, TEAL, KELP, CORAL, DRIFT } from "./world/pa
 import { Lighting, WaterFilter, Weather, Clouds, Sky, mix, type LightSource } from "./world/fx";
 import { Life, type Critter } from "./world/life";
 import { Occasions } from "./world/occasions";
+import { Graveyard, type Life as LifeBook } from "./world/graveyard";
 import { Post, gradeFor, NEUTRAL, type Grade } from "./world/post";
 import { Particles } from "./world/particles";
 import { drawGround, drawRoads, segmentsOf, keepOffRoads, Wear, noise } from "./world/terrain";
@@ -478,7 +479,7 @@ export function World({ photoControl, rewindControl: rewindHandle, onRewind, min
       // gone goes grey and quiet: weeds up the walls, a slipped tile or two at its foot, and no smoke (the hearth is out)
       const homeState = new Map<string, string>(), homeDress = new Map<string, Container>();
       const dressHome = (p: PlaceView) => {
-        const h = houseOf.get(p.id); const homey = !!h && (p.kind === "home" || ["stone", "fisher", "townhouse"].includes(h.kind));
+        const h = houseOf.get(p.id); const homey = !!h && (p.kind === "home" || p.kind === "inn" || /house|cottage/.test(p.sprite)) && ["stone", "fisher", "townhouse"].includes(h.kind); // a home, not the council hall someone sleeps in
         const living = homey ? [...agents.current.values()].filter((a) => a.home === p.id).length : 0;
         const forced = q?.get("homes"); // ?homes=lived|empty previews every house one way
         const state = !homey || p.site ? "" : forced === "lived" || forced === "empty" ? forced : living ? "lived" : p.kind === "home" ? "empty" : "";
@@ -552,6 +553,11 @@ export function World({ photoControl, rewindControl: rewindHandle, onRewind, min
       { const k = q?.get("stage"); const pl = places.get(q?.get("stageAt") ?? (k === "funeral" ? "chapel" : "market")); if (k && pl) staged.current = { kind: k, place: pl.id, x: pl.x, y: pl.y, actors: [], until: Infinity }; }
       // out over the water from the harbour, away from the middle of the island: where a feast's fireworks go up
       const seaward = (() => { const dx = harbor.x - W / 2, dy = harbor.y - H / 2, L = Math.hypot(dx, dy) || 1; return { x: harbor.x + (dx / L) * 520, y: harbor.y + (dy / L) * 320 - 240 }; })();
+      // the island's memory: a walled yard behind the chapel with a stone for each who died here, and candles on the quay for whoever left
+      const graveyard = new Graveyard((id) => { window.location.assign(`/library?book=${encodeURIComponent(id)}`); }); scene.addChild(graveyard.root);
+      const yardAt = (() => { const ch = places.get("chapel"); if (!ch) return null; for (const [dx, dy] of [[170, -70], [-170, -70], [190, 40], [-190, 40], [0, -130]] as const) { const x = ch.x + dx, y = ch.y + dy; if (inside(x, y) > 0.85) continue; if ([...places.values()].every((p) => p.id === "chapel" || Math.hypot(p.x - x, p.y - y) > 150)) return { x, y }; } return { x: ch.x + 170, y: ch.y - 70 }; })();
+      const loadLives = async () => { if (!yardAt) return; try { const lives = (await (await fetch(`${apiUrl}/api/library`, { cache: "no-store" })).json()) as LifeBook[]; if (alive && Array.isArray(lives)) graveyard.build(lives, clockRef.current?.day ?? townView.day ?? 1, yardAt.x, yardAt.y, { x: harbor.x + 30, y: harbor.y + 66 }); } catch {} };
+      void loadLives();
       const occasions = new Occasions(); scene.addChild(occasions.root); // what a gathering puts up on the street; its fireworks go over the night, see below
       const dockX = harbor.x - 420, awayX = -760;
       const boat = put("boat", dockX, harbor.y + 20)!; boat.zIndex = harbor.y - 30; let boatTarget = dockX;
@@ -768,6 +774,7 @@ export function World({ photoControl, rewindControl: rewindHandle, onRewind, min
         if (e.kind === "agent.arrive" && past) { const f = figs.current.get(e.actors[0]!); if (f) { f.away = false; f.place = ""; moveTo(f.id, e.place ?? "harbor"); if (!quiet) { f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); welcome(f, 8000); } } }
         else if (e.kind === "agent.arrive") { void fetch(`${apiUrl}/api/agents/${e.actors[0]}`).then((r) => r.json()).then((a: PublicAgent) => { if (a?.id) { const f = ensure(a); f.x = boat.position.x + 40; f.y = boat.position.y - 10; f.g.position.set(f.x, f.y); welcome(f, 90000); } }); }
         if (!past && (e.kind.startsWith("item.") || e.kind === "town.recipe" || e.kind === "agent.trade" || e.kind === "agent.make" || e.kind === "place.decorated" || e.kind === "garden.harvest" || e.kind === "agent.build" || e.kind === "town.built" || (e.kind === "agent.work" && /mornings done/.test(e.text)))) void refreshPlaces();
+        if (!past && (e.kind === "town.book" || e.kind === "agent.died" || e.kind === "agent.leave")) setTimeout(() => { if (alive) void loadLives(); }, 5000); // the book is written a moment after
         if (e.kind === "weather.change" && rw) rw.weather = /turned to (\w+)/.exec(e.text)?.[1] ?? rw.weather;
         if (e.importance >= 0.1 && e.kind !== "agent.move" && !quiet) setFeed((f) => [e, ...f].slice(0, 12));
       };
@@ -1091,7 +1098,7 @@ export function World({ photoControl, rewindControl: rewindHandle, onRewind, min
             for (const p of places.values()) if (p.crowd > 0 && indoors(p)) { sources.push({ x: p.x - 22, y: p.y - 78, r: 90, color: LIGHT.window, strength: 0.7, flicker: 0.025 }); sources.push({ x: p.x - 14, y: p.y + 20, r: 78, aspect: 0.4, color: LIGHT.window, strength: 0.42, flicker: 0.02 }); } // #4: warm light spilling from the windows onto the ground at the threshold
           }
           if (night.alpha > 0.1) sources.push({ x: W - 220, y: 90, r: 130, color: 0xdfe8ff, strength: 0.5, noHole: true }); // the moon blooms too
-          sources.push(...life.lights, ...occasions.lights);
+          sources.push(...life.lights, ...occasions.lights, ...graveyard.lights);
           lighting.update(night.alpha * (1 - golden * (1 - cover) * 0.55), sources, ft, flash.alpha, shadeTint); // the low sun holds the dark off a while
           weatherFx.update({ weather, wind, snowing, wet, tick: ft, dt: dtf, density: still ? 0.35 : 1, night: Math.min(1, night.alpha / 0.42), fogColor: weather === "jugo" ? 0xe4d9c2 : 0xd7dfe2, rainColor: night.alpha > 0.15 ? 0xdfe8ee : 0x4b5560 });
           clouds.update({ tick: ft, wind, sunUp: up ? 1 - Math.min(1, night.alpha / 0.42) : 0, night: Math.min(1, night.alpha / 0.42), weather, warm: golden * (1 - cover) }); if (miniRef.current) clouds.puffs.visible = clouds.shadows.visible = false; // no weather in the sky over a model on a table
@@ -1150,6 +1157,7 @@ export function World({ photoControl, rewindControl: rewindHandle, onRewind, min
         // the gathering's dressing: bunting, lanterns and petals, the coffin on its trestles, fireworks over the harbour on a feast night
         { const pl = stagedNow ? places.get(stagedNow.place) : null; const sp = pl ? gather(pl) : null; const leads = stagedNow?.kind === "wedding" ? stagedNow.actors.map((id) => figs.current.get(id)).filter((f): f is Fig => !!f && f.place === stagedNow.place) : [];
           occasions.update(stagedNow && sp ? { kind: stagedNow.kind, x: sp.x, y: sp.y, w: sp.w, night: Math.min(1, night.alpha / 0.42), over: seaward, couple: leads.length ? { x: leads.reduce((a, f) => a + f.x, 0) / leads.length, y: leads.reduce((a, f) => a + f.y, 0) / leads.length } : null } : null, performance.now() / 1000, still);
+          graveyard.update(performance.now() / 1000, Math.min(1, night.alpha / 0.42));
           if (occasions.popped) ambience.cue("boom", Math.hypot(seaward.x - (Wd / 2 - cam.x) / cam.zoom, seaward.y - (Hd / 2 - cam.y) / cam.zoom) * 0.4, seaward.x - (Wd / 2 - cam.x) / cam.zoom, 1); }
         perfMark("people");
         const now = Date.now(); const next: typeof labels = []; const secs = now / 1000;
