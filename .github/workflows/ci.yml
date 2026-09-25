@@ -46,3 +46,12 @@ jobs:
             apps/web/playwright-report
             apps/web/test-results
             apps/web/e2e/__screenshots__/*-linux.png
+      # the pictures alone, small enough to fetch quickly: new baselines and what a failed comparison actually drew
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-pictures
+          retention-days: 7
+          path: |
+            apps/web/e2e/__screenshots__/*-linux.png
+            apps/web/test-results/**/*.png
