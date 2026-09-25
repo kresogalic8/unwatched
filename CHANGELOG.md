@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.18.0] - 2026-09-25
+### Added
+
 - A graveyard behind the chapel with a stone for everyone who died on the island; a new grave has flowers and a lamp at night, and tapping a stone opens their book in the Library. Whoever left on the boat gets a candle on the quay their first night gone.
 - Film it: the last day played back becomes a clip with the day and the hour on it, to save or send.
 - Ties: a view of who has had to do with whom this week, drawn as arcs between people from the public record (talk, gifts, weddings, thefts and charges), with a spark when two of them talk now. Trust stays private.
@@ -413,7 +420,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/kresogalic8/unwatched/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/kresogalic8/unwatched/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/kresogalic8/unwatched/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/kresogalic8/unwatched/compare/v0.14.1...v0.15.0
