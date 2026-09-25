@@ -6,9 +6,17 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- A graveyard behind the chapel with a stone for everyone who died on the island; a new grave has flowers and a lamp at night, and tapping a stone opens their book in the Library. Whoever left on the boat gets a candle on the quay their first night gone.
+- Film it: the last day played back becomes a clip with the day and the hour on it, to save or send.
+- Ties: a view of who has had to do with whom this week, drawn as arcs between people from the public record (talk, gifts, weddings, thefts and charges), with a spark when two of them talk now. Trust stays private.
+
 ### Changed
 
+- The Library opens a book straight from a link (`?book=`).
+
 ### Fixed
+
+- A washing line no longer hangs from the council hall when someone sleeps there.
 
 ## [0.17.0] - 2026-09-25
 ### Added
