@@ -156,6 +156,13 @@
 .moment[data-big="true"] { background: var(--accent); width: 10px; height: 10px; margin-left: -5px; top: 7px; }
 .moment::after { content: ""; position: absolute; inset: -8px; }
 .moment:hover, .moment:focus-visible { transform: scale(1.4); outline: none; }
+.filmBtn { flex-shrink: 0; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rule); font-size: 15px; white-space: nowrap; }
+.filmBtn:hover:not(:disabled) { background: var(--surface); }
+.filmBtn:disabled { cursor: default; }
+.recDot { width: 10px; height: 10px; border-radius: 999px; background: #e4572e; animation: rec 1s ease-in-out infinite alternate; }
+@keyframes rec { from { opacity: 1; } to { opacity: 0.35; } }
+.filmClip { width: 100%; height: auto; border-radius: 8px; background: #000; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+.card:has(video[data-upright="true"]) { width: min(420px, 100%, calc((100dvh - 140px) * 0.5625)); }
 .live { flex-shrink: 0; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--rule); font-size: 15px; white-space: nowrap; }
 .live:hover { background: var(--surface); }
 .liveShort { display: none; }
@@ -163,6 +170,7 @@
 
 /* the postcard: the card itself, large, over the island, with what to do with it underneath */
 .cardBack { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(15, 20, 18, 0.72); }
+.card:has(video) { width: min(900px, 100%, calc((100dvh - 140px) * 1.7778)); }
 .card { display: flex; flex-direction: column; gap: 16px; width: min(900px, 100%, calc((100dvh - 140px) * 1.5)); }
 .card:has(img[data-upright="true"]) { width: min(520px, 100%, calc((100dvh - 140px) / 1.5)); animation: panelIn 0.25s ease; }
 .card img { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); transform: rotate(-0.6deg); }
@@ -219,6 +227,7 @@
   .page:has(.panel[hidden]) .rewind { bottom: 76px; }
   .rewindTime { min-width: 0; font-size: 13px; }
   .live { padding: 0 12px; gap: 6px; font-size: 14px; }
+  .filmBtn { padding: 0; width: 44px; justify-content: center; }
   .liveLong { display: none; }
   .liveShort { display: inline; }
   .replayTag { display: none; }
