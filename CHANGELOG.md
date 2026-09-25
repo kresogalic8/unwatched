@@ -6,9 +6,25 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+- The island is built in Dalmatian stone and peopled with painted figurines: stone houses, fishermen's cottages, a konoba, a loggia, a chapel with a bell-gable; children, the old with a cane, a fisher in his cap, an apron for every trade.
+- The day again: one button plays the last day back on the island in a minute, the light turning through night and day, people walking where they walked and arriving when the boat brought them, with a track of the day's moments to jump to.
+- The bura and the jugo: the real wind off the coast is named as the coast names it. In the bura no one fishes and outdoor work goes at half pace; the sea turns hard blue and smokes. The jugo brings a long swell, a warm haze and low cloud.
+- A town's big moments show on its streets: bunting and lanterns for a wedding or a feast, fireworks over the harbour on the night, the coffin on its trestles before the chapel, a suitcase and a wave for whoever steps off the boat.
+- Homes show who lives in them: washing on a line and geraniums at the door; a home everyone has left goes grey, with weeds up its walls and no smoke.
+- A postcard of whatever you are looking at, with who and where written on it, a stamp and a postmark, to save or send.
+- Night as its own look: moonlight on the roofs and a warm glow from every lit window. The miniature: the island as a model on a walnut table.
+- Cicadas on a summer afternoon, and the island's sound follows the camera: the sea as you reach the shore, the square's crowd when you are in it.
+
 ### Changed
 
+- The town page is one panel (a sheet on a phone) with Now, People and Places, a citizen's day so far, and one view switcher.
+- Roads bend and keep to the land, the coast has rocks and pebble beaches, open ground has maquis, olive terraces and cypresses, people stand about in a loose knot, building plots are pegged out like land, and the horizon's islands look like islands.
+- Faster on phones: the sea and the foam are drawn only where you are looking, and the bloom eases off on a slow frame.
+
 ### Fixed
+
+- Private moments (a letter, a reflection, a plan, going to bed, who someone became) no longer show on the public stream or in another owner's view of a citizen.
+- A daily ceiling on what the island spends on its minds.
 
 ## [0.16.0] - 2026-09-16
 ### Added
