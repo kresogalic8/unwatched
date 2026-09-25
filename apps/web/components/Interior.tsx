@@ -193,11 +193,13 @@ export function Interior({ kind, sprite, hour, people, stock }: { kind: string; 
         if (pose === "sit" && at) c.seatAt(0); // the spot is the seat itself
         if (!at && pose === "sleep") {
           // no bed in this room: a straw pallet on the floor, a blanket over it, and the sleeper on that, not on the bare boards
-          const px = 60 + (pi++ % 5) * 84, py = floorY + 34, pal = new Graphics();
-          pal.roundRect(px - 34, py - 10, 68, 16, 6).fill(0xc9a86a).stroke({ width: 0.7, color: INK });
-          for (let k = -26; k <= 26; k += 6) pal.moveTo(px + k, py - 8).lineTo(px + k + 2, py + 4).stroke({ width: 0.6, color: 0x9b7a44, alpha: 0.7 });
-          pal.roundRect(px - 16, py - 14, 46, 14, 5).fill(0x9c4a3c).stroke({ width: 0.6, color: INK });
-          stage.addChild(pal); at = [px + 32, py - 4]; // lying, the figure reaches back from its feet, so it is set at the pallet's foot
+          // wider and longer than the one lying on it, or the figure hides it: the straw shows all round, the blanket's end at the feet
+          const px = 70 + (pi++ % 4) * 110, py = floorY + 36, pal = new Graphics();
+          pal.ellipse(px, py + 9, 60, 7).fill({ color: INK, alpha: 0.12 });
+          pal.roundRect(px - 56, py - 12, 112, 22, 8).fill(0xc9a86a).stroke({ width: 0.8, color: INK });
+          for (let k = -50; k <= 50; k += 6) pal.moveTo(px + k, py - 10).lineTo(px + k + 3, py + 8).stroke({ width: 0.6, color: 0x9b7a44, alpha: 0.7 });
+          pal.roundRect(px + 4, py - 14, 50, 22, 7).fill(0x9c4a3c).stroke({ width: 0.7, color: INK }); pal.rect(px + 8, py - 12, 3, 18).fill({ color: 0xf1e6c8, alpha: 0.7 });
+          stage.addChild(pal); at = [px + 44, py - 2]; // lying, the figure reaches back from its feet, so it is set near the pallet's foot
         }
         if (!at) { if(pose === "sit") c.setPose("idle"); at = [45 + (xi++ % 8) * 54, floorY + 28]; }
         c.position.set(at[0], at[1]); c.face(at[0] < W / 2 ? 1 : -1); stage.addChild(c); rigs.push(c);
