@@ -6,6 +6,13 @@ All notable changes to Unwatched are recorded here. The format is based on [Keep
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.17.0] - 2026-09-25
+### Added
+
 - The island is built in Dalmatian stone and peopled with painted figurines: stone houses, fishermen's cottages, a konoba, a loggia, a chapel with a bell-gable; children, the old with a cane, a fisher in his cap, an apron for every trade.
 - The day again: one button plays the last day back on the island in a minute, the light turning through night and day, people walking where they walked and arriving when the boat brought them, with a track of the day's moments to jump to.
 - The bura and the jugo: the real wind off the coast is named as the coast names it. In the bura no one fishes and outdoor work goes at half pace; the sea turns hard blue and smokes. The jugo brings a long swell, a warm haze and low cloud.
@@ -398,7 +405,8 @@ Changes to the own-brain protocol during this release, for a brain written again
 - self.mortal left the perception when everyone became mortal; self.days_hungry and self.weak remain.
 - The plan answer is waited for twelve seconds instead of thirty; a slower answer and the day runs on habit.
 
-[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/kresogalic8/unwatched/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/kresogalic8/unwatched/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/kresogalic8/unwatched/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/kresogalic8/unwatched/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/kresogalic8/unwatched/compare/v0.14.0...v0.14.1
