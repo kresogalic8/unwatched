@@ -5,7 +5,7 @@ import { adminResolver, backofficeRoutes } from "./backoffice.ts";
 import { configureDeliveryLog } from "./delivery-log.ts";
 import { telegramRoutes } from "./telegram-routes.ts";
 import { TelegramLetters } from "./telegram.ts";
-import { publicProject, replayOf } from "./views.ts";
+import { publicProject, replayOf, tiesOf } from "./views.ts";
 import { constructionRoutes } from "./construction.ts";
 import type { AgentState } from "@unwatched/engine";
 import { existsSync } from "node:fs";
@@ -718,6 +718,8 @@ app.get("/api/events", (c) => {
   return c.json(town.events.filter((e) => e.t >= since && (!place || e.place === place) && e.importance >= min).slice(-500).map(publicEvent));
 });
 // the day again, for the town to play back fast (see replayOf)
+// who has had to do with whom lately, as the public record shows it, for the town's map of ties
+app.get("/api/ties", (c) => c.json(tiesOf(town, Number(c.req.query("days")) || 7)));
 app.get("/api/replay", (c) => c.json(replayOf(town, Number(c.req.query("hours")) || 24, streamEvent)));
 app.post("/api/boarding/external", async(c)=>{
   const owner=await ownerOf(c.req.raw);if(!owner)return c.json({error:"Sign in first."},401);

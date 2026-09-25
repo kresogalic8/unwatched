@@ -100,3 +100,19 @@ export function replayOf(town: Pick<Town, "t" | "weather" | "events" | "agents">
   const events = town.events.filter((e) => e.t >= from).slice(-20000).map((e) => e.kind === "agent.move" ? { id: e.id, t: e.t, day: e.day, kind: e.kind, actors: e.actors, place: e.place, text: "", importance: 0 } as TownEvent : show(e));
   return { from, to: town.t, weather, start, events };
 }
+
+/** A tie between two citizens as anyone watching could know it: how often they talked, what passed between them, a wedding, a theft or
+ * a charge before the council, and when they last had to do with each other. Only what the public record shows; trust stays private. */
+export type Tie = { a: string; b: string; talk: number; give: number; take: number; accuse: number; wed: boolean; last: number };
+export function tiesOf(town: Pick<Town, "t" | "events" | "agents">, days: number): Tie[] {
+  const from = town.t - Math.min(30, Math.max(1, days)) * 1440; const ties = new Map<string, Tie>();
+  const tie = (x: string, y: string) => { const [a, b] = x < y ? [x, y] : [y, x]; const k = `${a}|${b}`; let t = ties.get(k); if (!t) { t = { a, b, talk: 0, give: 0, take: 0, accuse: 0, wed: false, last: 0 }; ties.set(k, t); } return t; };
+  for (const e of town.events) {
+    if (e.t < from) continue; const [x, y] = e.actors; if (!x || !y || x === y || !town.agents.has(x) || !town.agents.has(y)) continue;
+    const pay = (e.payload ?? {}) as { kind?: string; held?: boolean };
+    const t = e.kind === "conversation" || (e.kind === "agent.say" && e.text) ? tie(x, y) : e.kind === "agent.give" || e.kind === "agent.take" || e.kind === "town.verdict" ? tie(x, y) : e.kind === "town.gathering" && pay.kind === "wedding" && pay.held !== false ? tie(x, y) : null;
+    if (!t) continue; t.last = Math.max(t.last, e.t);
+    if (e.kind === "conversation" || e.kind === "agent.say") t.talk++; else if (e.kind === "agent.give") t.give++; else if (e.kind === "agent.take") t.take++; else if (e.kind === "town.verdict") t.accuse++; else t.wed = true;
+  }
+  return [...ties.values()];
+}

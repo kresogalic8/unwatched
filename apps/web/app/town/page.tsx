@@ -42,6 +42,7 @@ export default function Town() {
   const [nudge, setNudge] = useState(false);
   const [tab, setTab] = useState<"activity" | "people" | "places">("activity");
   const [miniature, setMiniature] = useState(false);
+  const [ties, setTies] = useState(false); // the map of who has had to do with whom
   const [hint, setHint] = useState(false);
   const [sheet, setSheet] = useState<"peek" | "open">("peek");
   const [selDay, setSelDay] = useState<TownEvent[]>([]);
@@ -233,6 +234,7 @@ export default function Town() {
           rewindControl={rewindCtl}
           photoControl={photoCtl}
           frameTap={frameTap}
+          ties={ties}
           onRewind={setRewind}
         />
       </section>
@@ -473,6 +475,9 @@ export default function Town() {
             <button aria-pressed={miniature} aria-label="Miniature" onClick={toggleMiniature}>
               <ArrowIcon name="model" size={20} /><span>Miniature</span>
             </button>
+            <button aria-pressed={ties} aria-label="Ties" title="Who has had to do with whom this week" onClick={() => setTies((t) => !t)}>
+              <ArrowIcon name="ties" size={20} /><span>Ties</span>
+            </button>
             <span className={s.navRule} aria-hidden="true" />
             <button aria-label="Postcard" title="Make a postcard of what you see" onClick={takePostcard}>
               <ArrowIcon name="postcard" size={20} /><span>Postcard</span>
@@ -506,6 +511,13 @@ export default function Town() {
                   <button className={s.secondary} onClick={() => setCard(null)}>Close</button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {ties && !rewinding && (
+            <div className={s.legend} data-panel={journalOpen} aria-label="What the lines mean">
+              <span><i style={{ background: "#f1e6c8" }} />Talked</span><span><i style={{ background: "#9fd08a" }} />Gave</span><span><i style={{ background: "#f29bb0" }} />Married</span><span><i className={s.feud} />Took or accused</span>
+              <small>{sel ? `${first(sel.name)}'s ties this week` : "This week, from the public record · pick someone to see theirs"}</small>
             </div>
           )}
 

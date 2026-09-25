@@ -178,6 +178,14 @@
 .cardActions .ctaBig { flex: 0 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 22px; text-decoration: none; }
 .cardActions .secondary { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 1px solid var(--rule); border-radius: 999px; background: var(--glass); color: var(--ink); font-size: 16px; }
 
+/* the ties' legend, above the view switcher */
+.legend { position: absolute; z-index: 34; bottom: 84px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px; max-width: min(640px, calc(100% - 32px)); padding: 8px 16px; background: var(--glass); border: 1px solid var(--rule); border-radius: 16px; font-size: 13px; color: var(--ink); }
+.legend[data-panel="true"] { left: calc((100% - var(--panel-w) - 16px) / 2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; }
+.legend i.feud { background: repeating-linear-gradient(90deg, #e0604a 0 5px, transparent 5px 8px); }
+.legend small { flex-basis: 100%; text-align: center; color: var(--muted); font-size: 12px; }
+
 /* the first-visit tip */
 .hint { position: absolute; z-index: 34; left: 20px; top: 76px; display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 16px; background: var(--glass); border: 1px solid var(--rule); border-radius: 999px; font-size: 14px; color: var(--muted); }
 .hint button { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--surface); color: var(--ink); }
@@ -198,7 +206,7 @@
 
 @keyframes panelIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-@media (max-width: 1180px) {
+@media (max-width: 1480px) {
   .views span { display: none; }
   .views button { padding: 0 12px; }
   .views button[aria-pressed="true"] span { display: inline; }
@@ -223,6 +231,8 @@
   .page:has(.panel[hidden]) .views { bottom: 76px; }
   .page:has(.panel[data-sheet="open"]) .views { display: none; }
   .views button { width: 44px; padding: 0; justify-content: center; }
+  .legend { bottom: calc(min(236px, 34dvh) + 68px); left: 50% !important; }
+  .page:has(.panel[data-sheet="open"]) .legend { display: none; }
   .rewind { bottom: calc(min(236px, 34dvh) + 12px); left: 12px !important; right: 12px; width: auto !important; transform: none; gap: 8px; }
   .page:has(.panel[hidden]) .rewind { bottom: 76px; }
   .rewindTime { min-width: 0; font-size: 13px; }
