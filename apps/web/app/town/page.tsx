@@ -16,6 +16,7 @@ import { Portrait } from "@/components/Portrait";
 import { useMyAgent } from "@/lib/useAgent";
 import type { WorldSnapshot, RewindControl, RewindState, Photo } from "@/components/World";
 import { postcard } from "@/lib/postcard";
+import { Film, canFilm, type Take } from "@/lib/film";
 import theme from "@/components/explore/explore.module.css";
 import s from "@/components/town/town.module.css";
 const World = dynamic(() => import("@/components/World").then((m) => m.World), {
@@ -48,6 +49,14 @@ export default function Town() {
   const rewindCtl = useRef<RewindControl | null>(null);
   const [rewind, setRewind] = useState<RewindState>(null);
   const [rewinding, setRewinding] = useState(false);
+  // the day as a film: the day played back from its start to now, recorded frame by frame, to keep or send
+  const frameTap = useRef<((canvas: HTMLCanvasElement) => void) | null>(null);
+  const film = useRef<Film | null>(null);
+  const rewindNow = useRef<RewindState>(null); rewindNow.current = rewind;
+  const [filming, setFilming] = useState(false);
+  const [take, setTake] = useState<Take | null>(null);
+  const [filmable, setFilmable] = useState(false);
+  useEffect(() => { setFilmable(canFilm()); }, []);
   // a postcard of the island as it is on screen, to keep or send
   const photoCtl = useRef<(() => Photo | null) | null>(null);
   const saveCard = useRef<HTMLAnchorElement>(null);
@@ -152,6 +161,26 @@ export default function Town() {
     setRewinding(true); setSel(null); setTracking(null); setFollow(false); setPossessed(false); changeView("cinema");
     try { await rewindCtl.current?.start(24); } catch { setRewinding(false); }
   }
+  function startFilming() {
+    const r = rewindNow.current; if (!r || filming || !filmable) return;
+    const upright = typeof window !== "undefined" && window.innerHeight > window.innerWidth * 1.1;
+    const who = tracking ? snapshot.citizens.find((p) => p.id === tracking) : null;
+    const title = who ? `A day with ${first(who.name)}` : "A day on the island";
+    try { film.current = new Film(upright); } catch { return; }
+    frameTap.current = (canvas) => { const now = rewindNow.current; if (film.current && now) film.current.frame(canvas, { day: dayNumber(Math.floor(now.t)), time: hhmm(Math.floor(now.t)), title }); };
+    rewindCtl.current?.seek(r.from); rewindCtl.current?.play(); setFilming(true);
+  }
+  function stopFilming() { frameTap.current = null; film.current?.cancel(); film.current = null; setFilming(false); }
+  // the day has played to its end while filming: the clip is done
+  useEffect(() => {
+    if (!filming || !rewind || rewind.playing || rewind.t < rewind.to || !film.current) return;
+    const f = film.current; film.current = null; frameTap.current = null; setFilming(false);
+    void f.stop(dayNumber(Math.floor(rewind.to))).then((t) => setTake((old) => { if (old) URL.revokeObjectURL(old.url); return t; }));
+  }, [filming, rewind]);
+  async function shareTake() {
+    if (!take) return; const file = new File([take.blob], take.name, { type: take.blob.type });
+    try { if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "A day on the island" }); } catch {}
+  }
   function takePostcard() {
     const shot = photoCtl.current?.(); const c = snapshot.clock; if (!shot || !c) return;
     const who = sel ?? (tracking ? snapshot.citizens.find((p) => p.id === tracking) : null);
@@ -164,7 +193,7 @@ export default function Town() {
     if (!card) return; const file = new File([card.blob], card.name, { type: "image/png" });
     try { if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "A postcard from the island" }); } catch {}
   }
-  function stopRewind() { rewindCtl.current?.stop(); setRewinding(false); changeView("street"); }
+  function stopRewind() { stopFilming(); rewindCtl.current?.stop(); setRewinding(false); changeView("street"); }
   function toggleMiniature() { setMiniature((m) => { try { localStorage.setItem("uw.look", m ? "town" : "miniature"); } catch {} return !m; }); }
   function dismissHint() { setHint(false); try { localStorage.setItem("uw.townHint", "1"); } catch {} }
   function open(person: PublicAgent) { setSel(person); setJournalOpen(true); setSheet("open"); }
@@ -203,6 +232,7 @@ export default function Town() {
           onSnapshot={setSnapshot}
           rewindControl={rewindCtl}
           photoControl={photoCtl}
+          frameTap={frameTap}
           onRewind={setRewind}
         />
       </section>
@@ -429,6 +459,7 @@ export default function Town() {
                   aria-valuetext={rewind ? `Day ${dayNumber(Math.floor(rewind.t))}, ${hhmm(Math.floor(rewind.t))}` : undefined}
                   onChange={(e) => rewindCtl.current?.seek(Number(e.target.value))} />
               </div>
+              {filmable && <button className={s.filmBtn} onClick={startFilming} disabled={!rewind || filming} aria-label={filming ? "Filming the day" : "Film this day"} title="Play the day from its start and keep it as a film">{filming ? <span className={s.recDot} aria-hidden="true" /> : <ArrowIcon name="film" size={20} />}<span className={s.liveLong}>{filming ? "Filming" : "Film it"}</span></button>}
               <button className={s.live} onClick={stopRewind} aria-label="Back to live"><span className={s.liveDot} aria-hidden="true" /><span className={s.liveLong}>Back to live</span><span className={s.liveShort}>Live</span></button>
             </div>
           )}
@@ -450,6 +481,19 @@ export default function Town() {
               <ArrowIcon name="rewind" size={20} /><span>The day again</span>
             </button>
           </nav>
+
+          {take && (
+            <div className={s.cardBack} role="dialog" aria-modal="true" aria-label="Your film of the day" onClick={(e) => { if (e.target === e.currentTarget) setTake(null); }} onKeyDown={(e) => { if (e.key === "Escape") setTake(null); }}>
+              <div className={s.card}>
+                <video src={take.url} data-upright={take.upright} className={s.filmClip} controls autoPlay muted loop playsInline />
+                <div className={s.cardActions}>
+                  <a className={s.ctaBig} href={take.url} download={take.name}><ArrowIcon name="download" size={20} />Save the film</a>
+                  {typeof navigator !== "undefined" && "canShare" in navigator && <button className={s.secondary} onClick={() => void shareTake()}><ArrowIcon name="share" size={20} />Send it</button>}
+                  <button className={s.secondary} onClick={() => setTake(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {card && (
             <div className={s.cardBack} role="dialog" aria-modal="true" aria-label="Your postcard" onClick={(e) => { if (e.target === e.currentTarget) setCard(null); }} onKeyDown={(e) => { if (e.key === "Escape") setCard(null); }}>
