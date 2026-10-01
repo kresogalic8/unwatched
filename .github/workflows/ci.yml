@@ -37,7 +37,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @unwatched/web exec playwright install --with-deps chromium
       - run: pnpm --filter @unwatched/web test:visual --update-snapshots=missing
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: visual
@@ -47,7 +47,7 @@ jobs:
             apps/web/test-results
             apps/web/e2e/__screenshots__/*-linux.png
       # the pictures alone, small enough to fetch quickly: new baselines and what a failed comparison actually drew
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: visual-pictures
