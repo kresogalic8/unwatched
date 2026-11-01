@@ -10,13 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
+    "@anthropic-ai/sdk": "^1.3.0",
     "@unwatched/engine": "workspace:*",
     "@unwatched/protocol": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.8.0",
+    "typescript": "^7.0.2",
     "@types/node": "^22.15.0",
     "vitest": "^5.0.0"
   }
