@@ -21,11 +21,11 @@
     "release": "node scripts/release.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.14",
+    "@biomejs/biome": "^2.6.4",
     "@types/node": "^22.15.0",
     "tsx": "^4.23.0",
     "turbo": "^2.10.0",
-    "typescript": "^5.8.0",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }
 }

@@ -24,7 +24,7 @@
     "three": "^0.186.0"
   },
   "devDependencies": {
-    "@esotericsoftware/spine-pixi-v8": "~4.2.120",
+    "@esotericsoftware/spine-pixi-v8": "~4.3.13",
     "@google/genai": "^2.22.0",
     "@playwright/test": "^1.63.0",
     "@resvg/resvg-js": "^2.6.2",
@@ -35,6 +35,6 @@
     "@types/three": "^0.186.0",
     "sharp": "^0.35.4",
     "tailwindcss": "^4.3.0",
-    "typescript": "^5.8.0"
+    "typescript": "^7.0.2"
   }
 }
